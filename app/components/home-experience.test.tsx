@@ -37,6 +37,24 @@ describe('HomeExperience', () => {
     expect(screen.getByText('1 opening')).toBeInTheDocument();
   });
 
+  it('combines role and compensation filters and resets them', () => {
+    render(<HomeExperience />);
+
+    fireEvent.change(screen.getByRole('combobox', { name: /filter by role/i }), {
+      target: { value: 'Design' },
+    });
+    expect(screen.getByText('2 openings')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole('combobox', { name: /filter by compensation/i }), {
+      target: { value: 'Paid' },
+    });
+    expect(screen.getByText('Product designer for an accessible finance app')).toBeInTheDocument();
+    expect(screen.getByText('1 opening')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /reset \(2\)/i }));
+    expect(screen.getByText('5 openings')).toBeInTheDocument();
+  });
+
   it('shows a useful empty state when no opening matches', () => {
     render(<HomeExperience />);
 
@@ -55,6 +73,26 @@ describe('HomeExperience', () => {
     expect(screen.getByRole('dialog', { name: /log in to branch-out/i })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /close login/i }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('opens a complete project detail panel and closes it', () => {
+    render(<HomeExperience />);
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: /view details for frontend engineer for a climate data explorer/i,
+      }),
+    );
+
+    const detailPanel = screen.getByRole('dialog', {
+      name: /frontend engineer for a climate data explorer/i,
+    });
+    expect(detailPanel).toHaveTextContent('Two-week trial milestone');
+    expect(detailPanel).toHaveTextContent('Maya Chen');
+    expect(detailPanel).toHaveTextContent('limited repository access');
+
+    fireEvent.click(screen.getByRole('button', { name: /close project details/i }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 

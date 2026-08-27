@@ -1,7 +1,16 @@
 'use client';
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { filterProjects, projects } from '../data/projects';
+import {
+  commitmentBands,
+  compensationTypes,
+  defaultProjectFilters,
+  filterProjects,
+  type ProjectFilters,
+  type ProjectOpening,
+  projectRoles,
+  projects,
+} from '../data/projects';
 import { ThemeToggle } from './theme-toggle';
 
 function LoginPanel({ onClose }: { onClose: () => void }) {
@@ -51,12 +60,102 @@ function LoginPanel({ onClose }: { onClose: () => void }) {
   );
 }
 
+function ProjectDetailPanel({
+  project,
+  onClose,
+}: {
+  project: ProjectOpening;
+  onClose: () => void;
+}) {
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  // The project panel mirrors the login panel's keyboard-safe close behavior.
+  useEffect(() => {
+    closeButtonRef.current?.focus();
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [onClose]);
+
+  return (
+    <div className="modal-backdrop detail-backdrop" role="presentation" onMouseDown={onClose}>
+      <section
+        aria-labelledby="project-detail-title"
+        aria-modal="true"
+        className="project-detail-panel"
+        onMouseDown={(event) => event.stopPropagation()}
+        role="dialog"
+      >
+        <div className="detail-header">
+          <div>
+            <span className="eyebrow">{project.stage}</span>
+            <h2 id="project-detail-title">{project.title}</h2>
+          </div>
+          <button
+            aria-label="Close project details"
+            className="icon-button"
+            onClick={onClose}
+            ref={closeButtonRef}
+            type="button"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="detail-owner">
+          <span aria-hidden="true" className="owner-avatar">{project.ownerName.charAt(0)}</span>
+          <div><strong>{project.ownerName}</strong><span>{project.ownerSignal}</span></div>
+        </div>
+
+        <div className="detail-facts" aria-label="Opening facts">
+          <div><span>Compensation</span><strong>{project.compensation}</strong></div>
+          <div><span>Commitment</span><strong>{project.commitment}</strong></div>
+          <div><span>Duration</span><strong>{project.duration}</strong></div>
+          <div><span>Overlap</span><strong>{project.timezone}</strong></div>
+        </div>
+
+        <div className="detail-sections">
+          <section><h3>Desired outcome</h3><p>{project.desiredOutcome}</p></section>
+          <section className="milestone-callout"><h3>Two-week trial milestone</h3><p>{project.firstMilestone}</p></section>
+          <section><h3>What the owner has already contributed</h3><p>{project.ownerContribution}</p></section>
+          <section><h3>Access and confidentiality</h3><p>{project.confidentiality}</p></section>
+        </div>
+
+        <div className="detail-footer">
+          <ul className="tag-list" aria-label="Skills for this opening">
+            {project.skills.map((skill) => <li key={skill}>{skill}</li>)}
+          </ul>
+          <a className="primary-button" href="#early-access" onClick={onClose}>
+            Request access to apply
+          </a>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 export function HomeExperience() {
-  const [query, setQuery] = useState('');
+  const [filters, setFilters] = useState<ProjectFilters>(defaultProjectFilters);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const [selectedProject, setSelectedProject] = useState<ProjectOpening | null>(null);
   const [email, setEmail] = useState('');
   const [signupMessage, setSignupMessage] = useState('');
-  const visibleProjects = useMemo(() => filterProjects(projects, query), [query]);
+  const projectTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const visibleProjects = useMemo(() => filterProjects(projects, filters), [filters]);
+  const activeFilterCount = Number(filters.role !== 'All roles')
+    + Number(filters.compensation !== 'All compensation')
+    + Number(filters.commitment !== 'Any commitment');
+
+  const updateFilter = <Key extends keyof ProjectFilters>(key: Key, value: ProjectFilters[Key]) => {
+    setFilters((current) => ({ ...current, [key]: value }));
+  };
+
+  const closeProjectDetails = () => {
+    setSelectedProject(null);
+    window.setTimeout(() => projectTriggerRef.current?.focus(), 0);
+  };
 
   // This frontend-only form gives clear feedback without pretending an account was created.
   const handleEarlyAccess = (event: FormEvent<HTMLFormElement>) => {
@@ -85,13 +184,13 @@ export function HomeExperience() {
           <span aria-hidden="true" className="search-symbol">⌕</span>
           <input
             aria-label="Search project openings"
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => updateFilter('query', event.target.value)}
             placeholder="Search roles, skills, or projects"
             type="search"
-            value={query}
+            value={filters.query}
           />
-          {query && (
-            <button aria-label="Clear search" onClick={() => setQuery('')} type="button">
+          {filters.query && (
+            <button aria-label="Clear search" onClick={() => updateFilter('query', '')} type="button">
               ×
             </button>
           )}
@@ -176,6 +275,50 @@ export function HomeExperience() {
             </span>
           </div>
 
+          <div className="filter-bar" aria-label="Filter project openings">
+            <label>
+              <span>Role</span>
+              <select
+                aria-label="Filter by role"
+                onChange={(event) => updateFilter('role', event.target.value as ProjectFilters['role'])}
+                value={filters.role}
+              >
+                <option>All roles</option>
+                {projectRoles.map((role) => <option key={role}>{role}</option>)}
+              </select>
+            </label>
+            <label>
+              <span>Compensation</span>
+              <select
+                aria-label="Filter by compensation"
+                onChange={(event) => updateFilter('compensation', event.target.value as ProjectFilters['compensation'])}
+                value={filters.compensation}
+              >
+                <option>All compensation</option>
+                {compensationTypes.map((type) => <option key={type}>{type}</option>)}
+              </select>
+            </label>
+            <label>
+              <span>Weekly time</span>
+              <select
+                aria-label="Filter by weekly commitment"
+                onChange={(event) => updateFilter('commitment', event.target.value as ProjectFilters['commitment'])}
+                value={filters.commitment}
+              >
+                <option>Any commitment</option>
+                {commitmentBands.map((band) => <option key={band}>{band}</option>)}
+              </select>
+            </label>
+            <button
+              className="reset-filters"
+              disabled={activeFilterCount === 0 && !filters.query}
+              onClick={() => setFilters(defaultProjectFilters)}
+              type="button"
+            >
+              Reset {activeFilterCount > 0 ? `(${activeFilterCount})` : ''}
+            </button>
+          </div>
+
           {visibleProjects.length > 0 ? (
             <div className="project-grid">
               {visibleProjects.map((project) => (
@@ -194,17 +337,25 @@ export function HomeExperience() {
                     <div><dt>Duration</dt><dd>{project.duration}</dd></div>
                     <div><dt>Overlap</dt><dd>{project.timezone}</dd></div>
                   </dl>
-                  <a className="card-action" href="#early-access" aria-label={`Request access to ${project.title}`}>
-                    Request project access <span aria-hidden="true">→</span>
-                  </a>
+                  <button
+                    className="card-action"
+                    onClick={(event) => {
+                      projectTriggerRef.current = event.currentTarget;
+                      setSelectedProject(project);
+                    }}
+                    type="button"
+                    aria-label={`View details for ${project.title}`}
+                  >
+                    View full opening <span aria-hidden="true">→</span>
+                  </button>
                 </article>
               ))}
             </div>
           ) : (
             <div className="empty-state" role="status">
-              <strong>No openings match “{query.trim()}”</strong>
-              <p>Try a broader skill, role, or project keyword.</p>
-              <button onClick={() => setQuery('')} type="button">Clear search</button>
+              <strong>No openings match the current filters</strong>
+              <p>Try a broader skill, role, compensation type, or weekly commitment.</p>
+              <button onClick={() => setFilters(defaultProjectFilters)} type="button">Reset all filters</button>
             </div>
           )}
         </section>
@@ -248,6 +399,9 @@ export function HomeExperience() {
       </footer>
 
       {isLoginOpen && <LoginPanel onClose={() => setIsLoginOpen(false)} />}
+      {selectedProject && (
+        <ProjectDetailPanel project={selectedProject} onClose={closeProjectDetails} />
+      )}
     </div>
   );
 }

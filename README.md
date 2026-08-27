@@ -15,8 +15,9 @@ clear components:
 
 - **Header:** Branch-Out wordmark, navigation, functional project search, login
   panel, and a persistent light/dark mode switch.
-- **Body:** product promise, two-week trial preview, trust ladder, searchable
-  project openings, and an early-access interaction.
+- **Body:** product promise, two-week trial preview, trust ladder, searchable and
+  filterable project openings, complete opening details, and an early-access
+  interaction.
 - **Footer:** product summary, navigation, and a clear team-responsibility note.
 
 The final original logo is intentionally deferred until the rest of the
@@ -61,12 +62,26 @@ pnpm lint
 pnpm build
 ```
 
-The current tests cover project discovery filtering, empty search results, the
-three main page regions, login-panel behavior, and theme preference persistence.
+The current tests cover text and structured project discovery filters, combined
+filter behavior, reset and empty states, complete project details, the three main
+page regions, login-panel behavior, and theme preference persistence.
+
+## Project discovery
+
+Openings can be narrowed by role, compensation, weekly commitment, or any
+combination of those filters with the header search. Each opening has an
+accessible detail panel containing:
+
+- Project stage and desired outcome
+- Owner contribution and visible trust signal
+- Commitment, duration, timezone overlap, and compensation
+- A small two-week trial milestone
+- Access and confidentiality expectations
 
 ## Current boundaries
 
-- Project openings use representative local data until the Go API is available.
+- Project openings and their detail records use representative local data until
+  the Go API is available.
 - The login panel is accessible and interactive, but GitHub OAuth remains
   disabled until backend authentication is implemented.
 - The early-access form confirms frontend input only and does not claim to store
