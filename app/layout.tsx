@@ -5,6 +5,9 @@ export const metadata: Metadata = {
   title: 'Branch-Out | Build trust through real work',
   description:
     'Find proven collaborators, begin with a focused milestone, and build a reputation through shared work.',
+  icons: {
+    icon: '/favicon.svg',
+  },
 };
 
 // Runs before paint so returning visitors do not see the wrong theme flash briefly.

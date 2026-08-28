@@ -39,12 +39,17 @@ are stored only in the current browser.
 The header stays at the top of the page and contains the application's global
 controls.
 
-### Branch-Out wordmark
+### Branch-Out identity
 
-**What it is:** The temporary text identity for the product. The final original
-logo will be designed after the remaining frontend features are complete.
+**What it is:** The original Branch-Out logo and product name. One grounded stem
+branches toward three nodes, representing Skill Screened, Work Demonstrated,
+and Collaboration Proven. It was drawn for this repository without third-party
+artwork and adapts to both color themes.
 
-**How to use it:** Select the wordmark to return to the top of the homepage.
+**How to use it:** Select the logo to return to the top of the homepage. On very
+narrow screens, the recognizable mark remains visible while the text name is
+hidden to preserve room for header controls. The complete identity remains in
+the footer.
 
 ### Primary navigation
 
@@ -564,7 +569,6 @@ production credentials into any frontend preview field.
 - Saved openings do not synchronize between browsers or devices.
 - Early-access email addresses are not transmitted or stored.
 - There is no backend API, database, account, notification, or moderation flow yet.
-- The final original Branch-Out logo is still deferred.
 - The temporary OpenAI Sites configuration will be removed with its related
   hosting setup during final project cleanup.
 

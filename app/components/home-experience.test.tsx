@@ -23,6 +23,7 @@ describe('HomeExperience', () => {
     expect(screen.getByRole('banner')).toBeInTheDocument();
     expect(screen.getByRole('main')).toBeInTheDocument();
     expect(screen.getByRole('contentinfo')).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: /branch-out home/i })).toHaveLength(2);
   });
 
   it('filters openings from the header search', () => {

@@ -109,14 +109,55 @@ p {
 }
 
 .wordmark {
-  font-size: 1.08rem;
-  font-weight: 800;
-  letter-spacing: -0.035em;
+  align-items: center;
+  display: inline-flex;
   white-space: nowrap;
 }
 
-.wordmark span {
+.brand-logo {
+  align-items: center;
+  display: inline-flex;
+  gap: 9px;
+}
+
+.brand-mark {
+  height: 35px;
+  overflow: visible;
+  width: 35px;
+}
+
+.brand-mark path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 4;
+}
+
+.brand-mark-stem {
+  stroke: var(--foreground);
+}
+
+.brand-mark-branches {
+  stroke: var(--accent);
+}
+
+.brand-mark circle {
+  fill: var(--accent);
+}
+
+.brand-mark .brand-mark-root {
+  fill: var(--foreground);
+}
+
+.brand-name {
+  font-size: 1.08rem;
+  font-weight: 850;
+  letter-spacing: -0.04em;
+}
+
+.brand-name > span {
   color: var(--accent);
+  margin-left: 2px;
 }
 
 .primary-nav,
@@ -3001,6 +3042,10 @@ p {
 
   .login-button {
     padding: 9px 12px;
+  }
+
+  .site-header .brand-name {
+    display: none;
   }
 
   .post-label-long {

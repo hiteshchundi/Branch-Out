@@ -20,9 +20,9 @@ the application changes.
 The first frontend slice is a responsive discovery homepage split into three
 clear components:
 
-- **Header:** Branch-Out wordmark, navigation, functional project search, login
-  and profile-onboarding preview, project-opening creator, and a persistent
-  light/dark mode switch.
+- **Header:** original Branch-Out identity, navigation, functional project
+  search, login and profile-onboarding preview, project-opening creator, and a
+  persistent light/dark mode switch.
 - **Body:** product promise, two-week trial preview, trust ladder, searchable and
   filterable project openings, a device-local saved-opening shortlist with
   factual side-by-side comparison, complete opening details, proof-led
@@ -30,9 +30,14 @@ clear components:
   and an early-access interaction.
 - **Footer:** product summary, navigation, and a clear team-responsibility note.
 
-The final original logo is intentionally deferred until the rest of the
-frontend is established. The current text wordmark is temporary and uses no
-third-party artwork.
+## Original brand identity
+
+The Branch-Out mark was drawn from scratch for this repository and uses no
+third-party artwork. One grounded stem branches into three outward nodes,
+representing Skill Screened, Work Demonstrated, and Collaboration Proven. The
+inline component adapts to light and dark themes; narrow headers retain the mark
+while hiding only the text name. The same geometry is available in
+`public/branch-out-mark.svg` and powers the custom favicon.
 
 ## Technology
 
@@ -210,5 +215,3 @@ and backend systems.
 - Outcome-review drafts and trust candidates stay local and are not confirmed or
   published.
 - Saved openings stay only in the current browser and are not synchronized.
-- The custom Branch-Out logo will be designed after the remaining frontend
-  surfaces are complete.

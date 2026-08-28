@@ -23,6 +23,7 @@ import {
   SAVED_PROJECTS_STORAGE_KEY,
 } from '../data/saved-projects';
 import { CreateOpeningPanel } from './create-opening-panel';
+import { BrandLogo } from './brand-logo';
 import { OutcomeFeedbackPanel } from './outcome-feedback-panel';
 import { ProofApplicationPanel } from './proof-application-panel';
 import { ProfileOnboardingPanel } from './profile-onboarding-panel';
@@ -347,9 +348,7 @@ export function HomeExperience() {
     <div className="site-shell">
       {/* Header: global identity, navigation, discovery search, login, and theme preference. */}
       <header className="site-header">
-        <a aria-label="Branch-Out home" className="wordmark" href="#top">
-          Branch<span>—Out</span>
-        </a>
+        <a aria-label="Branch-Out home" className="wordmark" href="#top"><BrandLogo /></a>
 
         <nav aria-label="Primary navigation" className="primary-nav">
           <a href="#openings">Openings</a>
@@ -618,7 +617,7 @@ export function HomeExperience() {
       {/* Footer: concise product context, navigation, and trust expectations. */}
       <footer className="site-footer">
         <div>
-          <a aria-label="Branch-Out home" className="wordmark" href="#top">Branch<span>—Out</span></a>
+          <a aria-label="Branch-Out home" className="wordmark" href="#top"><BrandLogo /></a>
           <p>Find proof. Start small. Build trust through real work.</p>
         </div>
         <nav aria-label="Footer navigation">
