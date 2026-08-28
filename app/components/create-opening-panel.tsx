@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useRef, useState } from 'react';
+import { useAccessibleDialog } from './use-accessible-dialog';
 
 export const OPENING_DRAFT_STORAGE_KEY = 'branch-out-opening-draft';
 
@@ -94,17 +95,10 @@ export function CreateOpeningPanel({ onClose }: { onClose: () => void }) {
   const [saveMessage, setSaveMessage] = useState('');
   const [isComplete, setIsComplete] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLElement>(null);
   const stepHeadingRef = useRef<HTMLHeadingElement>(null);
 
-  // Keyboard users can close the flow with Escape from any step.
-  useEffect(() => {
-    closeButtonRef.current?.focus();
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', closeOnEscape);
-    return () => window.removeEventListener('keydown', closeOnEscape);
-  }, [onClose]);
+  useAccessibleDialog({ dialogRef, initialFocusRef: closeButtonRef, onClose });
 
   useEffect(() => {
     if (step > 0) stepHeadingRef.current?.focus();
@@ -155,6 +149,7 @@ export function CreateOpeningPanel({ onClose }: { onClose: () => void }) {
         aria-modal="true"
         className="create-opening-panel"
         onMouseDown={(event) => event.stopPropagation()}
+        ref={dialogRef}
         role="dialog"
       >
         <header className="create-opening-header">

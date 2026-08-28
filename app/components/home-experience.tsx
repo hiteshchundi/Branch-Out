@@ -2,7 +2,6 @@
 
 import {
   FormEvent,
-  useEffect,
   useMemo,
   useRef,
   useState,
@@ -30,6 +29,7 @@ import { ProfileOnboardingPanel } from './profile-onboarding-panel';
 import { SavedProjectComparisonPanel } from './saved-project-comparison-panel';
 import { ThemeToggle } from './theme-toggle';
 import { TrialAgreementPanel } from './trial-agreement-panel';
+import { useAccessibleDialog } from './use-accessible-dialog';
 
 const SAVED_PROJECTS_CHANGED_EVENT = 'branch-out-saved-projects-changed';
 
@@ -60,16 +60,8 @@ function LoginPanel({
   onStartOnboarding: () => void;
 }) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-
-  // The panel moves initial focus and supports Escape so it remains usable by keyboard.
-  useEffect(() => {
-    closeButtonRef.current?.focus();
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', closeOnEscape);
-    return () => window.removeEventListener('keydown', closeOnEscape);
-  }, [onClose]);
+  const dialogRef = useRef<HTMLElement>(null);
+  useAccessibleDialog({ dialogRef, initialFocusRef: closeButtonRef, onClose });
 
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
@@ -78,6 +70,7 @@ function LoginPanel({
         aria-modal="true"
         className="login-panel"
         onMouseDown={(event) => event.stopPropagation()}
+        ref={dialogRef}
         role="dialog"
       >
         <button
@@ -127,16 +120,8 @@ function ProjectDetailPanel({
   onToggleSaved: (project: ProjectOpening) => void;
 }) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-
-  // The project panel mirrors the login panel's keyboard-safe close behavior.
-  useEffect(() => {
-    closeButtonRef.current?.focus();
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', closeOnEscape);
-    return () => window.removeEventListener('keydown', closeOnEscape);
-  }, [onClose]);
+  const dialogRef = useRef<HTMLElement>(null);
+  useAccessibleDialog({ dialogRef, initialFocusRef: closeButtonRef, onClose });
 
   return (
     <div className="modal-backdrop detail-backdrop" role="presentation" onMouseDown={onClose}>
@@ -145,6 +130,7 @@ function ProjectDetailPanel({
         aria-modal="true"
         className="project-detail-panel"
         onMouseDown={(event) => event.stopPropagation()}
+        ref={dialogRef}
         role="dialog"
       >
         <div className="detail-header">
@@ -335,6 +321,11 @@ export function HomeExperience() {
     window.setTimeout(() => loginTriggerRef.current?.focus(), 0);
   };
 
+  const closeLogin = () => {
+    setIsLoginOpen(false);
+    window.setTimeout(() => loginTriggerRef.current?.focus(), 0);
+  };
+
   // This frontend-only form gives clear feedback without pretending an account was created.
   const handleEarlyAccess = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -345,7 +336,8 @@ export function HomeExperience() {
   };
 
   return (
-    <div className="site-shell">
+    <div className="site-shell" id="top">
+      <a className="skip-link" href="#main-content">Skip to main content</a>
       {/* Header: global identity, navigation, discovery search, login, and theme preference. */}
       <header className="site-header">
         <a aria-label="Branch-Out home" className="wordmark" href="#top"><BrandLogo /></a>
@@ -389,7 +381,7 @@ export function HomeExperience() {
         </div>
       </header>
 
-      <main id="top">
+      <main id="main-content" tabIndex={-1}>
         {/* Body: a focused product promise followed by proof-led discovery. */}
         <section className="hero-section" aria-labelledby="hero-title">
           <div className="hero-copy">
@@ -630,7 +622,7 @@ export function HomeExperience() {
 
       {isLoginOpen && (
         <LoginPanel
-          onClose={() => setIsLoginOpen(false)}
+          onClose={closeLogin}
           onStartOnboarding={startProfileOnboarding}
         />
       )}

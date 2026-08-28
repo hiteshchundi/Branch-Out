@@ -92,6 +92,28 @@ p {
   min-height: 100vh;
 }
 
+.skip-link {
+  background: var(--foreground);
+  border-radius: 0 0 8px 8px;
+  color: var(--background);
+  font-weight: 750;
+  left: 18px;
+  padding: 10px 14px;
+  position: fixed;
+  top: 0;
+  transform: translateY(-120%);
+  transition: transform 150ms ease;
+  z-index: 100;
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+main:focus {
+  outline: none;
+}
+
 /* Header */
 .site-header {
   align-items: center;

@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useRef, useState } from 'react';
+import { useAccessibleDialog } from './use-accessible-dialog';
 
 export const PROFILE_DRAFT_STORAGE_KEY = 'branch-out-profile-draft';
 
@@ -112,17 +113,10 @@ export function ProfileOnboardingPanel({ onClose }: { onClose: () => void }) {
   const [saveMessage, setSaveMessage] = useState('');
   const [isComplete, setIsComplete] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLElement>(null);
   const stepHeadingRef = useRef<HTMLHeadingElement>(null);
 
-  // This is a profile draft only; no authentication token or credential is requested.
-  useEffect(() => {
-    closeButtonRef.current?.focus();
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', closeOnEscape);
-    return () => window.removeEventListener('keydown', closeOnEscape);
-  }, [onClose]);
+  useAccessibleDialog({ dialogRef, initialFocusRef: closeButtonRef, onClose });
 
   useEffect(() => {
     if (step > 0) stepHeadingRef.current?.focus();
@@ -161,7 +155,7 @@ export function ProfileOnboardingPanel({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="modal-backdrop profile-backdrop" role="presentation" onMouseDown={onClose}>
-      <section aria-labelledby="profile-onboarding-title" aria-modal="true" className="profile-panel" onMouseDown={(event) => event.stopPropagation()} role="dialog">
+      <section aria-labelledby="profile-onboarding-title" aria-modal="true" className="profile-panel" onMouseDown={(event) => event.stopPropagation()} ref={dialogRef} role="dialog">
         <header className="profile-header">
           <div><span className="eyebrow">Profile onboarding preview</span><h2 id="profile-onboarding-title">Make your collaboration fit visible.</h2></div>
           <button aria-label="Close profile onboarding" className="icon-button" onClick={onClose} ref={closeButtonRef} type="button">×</button>

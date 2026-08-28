@@ -1,7 +1,8 @@
 'use client';
 
-import { FormEvent, useEffect, useRef, useState } from 'react';
+import { FormEvent, useRef, useState } from 'react';
 import type { ProjectOpening } from '../data/projects';
+import { useAccessibleDialog } from './use-accessible-dialog';
 
 export const collaborationBehaviors = [
   'Reliable delivery',
@@ -155,16 +156,8 @@ export function OutcomeFeedbackPanel({ onClose, project }: { onClose: () => void
   const [saveMessage, setSaveMessage] = useState('');
   const [isComplete, setIsComplete] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-
-  // The review remains usable by keyboard and can be dismissed consistently with every other flow.
-  useEffect(() => {
-    closeButtonRef.current?.focus();
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', closeOnEscape);
-    return () => window.removeEventListener('keydown', closeOnEscape);
-  }, [onClose]);
+  const dialogRef = useRef<HTMLElement>(null);
+  useAccessibleDialog({ dialogRef, initialFocusRef: closeButtonRef, onClose });
 
   const updateDraft = <Field extends DraftField>(field: Field, value: OutcomeFeedbackDraft[Field]) => {
     setDraft((current) => ({ ...current, [field]: value }));
@@ -207,7 +200,7 @@ export function OutcomeFeedbackPanel({ onClose, project }: { onClose: () => void
 
   return (
     <div className="modal-backdrop outcome-backdrop" role="presentation" onMouseDown={onClose}>
-      <section aria-labelledby="outcome-title" aria-modal="true" className="outcome-panel" onMouseDown={(event) => event.stopPropagation()} role="dialog">
+      <section aria-labelledby="outcome-title" aria-modal="true" className="outcome-panel" onMouseDown={(event) => event.stopPropagation()} ref={dialogRef} role="dialog">
         <header className="outcome-header"><div><span className="eyebrow">Post-trial outcome review</span><h2 id="outcome-title">Turn observed work into explainable trust.</h2></div><button aria-label="Close outcome review" className="icon-button" onClick={onClose} ref={closeButtonRef} type="button">×</button></header>
         <div className="outcome-project-context"><span>{project.stage}</span><strong>{project.title}</strong><small>Trial milestone: {project.firstMilestone}</small></div>
 

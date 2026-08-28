@@ -528,11 +528,17 @@ access.
 
 ## Keyboard and accessibility behavior
 
+- Press `Tab` from the top of the page to reveal **Skip to main content**, then
+  press `Enter` to bypass the header controls.
 - Interactive controls have visible keyboard focus.
 - Dialog-style panels move focus to their close control when opened.
+- `Tab` and `Shift` + `Tab` remain inside the active dialog, and the page behind
+  the dialog is prevented from scrolling until the dialog closes.
 - Press `Escape` to close login, project details, applications, the
   project-opening creator, profile onboarding, saved-opening comparison, and
   trial-agreement and outcome-review flows.
+- Closing a dialog returns focus to the control that opened it so keyboard users
+  can continue from the same place.
 - Validation errors are connected to their fields and invalid fields expose
   their state to assistive technology.
 - Result counts and save confirmations use live status announcements.
@@ -569,8 +575,6 @@ production credentials into any frontend preview field.
 - Saved openings do not synchronize between browsers or devices.
 - Early-access email addresses are not transmitted or stored.
 - There is no backend API, database, account, notification, or moderation flow yet.
-- The temporary OpenAI Sites configuration will be removed with its related
-  hosting setup during final project cleanup.
 
 ## Handbook maintenance rule
 

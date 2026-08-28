@@ -1,7 +1,8 @@
 'use client';
 
-import { FormEvent, useEffect, useRef, useState } from 'react';
+import { FormEvent, useRef, useState } from 'react';
 import type { ProjectOpening } from '../data/projects';
+import { useAccessibleDialog } from './use-accessible-dialog';
 
 export type TrialAgreementDraft = {
   outcome: string;
@@ -135,16 +136,8 @@ export function TrialAgreementPanel({
   const [saveMessage, setSaveMessage] = useState('');
   const [isComplete, setIsComplete] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-
-  // Initial focus and Escape support keep the entire agreement flow keyboard-usable.
-  useEffect(() => {
-    closeButtonRef.current?.focus();
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', closeOnEscape);
-    return () => window.removeEventListener('keydown', closeOnEscape);
-  }, [onClose]);
+  const dialogRef = useRef<HTMLElement>(null);
+  useAccessibleDialog({ dialogRef, initialFocusRef: closeButtonRef, onClose });
 
   const updateDraft = <Field extends DraftField>(field: Field, value: TrialAgreementDraft[Field]) => {
     setDraft((current) => ({ ...current, [field]: value }));
@@ -179,7 +172,7 @@ export function TrialAgreementPanel({
 
   return (
     <div className="modal-backdrop trial-backdrop" role="presentation" onMouseDown={onClose}>
-      <section aria-labelledby="trial-title" aria-modal="true" className="trial-panel" onMouseDown={(event) => event.stopPropagation()} role="dialog">
+      <section aria-labelledby="trial-title" aria-modal="true" className="trial-panel" onMouseDown={(event) => event.stopPropagation()} ref={dialogRef} role="dialog">
         <header className="trial-header">
           <div><span className="eyebrow">Two-week trial draft</span><h2 id="trial-title">Agree on the small bet before the big commitment.</h2></div>
           <button aria-label="Close trial agreement" className="icon-button" onClick={onClose} ref={closeButtonRef} type="button">×</button>

@@ -23,6 +23,7 @@ describe('HomeExperience', () => {
     expect(screen.getByRole('banner')).toBeInTheDocument();
     expect(screen.getByRole('main')).toBeInTheDocument();
     expect(screen.getByRole('contentinfo')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /skip to main content/i })).toHaveAttribute('href', '#main-content');
     expect(screen.getAllByRole('link', { name: /branch-out home/i })).toHaveLength(2);
   });
 
@@ -68,7 +69,7 @@ describe('HomeExperience', () => {
     expect(screen.getByRole('status')).toHaveTextContent('No openings match');
   });
 
-  it('opens and closes the login panel', () => {
+  it('opens and closes the login panel', async () => {
     render(<HomeExperience />);
 
     fireEvent.click(screen.getByRole('button', { name: /^log in$/i }));
@@ -76,6 +77,9 @@ describe('HomeExperience', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /close login/i }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^log in$/i })).toHaveFocus();
+    });
   });
 
   it('starts profile onboarding from the login preview', () => {

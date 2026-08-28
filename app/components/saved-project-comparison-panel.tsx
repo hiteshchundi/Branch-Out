@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import type { ProjectOpening } from '../data/projects';
+import { useAccessibleDialog } from './use-accessible-dialog';
 
 const MAX_COMPARISON_PROJECTS = 3;
 
@@ -19,16 +20,8 @@ export function SavedProjectComparisonPanel({
   );
   const [selectionMessage, setSelectionMessage] = useState('');
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-
-  // Comparison is a keyboard-safe modal and never changes the saved shortlist.
-  useEffect(() => {
-    closeButtonRef.current?.focus();
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', closeOnEscape);
-    return () => window.removeEventListener('keydown', closeOnEscape);
-  }, [onClose]);
+  const dialogRef = useRef<HTMLElement>(null);
+  useAccessibleDialog({ dialogRef, initialFocusRef: closeButtonRef, onClose });
 
   const selectedProjects = savedProjects.filter((project) => selectedIds.includes(project.id));
 
@@ -58,6 +51,7 @@ export function SavedProjectComparisonPanel({
         aria-modal="true"
         className="comparison-panel"
         onMouseDown={(event) => event.stopPropagation()}
+        ref={dialogRef}
         role="dialog"
       >
         <header className="comparison-header">

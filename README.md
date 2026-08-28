@@ -15,10 +15,10 @@ current feature, exact usage steps, validation behavior, device-local storage,
 accessibility controls, and known limitations. The handbook is updated whenever
 the application changes.
 
-## Current frontend
+## Frontend MVP status
 
-The first frontend slice is a responsive discovery homepage split into three
-clear components:
+The frontend MVP is feature-complete and ready for backend integration. It is a
+responsive discovery homepage split into three clear components:
 
 - **Header:** original Branch-Out identity, navigation, functional project
   search, login and profile-onboarding preview, project-opening creator, and a
@@ -89,6 +89,11 @@ validation, safe draft recovery, two-week date bounds, persistence, and honest
 completion behavior. Outcome-review tests cover evidence requirements, safe
 links, draft recovery, transparent trust-candidate rules, and publication
 boundaries.
+
+The final accessibility pass adds a keyboard skip link, visible focus states,
+focus containment and background-scroll locking for every dialog, consistent
+Escape behavior, focus restoration to the control that opened a flow, reduced
+motion support, and graceful theme switching when browser storage is blocked.
 
 ## Profile onboarding
 

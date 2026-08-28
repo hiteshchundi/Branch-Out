@@ -1,7 +1,8 @@
 'use client';
 
-import { FormEvent, useEffect, useRef, useState } from 'react';
+import { FormEvent, useRef, useState } from 'react';
 import type { ProjectOpening } from '../data/projects';
+import { useAccessibleDialog } from './use-accessible-dialog';
 
 export type ApplicationDraft = {
   message: string;
@@ -83,16 +84,8 @@ export function ProofApplicationPanel({
   const [saveMessage, setSaveMessage] = useState('');
   const [isComplete, setIsComplete] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-
-  // Escape and initial focus make the application usable without a pointer.
-  useEffect(() => {
-    closeButtonRef.current?.focus();
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', closeOnEscape);
-    return () => window.removeEventListener('keydown', closeOnEscape);
-  }, [onClose]);
+  const dialogRef = useRef<HTMLElement>(null);
+  useAccessibleDialog({ dialogRef, initialFocusRef: closeButtonRef, onClose });
 
   const updateDraft = <Field extends DraftField>(field: Field, value: ApplicationDraft[Field]) => {
     setDraft((current) => ({ ...current, [field]: value }));
@@ -128,6 +121,7 @@ export function ProofApplicationPanel({
         aria-modal="true"
         className="application-panel"
         onMouseDown={(event) => event.stopPropagation()}
+        ref={dialogRef}
         role="dialog"
       >
         <header className="application-header">
