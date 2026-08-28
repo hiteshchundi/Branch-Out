@@ -76,6 +76,16 @@ describe('HomeExperience', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
+  it('opens and closes the create-opening flow from the header', () => {
+    render(<HomeExperience />);
+
+    fireEvent.click(screen.getByRole('button', { name: /post a project/i }));
+    expect(screen.getByRole('dialog', { name: /start with a clear, safe first step/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /close create opening/i }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
   it('opens a complete project detail panel and closes it', () => {
     render(<HomeExperience />);
 

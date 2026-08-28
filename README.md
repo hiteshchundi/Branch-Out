@@ -14,7 +14,7 @@ The first frontend slice is a responsive discovery homepage split into three
 clear components:
 
 - **Header:** Branch-Out wordmark, navigation, functional project search, login
-  panel, and a persistent light/dark mode switch.
+  panel, project-opening creator, and a persistent light/dark mode switch.
 - **Body:** product promise, two-week trial preview, trust ladder, searchable and
   filterable project openings, complete opening details, and an early-access
   interaction.
@@ -64,7 +64,8 @@ pnpm build
 
 The current tests cover text and structured project discovery filters, combined
 filter behavior, reset and empty states, complete project details, the three main
-page regions, login-panel behavior, and theme preference persistence.
+page regions, login-panel behavior, project-opening validation and draft
+persistence, and theme preference persistence.
 
 ## Project discovery
 
@@ -78,6 +79,19 @@ accessible detail panel containing:
 - A small two-week trial milestone
 - Access and confidentiality expectations
 
+## Create a project opening
+
+The **Post a project** action opens a three-step draft flow covering:
+
+1. Project problem, outcome, open role, and must-have skills
+2. Weekly commitment, duration, timezone overlap, and explicit compensation
+3. A small two-week trial milestone, owner contribution, and confidentiality
+
+Each step validates its own fields and provides accessible error messages. A
+partial or completed draft can be saved on the current device and restored when
+the flow is reopened. The interface clearly states that local completion is not
+publication; publishing will be connected after account onboarding exists.
+
 ## Current boundaries
 
 - Project openings and their detail records use representative local data until
@@ -86,5 +100,7 @@ accessible detail panel containing:
   disabled until backend authentication is implemented.
 - The early-access form confirms frontend input only and does not claim to store
   an email address.
+- Project-opening drafts are stored only in the current browser until the backend
+  project-opening API is implemented.
 - The custom Branch-Out logo will be designed after the remaining frontend
   surfaces are complete.

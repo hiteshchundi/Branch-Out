@@ -11,6 +11,7 @@ import {
   projectRoles,
   projects,
 } from '../data/projects';
+import { CreateOpeningPanel } from './create-opening-panel';
 import { ThemeToggle } from './theme-toggle';
 
 function LoginPanel({ onClose }: { onClose: () => void }) {
@@ -139,10 +140,12 @@ function ProjectDetailPanel({
 export function HomeExperience() {
   const [filters, setFilters] = useState<ProjectFilters>(defaultProjectFilters);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const [isCreateOpeningOpen, setIsCreateOpeningOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<ProjectOpening | null>(null);
   const [email, setEmail] = useState('');
   const [signupMessage, setSignupMessage] = useState('');
   const projectTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const createOpeningTriggerRef = useRef<HTMLButtonElement>(null);
   const visibleProjects = useMemo(() => filterProjects(projects, filters), [filters]);
   const activeFilterCount = Number(filters.role !== 'All roles')
     + Number(filters.compensation !== 'All compensation')
@@ -155,6 +158,11 @@ export function HomeExperience() {
   const closeProjectDetails = () => {
     setSelectedProject(null);
     window.setTimeout(() => projectTriggerRef.current?.focus(), 0);
+  };
+
+  const closeCreateOpening = () => {
+    setIsCreateOpeningOpen(false);
+    window.setTimeout(() => createOpeningTriggerRef.current?.focus(), 0);
   };
 
   // This frontend-only form gives clear feedback without pretending an account was created.
@@ -198,6 +206,15 @@ export function HomeExperience() {
 
         <div className="header-actions">
           <ThemeToggle />
+          <button
+            className="post-project-button"
+            onClick={() => setIsCreateOpeningOpen(true)}
+            ref={createOpeningTriggerRef}
+            type="button"
+          >
+            <span className="post-label-long">Post a project</span>
+            <span className="post-label-short">Post</span>
+          </button>
           <button className="login-button" onClick={() => setIsLoginOpen(true)} type="button">
             Log in
           </button>
@@ -399,6 +416,7 @@ export function HomeExperience() {
       </footer>
 
       {isLoginOpen && <LoginPanel onClose={() => setIsLoginOpen(false)} />}
+      {isCreateOpeningOpen && <CreateOpeningPanel onClose={closeCreateOpening} />}
       {selectedProject && (
         <ProjectDetailPanel project={selectedProject} onClose={closeProjectDetails} />
       )}
