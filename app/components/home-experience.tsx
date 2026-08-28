@@ -13,9 +13,16 @@ import {
 } from '../data/projects';
 import { CreateOpeningPanel } from './create-opening-panel';
 import { ProofApplicationPanel } from './proof-application-panel';
+import { ProfileOnboardingPanel } from './profile-onboarding-panel';
 import { ThemeToggle } from './theme-toggle';
 
-function LoginPanel({ onClose }: { onClose: () => void }) {
+function LoginPanel({
+  onClose,
+  onStartOnboarding,
+}: {
+  onClose: () => void;
+  onStartOnboarding: () => void;
+}) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   // The panel moves initial focus and supports Escape so it remains usable by keyboard.
@@ -57,6 +64,10 @@ function LoginPanel({ onClose }: { onClose: () => void }) {
           <span aria-hidden="true">↗</span>
         </button>
         <small>This preview never requests or stores account credentials.</small>
+        <div className="login-preview-divider"><span>Frontend preview</span></div>
+        <button className="secondary-button login-preview-button" onClick={onStartOnboarding} type="button">
+          Preview profile setup
+        </button>
       </section>
     </div>
   );
@@ -143,6 +154,7 @@ function ProjectDetailPanel({
 export function HomeExperience() {
   const [filters, setFilters] = useState<ProjectFilters>(defaultProjectFilters);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const [isProfileOnboardingOpen, setIsProfileOnboardingOpen] = useState(false);
   const [isCreateOpeningOpen, setIsCreateOpeningOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<ProjectOpening | null>(null);
   const [applicationProject, setApplicationProject] = useState<ProjectOpening | null>(null);
@@ -150,6 +162,7 @@ export function HomeExperience() {
   const [signupMessage, setSignupMessage] = useState('');
   const projectTriggerRef = useRef<HTMLButtonElement | null>(null);
   const createOpeningTriggerRef = useRef<HTMLButtonElement>(null);
+  const loginTriggerRef = useRef<HTMLButtonElement>(null);
   const visibleProjects = useMemo(() => filterProjects(projects, filters), [filters]);
   const activeFilterCount = Number(filters.role !== 'All roles')
     + Number(filters.compensation !== 'All compensation')
@@ -177,6 +190,16 @@ export function HomeExperience() {
   const closeApplication = () => {
     setApplicationProject(null);
     window.setTimeout(() => projectTriggerRef.current?.focus(), 0);
+  };
+
+  const startProfileOnboarding = () => {
+    setIsLoginOpen(false);
+    setIsProfileOnboardingOpen(true);
+  };
+
+  const closeProfileOnboarding = () => {
+    setIsProfileOnboardingOpen(false);
+    window.setTimeout(() => loginTriggerRef.current?.focus(), 0);
   };
 
   // This frontend-only form gives clear feedback without pretending an account was created.
@@ -229,7 +252,7 @@ export function HomeExperience() {
             <span className="post-label-long">Post a project</span>
             <span className="post-label-short">Post</span>
           </button>
-          <button className="login-button" onClick={() => setIsLoginOpen(true)} type="button">
+          <button className="login-button" onClick={() => setIsLoginOpen(true)} ref={loginTriggerRef} type="button">
             Log in
           </button>
         </div>
@@ -429,7 +452,13 @@ export function HomeExperience() {
         <p className="footer-note">© {new Date().getFullYear()} Branch-Out. Teams retain control of access, agreements, and intellectual property.</p>
       </footer>
 
-      {isLoginOpen && <LoginPanel onClose={() => setIsLoginOpen(false)} />}
+      {isLoginOpen && (
+        <LoginPanel
+          onClose={() => setIsLoginOpen(false)}
+          onStartOnboarding={startProfileOnboarding}
+        />
+      )}
+      {isProfileOnboardingOpen && <ProfileOnboardingPanel onClose={closeProfileOnboarding} />}
       {isCreateOpeningOpen && <CreateOpeningPanel onClose={closeCreateOpening} />}
       {selectedProject && (
         <ProjectDetailPanel

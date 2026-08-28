@@ -21,7 +21,8 @@ The first frontend slice is a responsive discovery homepage split into three
 clear components:
 
 - **Header:** Branch-Out wordmark, navigation, functional project search, login
-  panel, project-opening creator, and a persistent light/dark mode switch.
+  and profile-onboarding preview, project-opening creator, and a persistent
+  light/dark mode switch.
 - **Body:** product promise, two-week trial preview, trust ladder, searchable and
   filterable project openings, complete opening details, proof-led applications,
   and an early-access interaction.
@@ -73,7 +74,23 @@ The current tests cover text and structured project discovery filters, combined
 filter behavior, reset and empty states, complete project details, the three main
 page regions, login-panel behavior, project-opening validation and draft
 persistence, proof-led application validation and recovery, and theme preference
-persistence.
+persistence. Profile onboarding tests cover validation, draft recovery, safe
+evidence links, and honest completion behavior.
+
+## Profile onboarding
+
+The login panel includes a clearly labelled **Preview profile setup** action. It
+opens a three-step local draft for:
+
+1. Display name, primary role, bio, and timezone
+2. Weekly availability, preferred project duration, working style, and
+   communication cadence
+3. Skills, a required HTTPS GitHub profile, an optional portfolio, and a short
+   explanation of the applicant's evidence
+
+The preview never requests credentials or claims to authenticate the visitor.
+It validates unsafe or unrelated evidence links, saves the profile draft only in
+the current browser, and presents a profile preview without creating an account.
 
 ## Project discovery
 
@@ -121,6 +138,8 @@ completed frontend draft has not been sent.
   the Go API is available.
 - The login panel is accessible and interactive, but GitHub OAuth remains
   disabled until backend authentication is implemented.
+- Profile onboarding creates only a device-local preview, not an authenticated
+  account or public profile.
 - The early-access form confirms frontend input only and does not claim to store
   an email address.
 - Project-opening drafts are stored only in the current browser until the backend

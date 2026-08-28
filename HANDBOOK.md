@@ -91,10 +91,62 @@ preference.
 
 **How to use it:** Select **Log in** to inspect the panel. GitHub authentication
 is intentionally disabled until the backend authentication feature exists. The
-current panel never asks for or stores credentials.
+current panel never asks for or stores credentials. Select **Preview profile
+setup** to open the device-local onboarding flow described below.
 
 Close the panel with its close button, by selecting the shaded area outside it,
 or by pressing `Escape`.
+
+## Profile onboarding preview
+
+**What it is:** A three-step preview of the profile information Branch-Out will
+collect after GitHub authentication is implemented. It creates a local draft,
+not an account or public profile.
+
+### Step 1: Identity
+
+Enter:
+
+- Display name
+- Primary role
+- A bio of at least 40 characters explaining what you build and how you work
+- Timezone
+
+Do not enter private contact details in the bio.
+
+### Step 2: Availability
+
+Choose:
+
+- Realistic weekly availability
+- Preferred project duration
+- Async-first, balanced, or live-collaboration working style
+- Preferred communication cadence
+
+These expectations will later help both sides assess collaboration fit before
+starting a trial.
+
+### Step 3: Evidence
+
+Enter:
+
+- Skills you can demonstrate
+- A required complete HTTPS GitHub profile link
+- An optional complete HTTP or HTTPS portfolio link
+- An explanation of at least 20 characters describing what the evidence shows
+  and what you personally contributed
+
+Only public evidence should be linked. Never enter passwords, access tokens,
+private repository links, or client-confidential information.
+
+### Save and complete the profile draft
+
+Select **Save draft** at any step to store the current entries in this browser.
+The same draft is restored when onboarding is reopened.
+
+Select **Complete profile draft** after the Evidence step. Branch-Out displays a
+profile preview and states clearly that no account or public profile was created.
+Close onboarding with its close button, the shaded area, or `Escape`.
 
 ## Homepage introduction
 
@@ -319,6 +371,7 @@ access.
 The current frontend uses browser storage only for:
 
 - Light or dark theme preference
+- One profile-onboarding draft
 - One project-opening draft
 - One proof-led application draft per project
 
@@ -330,6 +383,8 @@ production credentials into any frontend preview field.
 
 - Project and owner information is representative local data.
 - GitHub login is not connected.
+- Profile onboarding creates a local draft only; it does not identify or
+  authenticate the visitor.
 - Opening drafts cannot be published.
 - Application drafts cannot be sent or reviewed by an owner.
 - Early-access email addresses are not transmitted or stored.

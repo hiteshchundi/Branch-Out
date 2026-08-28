@@ -76,6 +76,19 @@ describe('HomeExperience', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
+  it('starts profile onboarding from the login preview', () => {
+    render(<HomeExperience />);
+
+    fireEvent.click(screen.getByRole('button', { name: /^log in$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /preview profile setup/i }));
+
+    const onboarding = screen.getByRole('dialog', {
+      name: /make your collaboration fit visible/i,
+    });
+    expect(onboarding).toHaveTextContent('Profile onboarding preview');
+    expect(onboarding).toHaveTextContent('Identity');
+  });
+
   it('opens and closes the create-opening flow from the header', () => {
     render(<HomeExperience />);
 
