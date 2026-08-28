@@ -1,6 +1,7 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HomeExperience } from './home-experience';
+import { SAVED_PROJECTS_STORAGE_KEY } from '../data/saved-projects';
 
 describe('HomeExperience', () => {
   beforeEach(() => {
@@ -134,6 +135,53 @@ describe('HomeExperience', () => {
     });
     expect(application).toHaveTextContent('Frontend engineer for a climate data explorer');
     expect(application).toHaveTextContent('One relevant work sample');
+  });
+
+  it('saves an opening on this device and filters to the saved list', async () => {
+    render(<HomeExperience />);
+
+    const saveButton = screen.getByRole('button', {
+      name: /save frontend engineer for a climate data explorer/i,
+    });
+    fireEvent.click(saveButton);
+
+    await waitFor(() => {
+      expect(localStorage.getItem(SAVED_PROJECTS_STORAGE_KEY)).toBe(
+        JSON.stringify(['climate-data-explorer']),
+      );
+    });
+    expect(saveButton).toHaveAccessibleName(
+      /remove saved frontend engineer for a climate data explorer/i,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /saved only 1/i }));
+    expect(screen.getByText('1 opening')).toBeInTheDocument();
+    expect(screen.queryByText('Product designer for an accessible finance app')).not.toBeInTheDocument();
+  });
+
+  it('recovers saved openings and can remove one from project details', async () => {
+    localStorage.setItem(
+      SAVED_PROJECTS_STORAGE_KEY,
+      JSON.stringify(['accessible-finance', 'stale-project']),
+    );
+    render(<HomeExperience />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /saved only 1/i })).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('button', {
+      name: /view details for product designer for an accessible finance app/i,
+    }));
+    const detailPanel = screen.getByRole('dialog', {
+      name: /product designer for an accessible finance app/i,
+    });
+    fireEvent.click(
+      within(detailPanel).getByRole('button', { name: /^remove saved$/i }),
+    );
+
+    await waitFor(() => {
+      expect(localStorage.getItem(SAVED_PROJECTS_STORAGE_KEY)).toBe('[]');
+    });
   });
 
   it('toggles and persists the color theme', async () => {

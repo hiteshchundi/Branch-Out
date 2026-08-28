@@ -528,6 +528,54 @@ p {
   padding: 14px;
 }
 
+/* Saved discovery stays compact and clearly identifies its device-local scope. */
+.saved-filter-row {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-bottom: 24px;
+}
+
+.saved-filter-row small {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.saved-filter-button,
+.save-project-button {
+  align-items: center;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  color: var(--muted);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 0.78rem;
+  font-weight: 750;
+  gap: 7px;
+  padding: 8px 10px;
+}
+
+.saved-filter-button[aria-pressed='true'],
+.save-project-button[aria-pressed='true'] {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+  color: var(--accent);
+}
+
+.saved-filter-button strong {
+  align-items: center;
+  background: var(--surface-raised);
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 0.68rem;
+  height: 21px;
+  justify-content: center;
+  min-width: 21px;
+  padding: 0 5px;
+}
+
 .filter-bar label {
   display: grid;
   gap: 7px;
@@ -668,6 +716,18 @@ p {
   margin: 0;
 }
 
+.card-actions {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding-top: 22px;
+}
+
+.save-project-button {
+  flex: 0 0 auto;
+}
+
 .card-action {
   align-items: center;
   background: transparent;
@@ -678,9 +738,8 @@ p {
   font-size: 0.86rem;
   font-weight: 800;
   justify-content: space-between;
-  padding: 24px 0 0;
+  padding: 8px 0;
   text-decoration: none;
-  width: 100%;
 }
 
 .empty-state {
@@ -1012,6 +1071,13 @@ p {
   gap: 22px;
   justify-content: space-between;
   padding-top: 24px;
+}
+
+.detail-actions {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 10px;
 }
 
 .detail-footer .tag-list {
@@ -1926,6 +1992,10 @@ p {
     flex-direction: column;
   }
 
+  .detail-actions {
+    align-items: stretch;
+  }
+
   .create-opening-backdrop {
     padding: 0;
   }
@@ -2069,6 +2139,11 @@ p {
   .openings-heading {
     align-items: start;
     gap: 18px;
+  }
+
+  .saved-filter-row {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .email-field,

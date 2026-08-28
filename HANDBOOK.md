@@ -25,7 +25,8 @@ be built.
 1. Start the application and open the local address shown by the development
    server.
 2. Browse the homepage or use the search and filters to find an opening.
-3. Open an opening to review its outcome, owner contribution, trial milestone,
+3. Save interesting openings for a device-local shortlist, or open one to review
+   its outcome, owner contribution, trial milestone,
    and access expectations.
 4. Choose **Apply with proof** to prepare a project-specific application draft.
 5. Choose **Post a project** in the header to prepare a new opening draft.
@@ -221,13 +222,36 @@ Select **Reset** to clear all structured filters and search text. The number in
 parentheses shows how many structured filters are active. If nothing matches,
 use **Reset all filters** from the empty-result message.
 
+### Saved openings
+
+**What it is:** A shortlist of interesting openings stored only in the current
+browser. It does not require an account and does not synchronize to another
+device.
+
+**How to use it:**
+
+1. Select **Save** on an opening card, or **Save opening** inside its detail
+   panel.
+2. The control changes to **Saved**, and the count beside **Saved only** updates.
+3. Select **Saved only** to show only shortlisted openings. Search and the role,
+   compensation, and weekly-time filters continue to apply.
+4. Select **Showing saved** to return to all matching openings.
+5. Select **Saved** on a card or **Remove saved** in its detail panel to remove
+   the opening.
+
+When no openings are saved, the saved-only empty state provides **Browse all
+openings**. Save and removal confirmations are announced to assistive
+technologies. Branch-Out validates restored IDs against the current project
+catalogue and safely ignores malformed storage, duplicates, and openings that
+no longer exist.
+
 ### Project cards
 
 **What they are:** Compact summaries containing compensation, freshness, title,
 purpose, required skills, commitment, duration, and timezone overlap.
 
-**How to use them:** Select **View full opening** on a card to open its complete
-details.
+**How to use them:** Select **Save** to shortlist an opening or **View opening**
+to open its complete details.
 
 ## Project details
 
@@ -245,7 +269,8 @@ Each detail panel includes:
 - Required skills
 
 **How to use it:** Review the scope and risk before selecting **Apply with
-proof**. Close the panel with its close button, the shaded area, or `Escape`.
+proof**. The opening can also be saved or removed from the shortlist here. Close
+the panel with its close button, the shaded area, or `Escape`.
 
 ## Apply with proof
 
@@ -374,6 +399,7 @@ The current frontend uses browser storage only for:
 - One profile-onboarding draft
 - One project-opening draft
 - One proof-led application draft per project
+- A validated list of saved project-opening IDs
 
 This information stays in the browser profile on the current device. Clearing
 site data for the local Branch-Out address removes it. Do not enter sensitive or
@@ -387,6 +413,7 @@ production credentials into any frontend preview field.
   authenticate the visitor.
 - Opening drafts cannot be published.
 - Application drafts cannot be sent or reviewed by an owner.
+- Saved openings do not synchronize between browsers or devices.
 - Early-access email addresses are not transmitted or stored.
 - There is no backend API, database, account, notification, or moderation flow yet.
 - The final original Branch-Out logo is still deferred.

@@ -1,6 +1,13 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  FormEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import {
   commitmentBands,
   compensationTypes,
@@ -11,10 +18,35 @@ import {
   projectRoles,
   projects,
 } from '../data/projects';
+import {
+  parseSavedProjectIds,
+  SAVED_PROJECTS_STORAGE_KEY,
+} from '../data/saved-projects';
 import { CreateOpeningPanel } from './create-opening-panel';
 import { ProofApplicationPanel } from './proof-application-panel';
 import { ProfileOnboardingPanel } from './profile-onboarding-panel';
 import { ThemeToggle } from './theme-toggle';
+
+const SAVED_PROJECTS_CHANGED_EVENT = 'branch-out-saved-projects-changed';
+
+/** Subscribes React to saved-opening changes from this tab and other tabs. */
+function subscribeToSavedProjects(onStoreChange: () => void) {
+  window.addEventListener('storage', onStoreChange);
+  window.addEventListener(SAVED_PROJECTS_CHANGED_EVENT, onStoreChange);
+  return () => {
+    window.removeEventListener('storage', onStoreChange);
+    window.removeEventListener(SAVED_PROJECTS_CHANGED_EVENT, onStoreChange);
+  };
+}
+
+/** Returns a stable primitive snapshot and degrades safely when storage is blocked. */
+function getSavedProjectsSnapshot() {
+  try {
+    return window.localStorage.getItem(SAVED_PROJECTS_STORAGE_KEY) ?? '';
+  } catch {
+    return '';
+  }
+}
 
 function LoginPanel({
   onClose,
@@ -75,12 +107,16 @@ function LoginPanel({
 
 function ProjectDetailPanel({
   project,
+  isSaved,
   onClose,
   onApply,
+  onToggleSaved,
 }: {
   project: ProjectOpening;
+  isSaved: boolean;
   onClose: () => void;
   onApply: (project: ProjectOpening) => void;
+  onToggleSaved: (project: ProjectOpening) => void;
 }) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -142,9 +178,19 @@ function ProjectDetailPanel({
           <ul className="tag-list" aria-label="Skills for this opening">
             {project.skills.map((skill) => <li key={skill}>{skill}</li>)}
           </ul>
-          <button className="primary-button" onClick={() => onApply(project)} type="button">
-            Apply with proof
-          </button>
+          <div className="detail-actions">
+            <button
+              aria-pressed={isSaved}
+              className="secondary-button"
+              onClick={() => onToggleSaved(project)}
+              type="button"
+            >
+              {isSaved ? 'Remove saved' : 'Save opening'}
+            </button>
+            <button className="primary-button" onClick={() => onApply(project)} type="button">
+              Apply with proof
+            </button>
+          </div>
         </div>
       </section>
     </div>
@@ -158,18 +204,58 @@ export function HomeExperience() {
   const [isCreateOpeningOpen, setIsCreateOpeningOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<ProjectOpening | null>(null);
   const [applicationProject, setApplicationProject] = useState<ProjectOpening | null>(null);
+  const [showSavedOnly, setShowSavedOnly] = useState(false);
+  const [savedProjectsMessage, setSavedProjectsMessage] = useState('');
   const [email, setEmail] = useState('');
   const [signupMessage, setSignupMessage] = useState('');
   const projectTriggerRef = useRef<HTMLButtonElement | null>(null);
   const createOpeningTriggerRef = useRef<HTMLButtonElement>(null);
   const loginTriggerRef = useRef<HTMLButtonElement>(null);
-  const visibleProjects = useMemo(() => filterProjects(projects, filters), [filters]);
+  const savedProjectsSnapshot = useSyncExternalStore(
+    subscribeToSavedProjects,
+    getSavedProjectsSnapshot,
+    () => '',
+  );
+  const savedProjectIds = useMemo(
+    () => parseSavedProjectIds(savedProjectsSnapshot, projects),
+    [savedProjectsSnapshot],
+  );
+  const visibleProjects = useMemo(() => {
+    const filteredProjects = filterProjects(projects, filters);
+    return showSavedOnly
+      ? filteredProjects.filter((project) => savedProjectIds.includes(project.id))
+      : filteredProjects;
+  }, [filters, savedProjectIds, showSavedOnly]);
   const activeFilterCount = Number(filters.role !== 'All roles')
     + Number(filters.compensation !== 'All compensation')
     + Number(filters.commitment !== 'Any commitment');
 
   const updateFilter = <Key extends keyof ProjectFilters>(key: Key, value: ProjectFilters[Key]) => {
     setFilters((current) => ({ ...current, [key]: value }));
+  };
+
+  const toggleSavedProject = (project: ProjectOpening) => {
+    const isCurrentlySaved = savedProjectIds.includes(project.id);
+    const nextIds = isCurrentlySaved
+      ? savedProjectIds.filter((projectId) => projectId !== project.id)
+      : [...savedProjectIds, project.id];
+
+    try {
+      window.localStorage.setItem(SAVED_PROJECTS_STORAGE_KEY, JSON.stringify(nextIds));
+      window.dispatchEvent(new Event(SAVED_PROJECTS_CHANGED_EVENT));
+      setSavedProjectsMessage(
+        isCurrentlySaved
+          ? `${project.title} removed from saved openings.`
+          : `${project.title} saved on this device.`,
+      );
+    } catch {
+      setSavedProjectsMessage('This browser could not save that change.');
+    }
+  };
+
+  const resetDiscovery = () => {
+    setFilters(defaultProjectFilters);
+    setShowSavedOnly(false);
   };
 
   const closeProjectDetails = () => {
@@ -366,11 +452,26 @@ export function HomeExperience() {
             <button
               className="reset-filters"
               disabled={activeFilterCount === 0 && !filters.query}
-              onClick={() => setFilters(defaultProjectFilters)}
+              onClick={resetDiscovery}
               type="button"
             >
               Reset {activeFilterCount > 0 ? `(${activeFilterCount})` : ''}
             </button>
+          </div>
+
+          <div className="saved-filter-row">
+            <button
+              aria-pressed={showSavedOnly}
+              className="saved-filter-button"
+              onClick={() => setShowSavedOnly((current) => !current)}
+              type="button"
+            >
+              <span aria-hidden="true">{showSavedOnly ? '◆' : '◇'}</span>
+              {showSavedOnly ? 'Showing saved' : 'Saved only'}
+              <strong>{savedProjectIds.length}</strong>
+            </button>
+            <span aria-live="polite" className="sr-only">{savedProjectsMessage}</span>
+            <small>Saved openings stay only on this device.</small>
           </div>
 
           {visibleProjects.length > 0 ? (
@@ -391,17 +492,29 @@ export function HomeExperience() {
                     <div><dt>Duration</dt><dd>{project.duration}</dd></div>
                     <div><dt>Overlap</dt><dd>{project.timezone}</dd></div>
                   </dl>
-                  <button
-                    className="card-action"
-                    onClick={(event) => {
-                      projectTriggerRef.current = event.currentTarget;
-                      setSelectedProject(project);
-                    }}
-                    type="button"
-                    aria-label={`View details for ${project.title}`}
-                  >
-                    View full opening <span aria-hidden="true">→</span>
-                  </button>
+                  <div className="card-actions">
+                    <button
+                      aria-label={`${savedProjectIds.includes(project.id) ? 'Remove saved' : 'Save'} ${project.title}`}
+                      aria-pressed={savedProjectIds.includes(project.id)}
+                      className="save-project-button"
+                      onClick={() => toggleSavedProject(project)}
+                      type="button"
+                    >
+                      <span aria-hidden="true">{savedProjectIds.includes(project.id) ? '◆' : '◇'}</span>
+                      {savedProjectIds.includes(project.id) ? 'Saved' : 'Save'}
+                    </button>
+                    <button
+                      className="card-action"
+                      onClick={(event) => {
+                        projectTriggerRef.current = event.currentTarget;
+                        setSelectedProject(project);
+                      }}
+                      type="button"
+                      aria-label={`View details for ${project.title}`}
+                    >
+                      View opening <span aria-hidden="true">→</span>
+                    </button>
+                  </div>
                 </article>
               ))}
             </div>
@@ -409,7 +522,9 @@ export function HomeExperience() {
             <div className="empty-state" role="status">
               <strong>No openings match the current filters</strong>
               <p>Try a broader skill, role, compensation type, or weekly commitment.</p>
-              <button onClick={() => setFilters(defaultProjectFilters)} type="button">Reset all filters</button>
+              <button onClick={resetDiscovery} type="button">
+                {showSavedOnly && savedProjectIds.length === 0 ? 'Browse all openings' : 'Reset all filters'}
+              </button>
             </div>
           )}
         </section>
@@ -462,8 +577,10 @@ export function HomeExperience() {
       {isCreateOpeningOpen && <CreateOpeningPanel onClose={closeCreateOpening} />}
       {selectedProject && (
         <ProjectDetailPanel
+          isSaved={savedProjectIds.includes(selectedProject.id)}
           onApply={beginApplication}
           onClose={closeProjectDetails}
+          onToggleSaved={toggleSavedProject}
           project={selectedProject}
         />
       )}

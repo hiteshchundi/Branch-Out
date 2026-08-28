@@ -24,8 +24,8 @@ clear components:
   and profile-onboarding preview, project-opening creator, and a persistent
   light/dark mode switch.
 - **Body:** product promise, two-week trial preview, trust ladder, searchable and
-  filterable project openings, complete opening details, proof-led applications,
-  and an early-access interaction.
+  filterable project openings, a device-local saved-opening shortlist, complete
+  opening details, proof-led applications, and an early-access interaction.
 - **Footer:** product summary, navigation, and a clear team-responsibility note.
 
 The final original logo is intentionally deferred until the rest of the
@@ -75,7 +75,8 @@ filter behavior, reset and empty states, complete project details, the three mai
 page regions, login-panel behavior, project-opening validation and draft
 persistence, proof-led application validation and recovery, and theme preference
 persistence. Profile onboarding tests cover validation, draft recovery, safe
-evidence links, and honest completion behavior.
+evidence links, and honest completion behavior. Saved-opening tests cover safe
+storage recovery, stale and malformed data, saving, filtering, and removal.
 
 ## Profile onboarding
 
@@ -103,6 +104,15 @@ accessible detail panel containing:
 - Commitment, duration, timezone overlap, and compensation
 - A small two-week trial milestone
 - Access and confidentiality expectations
+
+### Saved openings
+
+Every opening card and detail panel can add or remove that opening from a
+device-local shortlist. **Saved only** combines with the existing search and
+structured filters, displays the saved count, and offers a clear route back to
+all openings when the shortlist is empty. Stored IDs are validated against the
+current catalogue, so malformed browser data and openings that no longer exist
+are ignored safely. The shortlist is not synced to an account or another device.
 
 ## Create a project opening
 
@@ -146,5 +156,6 @@ completed frontend draft has not been sent.
   project-opening API is implemented.
 - Application drafts are stored separately for each project in the current
   browser and are not submitted to another person.
+- Saved openings stay only in the current browser and are not synchronized.
 - The custom Branch-Out logo will be designed after the remaining frontend
   surfaces are complete.
