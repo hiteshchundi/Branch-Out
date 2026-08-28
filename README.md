@@ -16,8 +16,8 @@ clear components:
 - **Header:** Branch-Out wordmark, navigation, functional project search, login
   panel, project-opening creator, and a persistent light/dark mode switch.
 - **Body:** product promise, two-week trial preview, trust ladder, searchable and
-  filterable project openings, complete opening details, and an early-access
-  interaction.
+  filterable project openings, complete opening details, proof-led applications,
+  and an early-access interaction.
 - **Footer:** product summary, navigation, and a clear team-responsibility note.
 
 The final original logo is intentionally deferred until the rest of the
@@ -65,7 +65,8 @@ pnpm build
 The current tests cover text and structured project discovery filters, combined
 filter behavior, reset and empty states, complete project details, the three main
 page regions, login-panel behavior, project-opening validation and draft
-persistence, and theme preference persistence.
+persistence, proof-led application validation and recovery, and theme preference
+persistence.
 
 ## Project discovery
 
@@ -92,6 +93,21 @@ partial or completed draft can be saved on the current device and restored when
 the flow is reopened. The interface clearly states that local completion is not
 publication; publishing will be connected after account onboarding exists.
 
+## Proof-led applications
+
+The **Apply with proof** action inside each project detail opens an application
+draft tailored to that opening. It requires:
+
+- A short project-specific note
+- One complete HTTP or HTTPS work-sample link
+- A clear description of the applicant's contribution to that sample
+- Confirmed weekly availability
+- One small proposed first contribution
+
+Applications validate weak or missing evidence, reject unsupported URL schemes,
+save separately for each project on the current device, and clearly state that a
+completed frontend draft has not been sent.
+
 ## Current boundaries
 
 - Project openings and their detail records use representative local data until
@@ -102,5 +118,7 @@ publication; publishing will be connected after account onboarding exists.
   an email address.
 - Project-opening drafts are stored only in the current browser until the backend
   project-opening API is implemented.
+- Application drafts are stored separately for each project in the current
+  browser and are not submitted to another person.
 - The custom Branch-Out logo will be designed after the remaining frontend
   surfaces are complete.

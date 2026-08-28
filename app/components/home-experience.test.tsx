@@ -106,6 +106,23 @@ describe('HomeExperience', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
+  it('starts a proof-led application from project details', () => {
+    render(<HomeExperience />);
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: /view details for frontend engineer for a climate data explorer/i,
+      }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: /apply with proof/i }));
+
+    const application = screen.getByRole('dialog', {
+      name: /show why this specific project fits/i,
+    });
+    expect(application).toHaveTextContent('Frontend engineer for a climate data explorer');
+    expect(application).toHaveTextContent('One relevant work sample');
+  });
+
   it('toggles and persists the color theme', async () => {
     render(<HomeExperience />);
 

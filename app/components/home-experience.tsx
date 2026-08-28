@@ -12,6 +12,7 @@ import {
   projects,
 } from '../data/projects';
 import { CreateOpeningPanel } from './create-opening-panel';
+import { ProofApplicationPanel } from './proof-application-panel';
 import { ThemeToggle } from './theme-toggle';
 
 function LoginPanel({ onClose }: { onClose: () => void }) {
@@ -64,9 +65,11 @@ function LoginPanel({ onClose }: { onClose: () => void }) {
 function ProjectDetailPanel({
   project,
   onClose,
+  onApply,
 }: {
   project: ProjectOpening;
   onClose: () => void;
+  onApply: (project: ProjectOpening) => void;
 }) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -128,9 +131,9 @@ function ProjectDetailPanel({
           <ul className="tag-list" aria-label="Skills for this opening">
             {project.skills.map((skill) => <li key={skill}>{skill}</li>)}
           </ul>
-          <a className="primary-button" href="#early-access" onClick={onClose}>
-            Request access to apply
-          </a>
+          <button className="primary-button" onClick={() => onApply(project)} type="button">
+            Apply with proof
+          </button>
         </div>
       </section>
     </div>
@@ -142,6 +145,7 @@ export function HomeExperience() {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isCreateOpeningOpen, setIsCreateOpeningOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<ProjectOpening | null>(null);
+  const [applicationProject, setApplicationProject] = useState<ProjectOpening | null>(null);
   const [email, setEmail] = useState('');
   const [signupMessage, setSignupMessage] = useState('');
   const projectTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -163,6 +167,16 @@ export function HomeExperience() {
   const closeCreateOpening = () => {
     setIsCreateOpeningOpen(false);
     window.setTimeout(() => createOpeningTriggerRef.current?.focus(), 0);
+  };
+
+  const beginApplication = (project: ProjectOpening) => {
+    setSelectedProject(null);
+    setApplicationProject(project);
+  };
+
+  const closeApplication = () => {
+    setApplicationProject(null);
+    window.setTimeout(() => projectTriggerRef.current?.focus(), 0);
   };
 
   // This frontend-only form gives clear feedback without pretending an account was created.
@@ -418,7 +432,14 @@ export function HomeExperience() {
       {isLoginOpen && <LoginPanel onClose={() => setIsLoginOpen(false)} />}
       {isCreateOpeningOpen && <CreateOpeningPanel onClose={closeCreateOpening} />}
       {selectedProject && (
-        <ProjectDetailPanel project={selectedProject} onClose={closeProjectDetails} />
+        <ProjectDetailPanel
+          onApply={beginApplication}
+          onClose={closeProjectDetails}
+          project={selectedProject}
+        />
+      )}
+      {applicationProject && (
+        <ProofApplicationPanel project={applicationProject} onClose={closeApplication} />
       )}
     </div>
   );
