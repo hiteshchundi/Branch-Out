@@ -8,6 +8,13 @@ understandable signals:
 2. **Work Demonstrated** — prior work and the person’s contribution are visible.
 3. **Collaboration Proven** — a teammate confirms behavior observed in shared work.
 
+## Documentation
+
+See the [Branch-Out Handbook](HANDBOOK.md) for a complete explanation of every
+current feature, exact usage steps, validation behavior, device-local storage,
+accessibility controls, and known limitations. The handbook is updated whenever
+the application changes.
+
 ## Current frontend
 
 The first frontend slice is a responsive discovery homepage split into three
