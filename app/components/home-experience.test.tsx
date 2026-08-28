@@ -137,6 +137,21 @@ describe('HomeExperience', () => {
     expect(application).toHaveTextContent('One relevant work sample');
   });
 
+  it('starts a two-week trial agreement from project details', () => {
+    render(<HomeExperience />);
+    fireEvent.click(screen.getByRole('button', {
+      name: /view details for frontend engineer for a climate data explorer/i,
+    }));
+    fireEvent.click(screen.getByRole('button', { name: /plan trial/i }));
+
+    const trial = screen.getByRole('dialog', {
+      name: /agree on the small bet before the big commitment/i,
+    });
+    expect(trial).toHaveTextContent('Two-week trial draft');
+    expect(trial).toHaveTextContent('Scope');
+    expect(trial).toHaveTextContent('Frontend engineer for a climate data explorer');
+  });
+
   it('saves an opening on this device and filters to the saved list', async () => {
     render(<HomeExperience />);
 

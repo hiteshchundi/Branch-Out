@@ -292,8 +292,9 @@ Each detail panel includes:
 - Required skills
 
 **How to use it:** Review the scope and risk before selecting **Apply with
-proof**. The opening can also be saved or removed from the shortlist here. Close
-the panel with its close button, the shaded area, or `Escape`.
+proof**. Select **Plan trial** to prepare a bounded collaboration agreement. The
+opening can also be saved or removed from the shortlist here. Close the panel
+with its close button, the shaded area, or `Escape`.
 
 ## Apply with proof
 
@@ -332,6 +333,62 @@ Real submission will be added after account onboarding and the applications API
 exist.
 
 Close the application with its close button, the shaded area, or `Escape`.
+
+## Plan a two-week trial
+
+**What it is:** A project-specific draft that helps two people discuss a small,
+reversible collaboration before making a larger commitment. It is a planning
+aid, not a transmitted offer or legal agreement.
+
+**Where to find it:** Open any project detail and select **Plan trial**.
+
+### Step 1: Scope
+
+Define:
+
+- A trial outcome of at least 20 characters
+- A concrete, reviewable deliverable of at least 20 characters
+- Explicit non-goals of at least 15 characters to prevent scope creep
+
+The opening's proposed two-week milestone pre-fills the outcome and remains
+editable.
+
+### Step 2: Working terms
+
+Choose:
+
+- Start and end dates spanning 13–15 calendar days
+- Whole-number weekly hours between 1 and 40
+- Async updates every two days, twice-weekly live check-ins, or a weekly review
+  with async updates
+
+The end date must be after the start date. Invalid, shorter, or longer date
+ranges receive an accessible field-level explanation.
+
+### Step 3: Safeguards
+
+Choose or describe:
+
+- The minimum repository or production access needed
+- Public, written-agreement, or synthetic-data confidentiality handling
+- An ownership or licensing expectation to discuss before work starts
+- A clean exit plan of at least 20 characters covering handoff, access removal,
+  payment, or early termination
+- Confirmation that both people must review and explicitly accept final terms
+
+The ownership choices are discussion prompts, not legal advice. Teams remain
+responsible for appropriate contracts, IP terms, security, and offboarding.
+
+### Save and complete the trial draft
+
+Select **Save draft** on any step. Each project has its own browser-local trial
+agreement and safely ignores malformed stored fields.
+
+Select **Complete trial draft** after Safeguards. The completion summary shows
+the outcome, dates, weekly time, check-in cadence, access level, and exit plan.
+It explicitly states that the draft has not been sent, accepted, or turned into
+a legal agreement. Close the flow with its close button, the shaded area, or
+`Escape`.
 
 ## Create a project opening
 
@@ -407,7 +464,8 @@ access.
 - Interactive controls have visible keyboard focus.
 - Dialog-style panels move focus to their close control when opened.
 - Press `Escape` to close login, project details, applications, the
-  project-opening creator, profile onboarding, and saved-opening comparison.
+  project-opening creator, profile onboarding, saved-opening comparison, and
+  trial-agreement flow.
 - Validation errors are connected to their fields and invalid fields expose
   their state to assistive technology.
 - Result counts and save confirmations use live status announcements.
@@ -422,6 +480,7 @@ The current frontend uses browser storage only for:
 - One profile-onboarding draft
 - One project-opening draft
 - One proof-led application draft per project
+- One two-week trial-agreement draft per project
 - A validated list of saved project-opening IDs
 
 This information stays in the browser profile on the current device. Clearing
@@ -436,6 +495,7 @@ production credentials into any frontend preview field.
   authenticate the visitor.
 - Opening drafts cannot be published.
 - Application drafts cannot be sent or reviewed by an owner.
+- Trial-agreement drafts cannot be sent, mutually accepted, or signed.
 - Saved openings do not synchronize between browsers or devices.
 - Early-access email addresses are not transmitted or stored.
 - There is no backend API, database, account, notification, or moderation flow yet.

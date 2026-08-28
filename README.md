@@ -26,7 +26,8 @@ clear components:
 - **Body:** product promise, two-week trial preview, trust ladder, searchable and
   filterable project openings, a device-local saved-opening shortlist with
   factual side-by-side comparison, complete opening details, proof-led
-  applications, and an early-access interaction.
+  applications, bounded two-week trial agreements, and an early-access
+  interaction.
 - **Footer:** product summary, navigation, and a clear team-responsibility note.
 
 The final original logo is intentionally deferred until the rest of the
@@ -78,7 +79,9 @@ persistence, proof-led application validation and recovery, and theme preference
 persistence. Profile onboarding tests cover validation, draft recovery, safe
 evidence links, and honest completion behavior. Saved-opening tests cover safe
 storage recovery, stale and malformed data, saving, filtering, removal, and
-two-to-three-opening comparison behavior.
+two-to-three-opening comparison behavior. Trial-agreement tests cover step-level
+validation, safe draft recovery, two-week date bounds, persistence, and honest
+completion behavior.
 
 ## Profile onboarding
 
@@ -150,6 +153,21 @@ Applications validate weak or missing evidence, reject unsupported URL schemes,
 save separately for each project on the current device, and clearly state that a
 completed frontend draft has not been sent.
 
+## Two-week trial agreements
+
+The **Plan trial** action inside each project detail opens a three-step draft:
+
+1. One inspectable outcome, a reviewable deliverable, and explicit non-goals
+2. Start and end dates spanning 13–15 calendar days, bounded whole-number weekly
+   hours, and a check-in cadence
+3. Minimum access, confidentiality handling, an ownership expectation to
+   discuss, a clean exit plan, and mutual-review confirmation
+
+Each project keeps a separate device-local draft. Restored data is limited to
+known field types, each visible step validates independently, and completion
+clearly states that the draft has not been sent, accepted, or converted into a
+legal agreement.
+
 ## Current boundaries
 
 - Project openings and their detail records use representative local data until
@@ -164,6 +182,8 @@ completed frontend draft has not been sent.
   project-opening API is implemented.
 - Application drafts are stored separately for each project in the current
   browser and are not submitted to another person.
+- Trial-agreement drafts stay in the current browser and are not sent or
+  accepted by another person.
 - Saved openings stay only in the current browser and are not synchronized.
 - The custom Branch-Out logo will be designed after the remaining frontend
   surfaces are complete.

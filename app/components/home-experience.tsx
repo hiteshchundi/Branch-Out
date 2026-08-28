@@ -27,6 +27,7 @@ import { ProofApplicationPanel } from './proof-application-panel';
 import { ProfileOnboardingPanel } from './profile-onboarding-panel';
 import { SavedProjectComparisonPanel } from './saved-project-comparison-panel';
 import { ThemeToggle } from './theme-toggle';
+import { TrialAgreementPanel } from './trial-agreement-panel';
 
 const SAVED_PROJECTS_CHANGED_EVENT = 'branch-out-saved-projects-changed';
 
@@ -111,12 +112,14 @@ function ProjectDetailPanel({
   isSaved,
   onClose,
   onApply,
+  onPlanTrial,
   onToggleSaved,
 }: {
   project: ProjectOpening;
   isSaved: boolean;
   onClose: () => void;
   onApply: (project: ProjectOpening) => void;
+  onPlanTrial: (project: ProjectOpening) => void;
   onToggleSaved: (project: ProjectOpening) => void;
 }) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -188,6 +191,9 @@ function ProjectDetailPanel({
             >
               {isSaved ? 'Remove saved' : 'Save opening'}
             </button>
+            <button className="secondary-button" onClick={() => onPlanTrial(project)} type="button">
+              Plan trial
+            </button>
             <button className="primary-button" onClick={() => onApply(project)} type="button">
               Apply with proof
             </button>
@@ -205,6 +211,7 @@ export function HomeExperience() {
   const [isCreateOpeningOpen, setIsCreateOpeningOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<ProjectOpening | null>(null);
   const [applicationProject, setApplicationProject] = useState<ProjectOpening | null>(null);
+  const [trialProject, setTrialProject] = useState<ProjectOpening | null>(null);
   const [isSavedComparisonOpen, setIsSavedComparisonOpen] = useState(false);
   const [showSavedOnly, setShowSavedOnly] = useState(false);
   const [savedProjectsMessage, setSavedProjectsMessage] = useState('');
@@ -291,8 +298,18 @@ export function HomeExperience() {
     setApplicationProject(project);
   };
 
+  const beginTrialAgreement = (project: ProjectOpening) => {
+    setSelectedProject(null);
+    setTrialProject(project);
+  };
+
   const closeApplication = () => {
     setApplicationProject(null);
+    window.setTimeout(() => projectTriggerRef.current?.focus(), 0);
+  };
+
+  const closeTrialAgreement = () => {
+    setTrialProject(null);
     window.setTimeout(() => projectTriggerRef.current?.focus(), 0);
   };
 
@@ -614,12 +631,16 @@ export function HomeExperience() {
           isSaved={savedProjectIds.includes(selectedProject.id)}
           onApply={beginApplication}
           onClose={closeProjectDetails}
+          onPlanTrial={beginTrialAgreement}
           onToggleSaved={toggleSavedProject}
           project={selectedProject}
         />
       )}
       {applicationProject && (
         <ProofApplicationPanel project={applicationProject} onClose={closeApplication} />
+      )}
+      {trialProject && (
+        <TrialAgreementPanel onClose={closeTrialAgreement} project={trialProject} />
       )}
       {isSavedComparisonOpen && (
         <SavedProjectComparisonPanel
