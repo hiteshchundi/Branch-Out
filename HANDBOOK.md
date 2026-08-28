@@ -245,6 +245,29 @@ technologies. Branch-Out validates restored IDs against the current project
 catalogue and safely ignores malformed storage, duplicates, and openings that
 no longer exist.
 
+### Compare saved openings
+
+**What it is:** A factual side-by-side decision aid for saved openings. It does
+not assign a fit score, rank project owners, or recommend a winner.
+
+**How to use it:**
+
+1. Save at least two openings. **Compare saved** remains disabled until two are
+   available.
+2. Select **Compare saved** beside the saved-only control.
+3. Use the opening checkboxes to choose any two or three saved openings. The
+   comparison supports a maximum of three columns to keep the facts readable.
+4. Compare project stage, owner trust signal, compensation, weekly time,
+   duration, timezone overlap, two-week trial milestone, and access terms.
+5. Select **View this opening** to move from comparison to that opening's full
+   detail panel.
+6. Select **Done comparing**, the close button, the shaded area, or press
+   `Escape` to close the comparison.
+
+Removing a checkbox affects only the current comparison; it does not remove the
+opening from the saved shortlist. Selection changes and limits are announced to
+assistive technologies. On narrow screens, comparison cards stack vertically.
+
 ### Project cards
 
 **What they are:** Compact summaries containing compensation, freshness, title,
@@ -383,8 +406,8 @@ access.
 
 - Interactive controls have visible keyboard focus.
 - Dialog-style panels move focus to their close control when opened.
-- Press `Escape` to close login, project details, applications, and the
-  project-opening creator.
+- Press `Escape` to close login, project details, applications, the
+  project-opening creator, profile onboarding, and saved-opening comparison.
 - Validation errors are connected to their fields and invalid fields expose
   their state to assistive technology.
 - Result counts and save confirmations use live status announcements.

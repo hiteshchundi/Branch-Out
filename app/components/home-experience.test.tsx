@@ -184,6 +184,25 @@ describe('HomeExperience', () => {
     });
   });
 
+  it('opens a comparison when at least two projects are saved', async () => {
+    localStorage.setItem(
+      SAVED_PROJECTS_STORAGE_KEY,
+      JSON.stringify(['climate-data-explorer', 'accessible-finance']),
+    );
+    render(<HomeExperience />);
+
+    const compareButton = await screen.findByRole('button', { name: /compare saved/i });
+    expect(compareButton).toBeEnabled();
+    fireEvent.click(compareButton);
+
+    const comparison = screen.getByRole('dialog', {
+      name: /compare the work, not just the title/i,
+    });
+    expect(comparison).toHaveTextContent('Frontend engineer for a climate data explorer');
+    expect(comparison).toHaveTextContent('Product designer for an accessible finance app');
+    expect(comparison).toHaveTextContent('Two-week trial');
+  });
+
   it('toggles and persists the color theme', async () => {
     render(<HomeExperience />);
 

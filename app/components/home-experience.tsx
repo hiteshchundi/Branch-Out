@@ -25,6 +25,7 @@ import {
 import { CreateOpeningPanel } from './create-opening-panel';
 import { ProofApplicationPanel } from './proof-application-panel';
 import { ProfileOnboardingPanel } from './profile-onboarding-panel';
+import { SavedProjectComparisonPanel } from './saved-project-comparison-panel';
 import { ThemeToggle } from './theme-toggle';
 
 const SAVED_PROJECTS_CHANGED_EVENT = 'branch-out-saved-projects-changed';
@@ -204,6 +205,7 @@ export function HomeExperience() {
   const [isCreateOpeningOpen, setIsCreateOpeningOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<ProjectOpening | null>(null);
   const [applicationProject, setApplicationProject] = useState<ProjectOpening | null>(null);
+  const [isSavedComparisonOpen, setIsSavedComparisonOpen] = useState(false);
   const [showSavedOnly, setShowSavedOnly] = useState(false);
   const [savedProjectsMessage, setSavedProjectsMessage] = useState('');
   const [email, setEmail] = useState('');
@@ -211,6 +213,7 @@ export function HomeExperience() {
   const projectTriggerRef = useRef<HTMLButtonElement | null>(null);
   const createOpeningTriggerRef = useRef<HTMLButtonElement>(null);
   const loginTriggerRef = useRef<HTMLButtonElement>(null);
+  const comparisonTriggerRef = useRef<HTMLButtonElement>(null);
   const savedProjectsSnapshot = useSyncExternalStore(
     subscribeToSavedProjects,
     getSavedProjectsSnapshot,
@@ -219,6 +222,10 @@ export function HomeExperience() {
   const savedProjectIds = useMemo(
     () => parseSavedProjectIds(savedProjectsSnapshot, projects),
     [savedProjectsSnapshot],
+  );
+  const savedProjects = useMemo(
+    () => projects.filter((project) => savedProjectIds.includes(project.id)),
+    [savedProjectIds],
   );
   const visibleProjects = useMemo(() => {
     const filteredProjects = filterProjects(projects, filters);
@@ -256,6 +263,17 @@ export function HomeExperience() {
   const resetDiscovery = () => {
     setFilters(defaultProjectFilters);
     setShowSavedOnly(false);
+  };
+
+  const closeSavedComparison = () => {
+    setIsSavedComparisonOpen(false);
+    window.setTimeout(() => comparisonTriggerRef.current?.focus(), 0);
+  };
+
+  const viewProjectFromComparison = (project: ProjectOpening) => {
+    setIsSavedComparisonOpen(false);
+    projectTriggerRef.current = comparisonTriggerRef.current;
+    setSelectedProject(project);
   };
 
   const closeProjectDetails = () => {
@@ -460,18 +478,34 @@ export function HomeExperience() {
           </div>
 
           <div className="saved-filter-row">
-            <button
-              aria-pressed={showSavedOnly}
-              className="saved-filter-button"
-              onClick={() => setShowSavedOnly((current) => !current)}
-              type="button"
-            >
-              <span aria-hidden="true">{showSavedOnly ? '◆' : '◇'}</span>
-              {showSavedOnly ? 'Showing saved' : 'Saved only'}
-              <strong>{savedProjectIds.length}</strong>
-            </button>
+            <div>
+              <button
+                aria-pressed={showSavedOnly}
+                className="saved-filter-button"
+                onClick={() => setShowSavedOnly((current) => !current)}
+                type="button"
+              >
+                <span aria-hidden="true">{showSavedOnly ? '◆' : '◇'}</span>
+                {showSavedOnly ? 'Showing saved' : 'Saved only'}
+                <strong>{savedProjectIds.length}</strong>
+              </button>
+              <button
+                className="compare-saved-button"
+                disabled={savedProjects.length < 2}
+                onClick={() => setIsSavedComparisonOpen(true)}
+                ref={comparisonTriggerRef}
+                title={savedProjects.length < 2 ? 'Save at least two openings to compare them' : undefined}
+                type="button"
+              >
+                Compare saved
+              </button>
+            </div>
             <span aria-live="polite" className="sr-only">{savedProjectsMessage}</span>
-            <small>Saved openings stay only on this device.</small>
+            <small>
+              {savedProjects.length < 2
+                ? 'Save at least two openings to compare.'
+                : 'Compare up to three; saved openings stay on this device.'}
+            </small>
           </div>
 
           {visibleProjects.length > 0 ? (
@@ -586,6 +620,13 @@ export function HomeExperience() {
       )}
       {applicationProject && (
         <ProofApplicationPanel project={applicationProject} onClose={closeApplication} />
+      )}
+      {isSavedComparisonOpen && (
+        <SavedProjectComparisonPanel
+          onClose={closeSavedComparison}
+          onViewProject={viewProjectFromComparison}
+          savedProjects={savedProjects}
+        />
       )}
     </div>
   );

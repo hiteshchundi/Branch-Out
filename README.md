@@ -24,8 +24,9 @@ clear components:
   and profile-onboarding preview, project-opening creator, and a persistent
   light/dark mode switch.
 - **Body:** product promise, two-week trial preview, trust ladder, searchable and
-  filterable project openings, a device-local saved-opening shortlist, complete
-  opening details, proof-led applications, and an early-access interaction.
+  filterable project openings, a device-local saved-opening shortlist with
+  factual side-by-side comparison, complete opening details, proof-led
+  applications, and an early-access interaction.
 - **Footer:** product summary, navigation, and a clear team-responsibility note.
 
 The final original logo is intentionally deferred until the rest of the
@@ -76,7 +77,8 @@ page regions, login-panel behavior, project-opening validation and draft
 persistence, proof-led application validation and recovery, and theme preference
 persistence. Profile onboarding tests cover validation, draft recovery, safe
 evidence links, and honest completion behavior. Saved-opening tests cover safe
-storage recovery, stale and malformed data, saving, filtering, and removal.
+storage recovery, stale and malformed data, saving, filtering, removal, and
+two-to-three-opening comparison behavior.
 
 ## Profile onboarding
 
@@ -113,6 +115,12 @@ structured filters, displays the saved count, and offers a clear route back to
 all openings when the shortlist is empty. Stored IDs are validated against the
 current catalogue, so malformed browser data and openings that no longer exist
 are ignored safely. The shortlist is not synced to an account or another device.
+
+When at least two openings are saved, **Compare saved** opens a responsive
+side-by-side view. People can choose any two or three saved openings and compare
+compensation, weekly time, duration, timezone overlap, owner trust evidence,
+the proposed two-week trial, and access expectations. The comparison does not
+generate a score, rank collaborators, or choose an opening for the visitor.
 
 ## Create a project opening
 
