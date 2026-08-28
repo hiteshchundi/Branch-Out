@@ -142,7 +142,7 @@ describe('HomeExperience', () => {
     fireEvent.click(screen.getByRole('button', {
       name: /view details for frontend engineer for a climate data explorer/i,
     }));
-    fireEvent.click(screen.getByRole('button', { name: /plan trial/i }));
+    fireEvent.click(screen.getByRole('button', { name: /plan this trial/i }));
 
     const trial = screen.getByRole('dialog', {
       name: /agree on the small bet before the big commitment/i,
@@ -150,6 +150,16 @@ describe('HomeExperience', () => {
     expect(trial).toHaveTextContent('Two-week trial draft');
     expect(trial).toHaveTextContent('Scope');
     expect(trial).toHaveTextContent('Frontend engineer for a climate data explorer');
+  });
+
+  it('starts a post-trial outcome review from project details', () => {
+    render(<HomeExperience />);
+    fireEvent.click(screen.getByRole('button', { name: /view details for frontend engineer for a climate data explorer/i }));
+    fireEvent.click(screen.getByRole('button', { name: /preview outcome review/i }));
+    const review = screen.getByRole('dialog', { name: /turn observed work into explainable trust/i });
+    expect(review).toHaveTextContent('Post-trial outcome review');
+    expect(review).toHaveTextContent('Outcome');
+    expect(review).toHaveTextContent('Frontend engineer for a climate data explorer');
   });
 
   it('saves an opening on this device and filters to the saved list', async () => {

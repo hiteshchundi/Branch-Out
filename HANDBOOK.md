@@ -293,8 +293,9 @@ Each detail panel includes:
 
 **How to use it:** Review the scope and risk before selecting **Apply with
 proof**. Select **Plan trial** to prepare a bounded collaboration agreement. The
-opening can also be saved or removed from the shortlist here. Close the panel
-with its close button, the shaded area, or `Escape`.
+trial milestone also provides **Preview outcome review** for post-trial evidence.
+The opening can also be saved or removed from the shortlist here. Close the
+panel with its close button, the shaded area, or `Escape`.
 
 ## Apply with proof
 
@@ -390,6 +391,67 @@ It explicitly states that the draft has not been sent, accepted, or turned into
 a legal agreement. Close the flow with its close button, the shaded area, or
 `Escape`.
 
+## Review a trial outcome
+
+**What it is:** A project-specific post-trial review that connects observable
+work and collaboration behavior to an explainable trust-signal candidate. It
+does not publish feedback, award a badge, or modify another person's profile.
+
+**Where to find it:** Open a project detail and select **Preview outcome review**
+inside the two-week trial milestone.
+
+### Step 1: Outcome
+
+Record:
+
+- Whether the trial was completed, partially completed, or stopped early
+- Whether the agreed deliverable was met, partially met, or not met
+- An outcome description of at least 30 characters
+- An optional complete HTTP or HTTPS public evidence link
+
+Activity alone is not presented as proof. The summary should describe the
+inspectable result and the contributor's part.
+
+### Step 2: Collaboration
+
+Choose at least two behaviors directly observed during the trial:
+
+- Reliable delivery
+- Clear communication
+- Sound scope judgment
+- Constructive feedback
+
+Then provide one concrete example of at least 30 characters and choose **Yes**,
+**Maybe, with different scope**, or **No** for collaborating again. Describe
+events and decisions rather than making unsupported personality judgments.
+
+### Step 3: Mutual review
+
+Write a public-safe summary of at least 30 characters. Confirm that it excludes
+secrets, private links, personal data, and confidential client information.
+Also confirm that both collaborators must review the record before a trust
+signal can be earned.
+
+### Transparent trust-candidate rules
+
+The completion preview shows every factor used; there is no hidden score.
+
+- **Collaboration Proven candidate:** completed trial, met deliverable, at least
+  three observed behaviors, and **Yes** to collaborating again
+- **Work Demonstrated candidate:** completed or partially completed work that
+  does not satisfy every Collaboration Proven rule
+- **No trust signal candidate:** a stopped-early outcome
+
+These are candidates only. No feedback or signal is published. Counterpart
+confirmation and moderation will be required after accounts and the backend
+exist.
+
+### Save and close the outcome draft
+
+Select **Save draft** at any step. Each project has a separate device-local
+outcome review, and malformed stored fields or unknown behavior labels are
+ignored safely. Close with the close button, shaded area, or `Escape`.
+
 ## Create a project opening
 
 **What it is:** A three-step draft flow for describing a credible, appropriately
@@ -465,7 +527,7 @@ access.
 - Dialog-style panels move focus to their close control when opened.
 - Press `Escape` to close login, project details, applications, the
   project-opening creator, profile onboarding, saved-opening comparison, and
-  trial-agreement flow.
+  trial-agreement and outcome-review flows.
 - Validation errors are connected to their fields and invalid fields expose
   their state to assistive technology.
 - Result counts and save confirmations use live status announcements.
@@ -481,6 +543,7 @@ The current frontend uses browser storage only for:
 - One project-opening draft
 - One proof-led application draft per project
 - One two-week trial-agreement draft per project
+- One outcome-review draft per project
 - A validated list of saved project-opening IDs
 
 This information stays in the browser profile on the current device. Clearing
@@ -496,6 +559,8 @@ production credentials into any frontend preview field.
 - Opening drafts cannot be published.
 - Application drafts cannot be sent or reviewed by an owner.
 - Trial-agreement drafts cannot be sent, mutually accepted, or signed.
+- Outcome feedback and trust-signal candidates cannot be mutually confirmed,
+  moderated, or published.
 - Saved openings do not synchronize between browsers or devices.
 - Early-access email addresses are not transmitted or stored.
 - There is no backend API, database, account, notification, or moderation flow yet.

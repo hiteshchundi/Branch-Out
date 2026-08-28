@@ -23,6 +23,7 @@ import {
   SAVED_PROJECTS_STORAGE_KEY,
 } from '../data/saved-projects';
 import { CreateOpeningPanel } from './create-opening-panel';
+import { OutcomeFeedbackPanel } from './outcome-feedback-panel';
 import { ProofApplicationPanel } from './proof-application-panel';
 import { ProfileOnboardingPanel } from './profile-onboarding-panel';
 import { SavedProjectComparisonPanel } from './saved-project-comparison-panel';
@@ -113,6 +114,7 @@ function ProjectDetailPanel({
   onClose,
   onApply,
   onPlanTrial,
+  onReviewOutcome,
   onToggleSaved,
 }: {
   project: ProjectOpening;
@@ -120,6 +122,7 @@ function ProjectDetailPanel({
   onClose: () => void;
   onApply: (project: ProjectOpening) => void;
   onPlanTrial: (project: ProjectOpening) => void;
+  onReviewOutcome: (project: ProjectOpening) => void;
   onToggleSaved: (project: ProjectOpening) => void;
 }) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -173,7 +176,7 @@ function ProjectDetailPanel({
 
         <div className="detail-sections">
           <section><h3>Desired outcome</h3><p>{project.desiredOutcome}</p></section>
-          <section className="milestone-callout"><h3>Two-week trial milestone</h3><p>{project.firstMilestone}</p></section>
+          <section className="milestone-callout"><h3>Two-week trial milestone</h3><p>{project.firstMilestone}</p><div className="milestone-actions"><button onClick={() => onPlanTrial(project)} type="button">Plan this trial</button><button onClick={() => onReviewOutcome(project)} type="button">Preview outcome review</button></div></section>
           <section><h3>What the owner has already contributed</h3><p>{project.ownerContribution}</p></section>
           <section><h3>Access and confidentiality</h3><p>{project.confidentiality}</p></section>
         </div>
@@ -190,9 +193,6 @@ function ProjectDetailPanel({
               type="button"
             >
               {isSaved ? 'Remove saved' : 'Save opening'}
-            </button>
-            <button className="secondary-button" onClick={() => onPlanTrial(project)} type="button">
-              Plan trial
             </button>
             <button className="primary-button" onClick={() => onApply(project)} type="button">
               Apply with proof
@@ -212,6 +212,7 @@ export function HomeExperience() {
   const [selectedProject, setSelectedProject] = useState<ProjectOpening | null>(null);
   const [applicationProject, setApplicationProject] = useState<ProjectOpening | null>(null);
   const [trialProject, setTrialProject] = useState<ProjectOpening | null>(null);
+  const [outcomeProject, setOutcomeProject] = useState<ProjectOpening | null>(null);
   const [isSavedComparisonOpen, setIsSavedComparisonOpen] = useState(false);
   const [showSavedOnly, setShowSavedOnly] = useState(false);
   const [savedProjectsMessage, setSavedProjectsMessage] = useState('');
@@ -303,6 +304,11 @@ export function HomeExperience() {
     setTrialProject(project);
   };
 
+  const beginOutcomeReview = (project: ProjectOpening) => {
+    setSelectedProject(null);
+    setOutcomeProject(project);
+  };
+
   const closeApplication = () => {
     setApplicationProject(null);
     window.setTimeout(() => projectTriggerRef.current?.focus(), 0);
@@ -310,6 +316,11 @@ export function HomeExperience() {
 
   const closeTrialAgreement = () => {
     setTrialProject(null);
+    window.setTimeout(() => projectTriggerRef.current?.focus(), 0);
+  };
+
+  const closeOutcomeReview = () => {
+    setOutcomeProject(null);
     window.setTimeout(() => projectTriggerRef.current?.focus(), 0);
   };
 
@@ -632,6 +643,7 @@ export function HomeExperience() {
           onApply={beginApplication}
           onClose={closeProjectDetails}
           onPlanTrial={beginTrialAgreement}
+          onReviewOutcome={beginOutcomeReview}
           onToggleSaved={toggleSavedProject}
           project={selectedProject}
         />
@@ -641,6 +653,9 @@ export function HomeExperience() {
       )}
       {trialProject && (
         <TrialAgreementPanel onClose={closeTrialAgreement} project={trialProject} />
+      )}
+      {outcomeProject && (
+        <OutcomeFeedbackPanel onClose={closeOutcomeReview} project={outcomeProject} />
       )}
       {isSavedComparisonOpen && (
         <SavedProjectComparisonPanel

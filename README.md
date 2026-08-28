@@ -26,8 +26,8 @@ clear components:
 - **Body:** product promise, two-week trial preview, trust ladder, searchable and
   filterable project openings, a device-local saved-opening shortlist with
   factual side-by-side comparison, complete opening details, proof-led
-  applications, bounded two-week trial agreements, and an early-access
-  interaction.
+  applications, bounded two-week trial agreements, explainable outcome reviews,
+  and an early-access interaction.
 - **Footer:** product summary, navigation, and a clear team-responsibility note.
 
 The final original logo is intentionally deferred until the rest of the
@@ -81,7 +81,9 @@ evidence links, and honest completion behavior. Saved-opening tests cover safe
 storage recovery, stale and malformed data, saving, filtering, removal, and
 two-to-three-opening comparison behavior. Trial-agreement tests cover step-level
 validation, safe draft recovery, two-week date bounds, persistence, and honest
-completion behavior.
+completion behavior. Outcome-review tests cover evidence requirements, safe
+links, draft recovery, transparent trust-candidate rules, and publication
+boundaries.
 
 ## Profile onboarding
 
@@ -168,6 +170,27 @@ known field types, each visible step validates independently, and completion
 clearly states that the draft has not been sent, accepted, or converted into a
 legal agreement.
 
+## Outcome feedback and trust candidates
+
+**Preview outcome review** inside a project's trial milestone opens a three-step
+post-trial draft:
+
+1. Actual trial and deliverable status, an outcome summary, and optional public
+   evidence
+2. At least two directly observed collaboration behaviors, a concrete example,
+   and whether the reviewer would collaborate again
+3. A public-safe summary plus privacy and mutual-review confirmations
+
+The resulting preview is transparent: a **Collaboration Proven candidate**
+requires a completed trial, met deliverable, at least three observed behaviors,
+and “Yes” to collaborating again. Completed or partial work can instead become a
+**Work Demonstrated candidate**. A stopped outcome creates no signal candidate.
+The interface displays every factor and never calculates a hidden score.
+
+Each project stores a separate draft locally. No feedback or trust signal is
+published; counterpart confirmation and moderation require the future account
+and backend systems.
+
 ## Current boundaries
 
 - Project openings and their detail records use representative local data until
@@ -184,6 +207,8 @@ legal agreement.
   browser and are not submitted to another person.
 - Trial-agreement drafts stay in the current browser and are not sent or
   accepted by another person.
+- Outcome-review drafts and trust candidates stay local and are not confirmed or
+  published.
 - Saved openings stay only in the current browser and are not synchronized.
 - The custom Branch-Out logo will be designed after the remaining frontend
   surfaces are complete.
