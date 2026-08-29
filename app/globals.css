@@ -2147,6 +2147,19 @@ main:focus {
   outline: none;
 }
 
+.profile-form-grid input[readonly] {
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.profile-form-grid label > small,
+.profile-actions small {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
 .profile-form-grid [aria-invalid='true'] {
   border-color: #b83f42;
 }
@@ -2191,6 +2204,12 @@ main:focus {
   align-items: center;
   display: flex;
   gap: 12px;
+}
+
+.profile-loading {
+  color: var(--muted);
+  padding: 72px 20px;
+  text-align: center;
 }
 
 .profile-complete {

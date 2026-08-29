@@ -130,7 +130,7 @@ function LoginPanel({
         )}
         <div className="login-preview-divider"><span>Profile details</span></div>
         <button className="secondary-button login-preview-button" onClick={onStartOnboarding} type="button">
-          Preview profile setup
+          {user ? 'Manage profile' : 'Preview profile setup'}
         </button>
       </section>
     </div>
@@ -726,7 +726,7 @@ export function HomeExperience() {
           user={authenticatedUser}
         />
       )}
-      {isProfileOnboardingOpen && <ProfileOnboardingPanel onClose={closeProfileOnboarding} />}
+      {isProfileOnboardingOpen && <ProfileOnboardingPanel authenticatedUser={authenticatedUser} key={authenticatedUser?.id ?? 'anonymous'} onClose={closeProfileOnboarding} />}
       {isCreateOpeningOpen && <CreateOpeningPanel onClose={closeCreateOpening} />}
       {selectedProject && (
         <ProjectDetailPanel

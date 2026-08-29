@@ -113,8 +113,8 @@ GitHub account to prevent a member from attaching another person's identity.
 
 `GET /v1/profile` returns HTTP 404 until the member has created a profile. A
 successful update replaces the editable profile fields while retaining its
-original creation time. The frontend onboarding form is still device-local and
-will be connected to these routes in the next integration milestone.
+original creation time. The frontend onboarding form uses these routes for
+authenticated members and keeps local-only drafts for signed-out visitors.
 
 ## Verify
 
@@ -162,6 +162,6 @@ filters, ordering, and cancellation.
 
 The memory repository remains as a fast domain-test double. Runtime traffic uses
 PostgreSQL. Authentication can create or update an account and revoke its
-sessions. Authenticated members can persist a collaboration profile. The
-frontend uses the authentication routes but has not yet connected its profile
-form; project openings remain read-only.
+sessions. Authenticated members can persist a collaboration profile, and the
+frontend uses both authentication and profile routes. Project openings remain
+read-only.

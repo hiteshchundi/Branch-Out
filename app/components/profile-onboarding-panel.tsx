@@ -1,6 +1,13 @@
 'use client';
 
 import { FormEvent, useEffect, useRef, useState } from 'react';
+import type { AuthenticatedUser } from '../data/auth';
+import {
+  loadCurrentProfile,
+  ProfileAPIError,
+  saveCurrentProfile,
+  type CollaborationProfile,
+} from '../data/profile';
 import { useAccessibleDialog } from './use-accessible-dialog';
 
 export const PROFILE_DRAFT_STORAGE_KEY = 'branch-out-profile-draft';
@@ -59,6 +66,23 @@ function loadSavedProfile(): ProfileDraft {
   }
 }
 
+function profileToDraft(profile: CollaborationProfile): ProfileDraft {
+  return {
+    displayName: profile.displayName,
+    primaryRole: profile.primaryRole,
+    bio: profile.bio,
+    timezone: profile.timezone,
+    weeklyAvailability: profile.weeklyAvailability,
+    preferredDuration: profile.preferredDuration,
+    workStyle: profile.workStyle,
+    communicationCadence: profile.communicationCadence,
+    skills: profile.skills.join(', '),
+    githubUrl: profile.githubUrl,
+    portfolioUrl: profile.portfolioUrl ?? '',
+    evidenceSummary: profile.evidenceSummary,
+  };
+}
+
 function isHttpUrl(value: string) {
   try {
     const url = new URL(value);
@@ -88,7 +112,15 @@ export function validateProfileStep(draft: ProfileDraft, step: number): ProfileE
   if (step === 0 && draft.bio.trim() && draft.bio.trim().length < 40) {
     errors.bio = 'Your bio should be at least 40 characters.';
   }
+  if (step === 0 && draft.displayName.trim().length > 100) errors.displayName = 'Use 100 characters or fewer.';
+  if (step === 0 && draft.bio.trim().length > 500) errors.bio = 'Use 500 characters or fewer.';
+  if (step === 0 && draft.timezone.trim().length > 50) errors.timezone = 'Use 50 characters or fewer.';
   if (step === 2) {
+    const skills = draft.skills.split(',').map((skill) => skill.trim()).filter(Boolean);
+    const normalizedSkills = skills.map((skill) => skill.toLowerCase());
+    if (skills.length > 10) errors.skills = 'Add no more than 10 skills.';
+    else if (skills.some((skill) => skill.length > 40)) errors.skills = 'Keep each skill to 40 characters or fewer.';
+    else if (new Set(normalizedSkills).size !== normalizedSkills.length) errors.skills = 'List each skill only once.';
     if (draft.githubUrl.trim() && !isGitHubProfile(draft.githubUrl.trim())) {
       errors.githubUrl = 'Enter a complete HTTPS GitHub profile link.';
     }
@@ -98,6 +130,7 @@ export function validateProfileStep(draft: ProfileDraft, step: number): ProfileE
     if (draft.evidenceSummary.trim() && draft.evidenceSummary.trim().length < 20) {
       errors.evidenceSummary = 'Describe your evidence in at least 20 characters.';
     }
+    if (draft.evidenceSummary.trim().length > 500) errors.evidenceSummary = 'Use 500 characters or fewer.';
   }
   return errors;
 }
@@ -106,12 +139,27 @@ function FieldError({ field, errors }: { field: DraftField; errors: ProfileError
   return errors[field] ? <span className="field-error" id={`profile-${field}-error`}>{errors[field]}</span> : null;
 }
 
-export function ProfileOnboardingPanel({ onClose }: { onClose: () => void }) {
-  const [draft, setDraft] = useState<ProfileDraft>(loadSavedProfile);
+export function ProfileOnboardingPanel({
+  authenticatedUser = null,
+  onClose,
+}: {
+  authenticatedUser?: AuthenticatedUser | null;
+  onClose: () => void;
+}) {
+  const isAuthenticated = authenticatedUser !== null;
+  const [draft, setDraft] = useState<ProfileDraft>(() => isAuthenticated ? {
+    ...emptyDraft,
+    displayName: authenticatedUser.displayName || authenticatedUser.githubLogin,
+    githubUrl: authenticatedUser.profileUrl,
+  } : loadSavedProfile());
   const [step, setStep] = useState(0);
   const [errors, setErrors] = useState<ProfileErrors>({});
   const [saveMessage, setSaveMessage] = useState('');
   const [isComplete, setIsComplete] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [profileLoadStatus, setProfileLoadStatus] = useState<'local' | 'loading' | 'ready' | 'error'>(
+    isAuthenticated ? 'loading' : 'local',
+  );
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLElement>(null);
   const stepHeadingRef = useRef<HTMLHeadingElement>(null);
@@ -122,6 +170,31 @@ export function ProfileOnboardingPanel({ onClose }: { onClose: () => void }) {
     if (step > 0) stepHeadingRef.current?.focus();
   }, [step]);
 
+  useEffect(() => {
+    if (!authenticatedUser) return;
+    const controller = new AbortController();
+    let active = true;
+    loadCurrentProfile(controller.signal)
+      .then((profile) => {
+        if (!active) return;
+        if (profile) setDraft(profileToDraft(profile));
+        setProfileLoadStatus('ready');
+      })
+      .catch((error: unknown) => {
+        if (!active || (error instanceof DOMException && error.name === 'AbortError')) return;
+        setProfileLoadStatus('error');
+        setSaveMessage(
+          error instanceof ProfileAPIError && error.status === 401
+            ? 'Your session expired. Log in again before saving a profile.'
+            : 'Your saved profile could not be loaded. You can retry by reopening this panel.',
+        );
+      });
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [authenticatedUser]);
+
   const updateDraft = (field: DraftField, value: string) => {
     setDraft((current) => ({ ...current, [field]: value }));
     setErrors((current) => ({ ...current, [field]: undefined }));
@@ -129,6 +202,10 @@ export function ProfileOnboardingPanel({ onClose }: { onClose: () => void }) {
   };
 
   const persistDraft = () => {
+    if (isAuthenticated) {
+      setSaveMessage('Complete all three steps to save this profile to your account.');
+      return false;
+    }
     try {
       window.localStorage.setItem(PROFILE_DRAFT_STORAGE_KEY, JSON.stringify(draft));
       setSaveMessage('Profile draft saved on this device.');
@@ -139,7 +216,7 @@ export function ProfileOnboardingPanel({ onClose }: { onClose: () => void }) {
     }
   };
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const nextErrors = validateProfileStep(draft, step);
     setErrors(nextErrors);
@@ -148,7 +225,38 @@ export function ProfileOnboardingPanel({ onClose }: { onClose: () => void }) {
       setStep((current) => current + 1);
       return;
     }
-    if (persistDraft()) setIsComplete(true);
+    if (!isAuthenticated) {
+      if (persistDraft()) setIsComplete(true);
+      return;
+    }
+
+    setIsSaving(true);
+    setSaveMessage('');
+    try {
+      const saved = await saveCurrentProfile({
+        displayName: draft.displayName.trim(),
+        primaryRole: draft.primaryRole,
+        bio: draft.bio.trim(),
+        timezone: draft.timezone.trim(),
+        weeklyAvailability: draft.weeklyAvailability,
+        preferredDuration: draft.preferredDuration,
+        workStyle: draft.workStyle,
+        communicationCadence: draft.communicationCadence,
+        skills: draft.skills.split(',').map((skill) => skill.trim()).filter(Boolean),
+        portfolioUrl: draft.portfolioUrl.trim() || null,
+        evidenceSummary: draft.evidenceSummary.trim(),
+      });
+      setDraft(profileToDraft(saved));
+      setIsComplete(true);
+    } catch (error) {
+      setSaveMessage(
+        error instanceof ProfileAPIError && error.status === 401
+          ? 'Your session expired. Log in again before saving this profile.'
+          : 'Your profile could not be saved. Review the fields and try again.',
+      );
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const describedBy = (field: DraftField) => errors[field] ? `profile-${field}-error` : undefined;
@@ -157,16 +265,18 @@ export function ProfileOnboardingPanel({ onClose }: { onClose: () => void }) {
     <div className="modal-backdrop profile-backdrop" role="presentation" onMouseDown={onClose}>
       <section aria-labelledby="profile-onboarding-title" aria-modal="true" className="profile-panel" onMouseDown={(event) => event.stopPropagation()} ref={dialogRef} role="dialog">
         <header className="profile-header">
-          <div><span className="eyebrow">Profile onboarding preview</span><h2 id="profile-onboarding-title">Make your collaboration fit visible.</h2></div>
+          <div><span className="eyebrow">{isAuthenticated ? 'Account profile' : 'Profile onboarding preview'}</span><h2 id="profile-onboarding-title">Make your collaboration fit visible.</h2></div>
           <button aria-label="Close profile onboarding" className="icon-button" onClick={onClose} ref={closeButtonRef} type="button">×</button>
         </header>
 
         {isComplete ? (
           <div className="profile-complete" role="status">
             <span aria-hidden="true" className="complete-mark">✓</span>
-            <span className="eyebrow">Profile draft ready</span>
+            <span className="eyebrow">{isAuthenticated ? 'Profile saved' : 'Profile draft ready'}</span>
             <h3>{draft.displayName}</h3>
-            <p>Your profile draft is saved on this device. It is not an account and has not been published.</p>
+            <p>{isAuthenticated
+              ? 'Your profile is saved to your Branch-Out account. It has not been published or verified.'
+              : 'Your profile draft is saved on this device. It is not an account and has not been published.'}</p>
             <div className="profile-preview-card">
               <div className="profile-preview-top"><span aria-hidden="true">{draft.displayName.charAt(0).toUpperCase()}</span><div><strong>{draft.primaryRole}</strong><small>{draft.timezone} · {draft.weeklyAvailability}</small></div></div>
               <p>{draft.bio}</p>
@@ -175,6 +285,8 @@ export function ProfileOnboardingPanel({ onClose }: { onClose: () => void }) {
             </div>
             <button className="primary-button" onClick={onClose} type="button">Return to homepage</button>
           </div>
+        ) : profileLoadStatus === 'loading' ? (
+          <div className="profile-loading" role="status">Loading your saved profile…</div>
         ) : (
           <>
             <ol className="profile-progress" aria-label={`Step ${step + 1} of 3`}>
@@ -188,10 +300,10 @@ export function ProfileOnboardingPanel({ onClose }: { onClose: () => void }) {
               </div>
 
               {step === 0 && <div className="profile-form-grid">
-                <label>Display name<input aria-describedby={describedBy('displayName')} aria-invalid={Boolean(errors.displayName)} onChange={(e) => updateDraft('displayName', e.target.value)} placeholder="Your working name" value={draft.displayName} /><FieldError field="displayName" errors={errors} /></label>
+                <label>Display name<input aria-describedby={describedBy('displayName')} aria-invalid={Boolean(errors.displayName)} maxLength={100} onChange={(e) => updateDraft('displayName', e.target.value)} placeholder="Your working name" value={draft.displayName} /><FieldError field="displayName" errors={errors} /></label>
                 <label>Primary role<select aria-describedby={describedBy('primaryRole')} aria-invalid={Boolean(errors.primaryRole)} onChange={(e) => updateDraft('primaryRole', e.target.value)} value={draft.primaryRole}><option value="">Select your role</option><option>Software developer</option><option>Product designer</option><option>UX researcher</option><option>Product builder</option></select><FieldError field="primaryRole" errors={errors} /></label>
-                <label className="full-field">Short bio<textarea aria-describedby={describedBy('bio')} aria-invalid={Boolean(errors.bio)} onChange={(e) => updateDraft('bio', e.target.value)} placeholder="Describe what you build, the problems you enjoy, and the teams you work well with." rows={4} value={draft.bio} /><FieldError field="bio" errors={errors} /></label>
-                <label>Timezone<input aria-describedby={describedBy('timezone')} aria-invalid={Boolean(errors.timezone)} onChange={(e) => updateDraft('timezone', e.target.value)} placeholder="e.g. UTC+5:30" value={draft.timezone} /><FieldError field="timezone" errors={errors} /></label>
+                <label className="full-field">Short bio<textarea aria-describedby={describedBy('bio')} aria-invalid={Boolean(errors.bio)} maxLength={500} onChange={(e) => updateDraft('bio', e.target.value)} placeholder="Describe what you build, the problems you enjoy, and the teams you work well with." rows={4} value={draft.bio} /><FieldError field="bio" errors={errors} /></label>
+                <label>Timezone<input aria-describedby={describedBy('timezone')} aria-invalid={Boolean(errors.timezone)} maxLength={50} onChange={(e) => updateDraft('timezone', e.target.value)} placeholder="e.g. UTC+5:30" value={draft.timezone} /><FieldError field="timezone" errors={errors} /></label>
               </div>}
 
               {step === 1 && <div className="profile-form-grid">
@@ -203,15 +315,15 @@ export function ProfileOnboardingPanel({ onClose }: { onClose: () => void }) {
 
               {step === 2 && <div className="profile-form-grid">
                 <label className="full-field">Skills to demonstrate<input aria-describedby={describedBy('skills')} aria-invalid={Boolean(errors.skills)} onChange={(e) => updateDraft('skills', e.target.value)} placeholder="TypeScript, React, data visualisation" value={draft.skills} /><FieldError field="skills" errors={errors} /></label>
-                <label>GitHub profile<input aria-describedby={describedBy('githubUrl')} aria-invalid={Boolean(errors.githubUrl)} inputMode="url" onChange={(e) => updateDraft('githubUrl', e.target.value)} placeholder="https://github.com/your-name" type="url" value={draft.githubUrl} /><FieldError field="githubUrl" errors={errors} /></label>
+                <label>GitHub profile<input aria-describedby={describedBy('githubUrl')} aria-invalid={Boolean(errors.githubUrl)} inputMode="url" onChange={(e) => updateDraft('githubUrl', e.target.value)} placeholder="https://github.com/your-name" readOnly={isAuthenticated} type="url" value={draft.githubUrl} /><FieldError field="githubUrl" errors={errors} />{isAuthenticated && <small>Verified from your signed-in GitHub account.</small>}</label>
                 <label>Portfolio link <span className="optional-label">Optional</span><input aria-describedby={describedBy('portfolioUrl')} aria-invalid={Boolean(errors.portfolioUrl)} inputMode="url" onChange={(e) => updateDraft('portfolioUrl', e.target.value)} placeholder="https://your-work.example" type="url" value={draft.portfolioUrl} /><FieldError field="portfolioUrl" errors={errors} /></label>
-                <label className="full-field">What does this evidence show?<textarea aria-describedby={describedBy('evidenceSummary')} aria-invalid={Boolean(errors.evidenceSummary)} onChange={(e) => updateDraft('evidenceSummary', e.target.value)} placeholder="Explain the work you personally delivered and the judgment it demonstrates." rows={3} value={draft.evidenceSummary} /><FieldError field="evidenceSummary" errors={errors} /></label>
+                <label className="full-field">What does this evidence show?<textarea aria-describedby={describedBy('evidenceSummary')} aria-invalid={Boolean(errors.evidenceSummary)} maxLength={500} onChange={(e) => updateDraft('evidenceSummary', e.target.value)} placeholder="Explain the work you personally delivered and the judgment it demonstrates." rows={3} value={draft.evidenceSummary} /><FieldError field="evidenceSummary" errors={errors} /></label>
                 <aside className="profile-safety-note full-field"><strong>Public evidence only</strong><p>Link public work or a portfolio page. Never enter passwords, tokens, private repository URLs, or client-confidential information.</p></aside>
               </div>}
 
               <footer className="profile-actions">
-                <div><button className="secondary-button" onClick={persistDraft} type="button">Save draft</button>{saveMessage && <span aria-live="polite" className="save-message">{saveMessage}</span>}</div>
-                <div>{step > 0 && <button className="text-button" onClick={() => setStep((current) => current - 1)} type="button">Back</button>}<button className="primary-button" type="submit">{step === 2 ? 'Complete profile draft' : 'Continue'}</button></div>
+                <div>{isAuthenticated ? <small>Saved to your account when all steps are complete.</small> : <button className="secondary-button" onClick={persistDraft} type="button">Save draft</button>}{saveMessage && <span aria-live="polite" className="save-message">{saveMessage}</span>}</div>
+                <div>{step > 0 && <button className="text-button" disabled={isSaving} onClick={() => setStep((current) => current - 1)} type="button">Back</button>}<button className="primary-button" disabled={isSaving || profileLoadStatus === 'error'} type="submit">{isSaving ? 'Saving profile…' : step === 2 ? (isAuthenticated ? 'Save profile' : 'Complete profile draft') : 'Continue'}</button></div>
               </footer>
             </form>
           </>

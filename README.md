@@ -134,7 +134,8 @@ make vet
 The login panel supports GitHub sign-in, displays the returning member, links to
 their public GitHub profile, and can revoke the current session. It also includes
 a clearly labelled **Preview profile setup** action that opens a three-step local
-draft for:
+draft for signed-out visitors. Signed-in members see **Manage profile**, which
+loads and saves the same fields through their Branch-Out account:
 
 1. Display name, primary role, bio, and timezone
 2. Weekly availability, preferred project duration, working style, and
@@ -143,9 +144,10 @@ draft for:
    explanation of the applicant's evidence
 
 GitHub authentication never asks the frontend to handle a password or access
-token. The separate profile preview validates unsafe or unrelated evidence
-links, saves its draft only in the current browser, and does not publish a
-profile or attach the draft to the authenticated account.
+token. The profile flow validates unsafe or unrelated evidence links. GitHub
+identity is read-only for signed-in members, and completing the flow persists
+their account profile. Signed-out drafts remain only in the current browser.
+Neither path publishes or verifies the profile.
 
 ## Project discovery
 
@@ -245,11 +247,10 @@ and backend systems.
 - API project openings are persisted in PostgreSQL but remain read-only.
 - GitHub login and logout are connected, but the OAuth app must be configured in
   the backend environment before sign-in is available.
-- Authenticated GitHub identity is not yet connected to the device-local profile
-  onboarding interface. The backend profile read/update endpoints are ready for
-  that integration.
-- Profile onboarding creates only a device-local preview, not an authenticated
-  account or public profile.
+- Authenticated profile onboarding loads and saves through the member account;
+  signed-out onboarding remains a device-local preview.
+- Saved account profiles are not yet public, searchable, or attached to project
+  applications.
 - The early-access form confirms frontend input only and does not claim to store
   an email address.
 - Project-opening drafts are stored only in the current browser until the backend

@@ -99,7 +99,7 @@ session.
 **How to use it:** Select **Log in**, then **Continue with GitHub**. GitHub asks
 for authorization and returns to Branch-Out. The header shows the member's
 display name or GitHub login after the session is confirmed. Open it to view the
-public GitHub profile, log out, or continue to the device-local profile preview.
+public GitHub profile, log out, or manage the account profile.
 Branch-Out never asks the frontend to collect a GitHub password or access token.
 
 The backend must be running with a configured GitHub OAuth app. If the API cannot
@@ -111,11 +111,11 @@ browser cookie.
 Close the panel with its close button, by selecting the shaded area outside it,
 or by pressing `Escape`.
 
-## Profile onboarding preview
+## Profile onboarding
 
-**What it is:** A three-step preview of the profile information Branch-Out will
-collect alongside a GitHub-backed account. It creates a local draft, not a
-public profile, and is not yet attached to the authenticated account.
+**What it is:** A three-step collaboration profile. Signed-in members load and
+save it through their Branch-Out account. Signed-out visitors can still use a
+device-local preview. Neither version creates a public or verified profile.
 
 ### Step 1: Identity
 
@@ -145,7 +145,8 @@ starting a trial.
 Enter:
 
 - Skills you can demonstrate
-- A required complete HTTPS GitHub profile link
+- A required complete HTTPS GitHub profile link; for signed-in members this is
+  supplied by the authenticated account and cannot be edited
 - An optional complete HTTP or HTTPS portfolio link
 - An explanation of at least 20 characters describing what the evidence shows
   and what you personally contributed
@@ -153,13 +154,17 @@ Enter:
 Only public evidence should be linked. Never enter passwords, access tokens,
 private repository links, or client-confidential information.
 
-### Save and complete the profile draft
+### Save and complete the profile
 
-Select **Save draft** at any step to store the current entries in this browser.
-The same draft is restored when onboarding is reopened.
+Signed-out visitors can select **Save draft** at any step to store the current
+entries in this browser. The same local draft is restored when onboarding is
+reopened.
 
-Select **Complete profile draft** after the Evidence step. Branch-Out displays a
-profile preview and states clearly that no account or public profile was created.
+Signed-in members see existing account data when the flow opens. Complete all
+three steps and select **Save profile** to create or replace the account-backed
+profile. Partial authenticated profiles are not saved. Branch-Out displays the
+result and states that it has not been published or verified. Signed-out users
+select **Complete profile draft** and receive the existing local-only preview.
 Close onboarding with its close button, the shaded area, or `Escape`.
 
 ## Homepage introduction
@@ -592,8 +597,9 @@ read-only.
 
 Authenticated members can also create or replace a validated collaboration
 profile through the backend. The GitHub profile link comes from the authenticated
-identity rather than editable input. The visible onboarding form remains
-device-local until the next frontend integration milestone.
+identity rather than editable input. The visible onboarding form now loads and
+saves these profiles for authenticated members while retaining a local preview
+for signed-out visitors.
 The OpenAPI contract, database commands, rollback instructions, authentication
 configuration, and operating details live in `backend/README.md`.
 
@@ -602,10 +608,8 @@ configuration, and operating details live in `backend/README.md`.
 - Project and owner information is representative data duplicated in the
   frontend and PostgreSQL until frontend integration lands.
 - GitHub login requires a configured OAuth app and a running API.
-- The backend can persist an authenticated profile, but the visible onboarding
-  form is not yet connected to it.
-- Profile onboarding creates a local draft only; it does not identify or
-  authenticate the visitor.
+- Authenticated profiles can be saved but are not yet public, searchable, or
+  attached to applications. Signed-out profile previews remain local only.
 - Opening drafts cannot be published.
 - Application drafts cannot be sent or reviewed by an owner.
 - Trial-agreement drafts cannot be sent, mutually accepted, or signed.
@@ -613,8 +617,8 @@ configuration, and operating details live in `backend/README.md`.
   moderated, or published.
 - Saved openings do not synchronize between browsers or devices.
 - Early-access email addresses are not transmitted or stored.
-- PostgreSQL-backed discovery exists, but there is no account, notification, or
-  moderation flow yet and the frontend is not connected to the API.
+- PostgreSQL-backed discovery exists, but the frontend discovery catalogue is
+  still local and notification and moderation flows do not exist yet.
 
 ## Handbook maintenance rule
 
