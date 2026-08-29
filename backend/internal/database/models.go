@@ -5,29 +5,54 @@
 package database
 
 import (
-	"github.com/jackc/pgx/v5/pgtype"
+	"time"
 )
 
+type OauthAttempt struct {
+	StateHash    []byte    `db:"state_hash" json:"state_hash"`
+	CodeVerifier string    `db:"code_verifier" json:"code_verifier"`
+	ExpiresAt    time.Time `db:"expires_at" json:"expires_at"`
+	CreatedAt    time.Time `db:"created_at" json:"created_at"`
+}
+
 type ProjectOpening struct {
-	ID                string             `db:"id" json:"id"`
-	Title             string             `db:"title" json:"title"`
-	Summary           string             `db:"summary" json:"summary"`
-	Skills            []string           `db:"skills" json:"skills"`
-	Role              string             `db:"role" json:"role"`
-	Compensation      string             `db:"compensation" json:"compensation"`
-	Commitment        string             `db:"commitment" json:"commitment"`
-	CommitmentBand    string             `db:"commitment_band" json:"commitment_band"`
-	Duration          string             `db:"duration" json:"duration"`
-	Timezone          string             `db:"timezone" json:"timezone"`
-	Freshness         string             `db:"freshness" json:"freshness"`
-	Stage             string             `db:"stage" json:"stage"`
-	DesiredOutcome    string             `db:"desired_outcome" json:"desired_outcome"`
-	FirstMilestone    string             `db:"first_milestone" json:"first_milestone"`
-	OwnerContribution string             `db:"owner_contribution" json:"owner_contribution"`
-	OwnerName         string             `db:"owner_name" json:"owner_name"`
-	OwnerSignal       string             `db:"owner_signal" json:"owner_signal"`
-	Confidentiality   string             `db:"confidentiality" json:"confidentiality"`
-	DisplayOrder      int32              `db:"display_order" json:"display_order"`
-	CreatedAt         pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt         pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ID                string    `db:"id" json:"id"`
+	Title             string    `db:"title" json:"title"`
+	Summary           string    `db:"summary" json:"summary"`
+	Skills            []string  `db:"skills" json:"skills"`
+	Role              string    `db:"role" json:"role"`
+	Compensation      string    `db:"compensation" json:"compensation"`
+	Commitment        string    `db:"commitment" json:"commitment"`
+	CommitmentBand    string    `db:"commitment_band" json:"commitment_band"`
+	Duration          string    `db:"duration" json:"duration"`
+	Timezone          string    `db:"timezone" json:"timezone"`
+	Freshness         string    `db:"freshness" json:"freshness"`
+	Stage             string    `db:"stage" json:"stage"`
+	DesiredOutcome    string    `db:"desired_outcome" json:"desired_outcome"`
+	FirstMilestone    string    `db:"first_milestone" json:"first_milestone"`
+	OwnerContribution string    `db:"owner_contribution" json:"owner_contribution"`
+	OwnerName         string    `db:"owner_name" json:"owner_name"`
+	OwnerSignal       string    `db:"owner_signal" json:"owner_signal"`
+	Confidentiality   string    `db:"confidentiality" json:"confidentiality"`
+	DisplayOrder      int32     `db:"display_order" json:"display_order"`
+	CreatedAt         time.Time `db:"created_at" json:"created_at"`
+	UpdatedAt         time.Time `db:"updated_at" json:"updated_at"`
+}
+
+type Session struct {
+	TokenHash []byte    `db:"token_hash" json:"token_hash"`
+	UserID    int64     `db:"user_id" json:"user_id"`
+	ExpiresAt time.Time `db:"expires_at" json:"expires_at"`
+	CreatedAt time.Time `db:"created_at" json:"created_at"`
+}
+
+type User struct {
+	ID           int64     `db:"id" json:"id"`
+	GithubUserID int64     `db:"github_user_id" json:"github_user_id"`
+	GithubLogin  string    `db:"github_login" json:"github_login"`
+	DisplayName  *string   `db:"display_name" json:"display_name"`
+	AvatarUrl    string    `db:"avatar_url" json:"avatar_url"`
+	ProfileUrl   string    `db:"profile_url" json:"profile_url"`
+	CreatedAt    time.Time `db:"created_at" json:"created_at"`
+	UpdatedAt    time.Time `db:"updated_at" json:"updated_at"`
 }

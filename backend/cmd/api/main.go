@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/hiteshchundi/branch-out/backend/internal/auth"
 	"github.com/hiteshchundi/branch-out/backend/internal/config"
 	"github.com/hiteshchundi/branch-out/backend/internal/database"
 	"github.com/hiteshchundi/branch-out/backend/internal/httpapi"
@@ -35,7 +36,16 @@ func main() {
 	}
 
 	repository := openings.NewPostgresRepository(database.New(pool))
-	api := httpapi.New(repository, pool, cfg.AllowedOrigin, logger)
+	authentication := auth.NewService(
+		auth.NewPostgresStore(database.New(pool)),
+		auth.NewGitHubClient(auth.GitHubConfig{
+			ClientID: cfg.GitHubClientID, ClientSecret: cfg.GitHubClientSecret,
+			CallbackURL: cfg.GitHubCallbackURL,
+		}, nil),
+	)
+	api := httpapi.New(repository, pool, authentication, httpapi.Options{
+		AllowedOrigin: cfg.AllowedOrigin, FrontendURL: cfg.FrontendURL, CookieSecure: cfg.CookieSecure,
+	}, logger)
 	server := &http.Server{
 		Addr:              cfg.Address,
 		Handler:           api,

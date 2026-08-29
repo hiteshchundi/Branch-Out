@@ -15,8 +15,13 @@ import (
 
 const allowedOrigin = "http://localhost:3000"
 
+var defaultOptions = Options{
+	AllowedOrigin: allowedOrigin,
+	FrontendURL:   "http://localhost:3000/",
+}
+
 func testAPI(repository openings.Repository) http.Handler {
-	return New(repository, readyChecker{}, allowedOrigin, slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)))
+	return New(repository, readyChecker{}, fakeAuthenticator{}, defaultOptions, slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)))
 }
 
 func TestStatusRoutes(t *testing.T) {
@@ -44,7 +49,7 @@ func TestReadinessReturnsUnavailableWhenDependencyFails(t *testing.T) {
 	api := New(
 		openings.NewMemoryRepository(nil),
 		readyChecker{err: errors.New("database unavailable")},
-		allowedOrigin,
+		fakeAuthenticator{}, defaultOptions,
 		slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)),
 	)
 	response := httptest.NewRecorder()
@@ -132,6 +137,9 @@ func TestCORS(t *testing.T) {
 		}
 		if response.Header().Get("Access-Control-Allow-Origin") != allowedOrigin {
 			t.Errorf("allow origin = %q, want %q", response.Header().Get("Access-Control-Allow-Origin"), allowedOrigin)
+		}
+		if response.Header().Get("Access-Control-Allow-Credentials") != "true" {
+			t.Error("credentialed CORS header is missing")
 		}
 	})
 

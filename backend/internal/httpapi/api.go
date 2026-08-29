@@ -13,10 +13,12 @@ import (
 )
 
 type API struct {
-	repository    openings.Repository
-	readiness     ReadinessChecker
-	allowedOrigin string
-	logger        *slog.Logger
+	repository     openings.Repository
+	readiness      ReadinessChecker
+	authentication Authenticator
+	options        Options
+	allowedOrigin  string
+	logger         *slog.Logger
 }
 
 type ReadinessChecker interface {
@@ -44,12 +46,17 @@ type apiError struct {
 	Field   string `json:"field,omitempty"`
 }
 
-func New(repository openings.Repository, readiness ReadinessChecker, allowedOrigin string, logger *slog.Logger) http.Handler {
-	api := &API{repository: repository, readiness: readiness, allowedOrigin: allowedOrigin, logger: logger}
+func New(repository openings.Repository, readiness ReadinessChecker, authentication Authenticator, options Options, logger *slog.Logger) http.Handler {
+	api := &API{repository: repository, readiness: readiness, authentication: authentication, options: options, allowedOrigin: options.AllowedOrigin, logger: logger}
 	routes := http.NewServeMux()
 	routes.HandleFunc("GET /healthz", api.health)
 	routes.HandleFunc("GET /readyz", api.ready)
 	routes.HandleFunc("GET /v1/openings", api.listOpenings)
+	routes.HandleFunc("GET /v1/auth/github/start", api.startGitHubAuth)
+	routes.HandleFunc("GET /v1/auth/github/callback", api.finishGitHubAuth)
+	routes.HandleFunc("GET /v1/session", api.currentSession)
+	routes.HandleFunc("DELETE /v1/session", api.deleteSession)
+	routes.HandleFunc("OPTIONS /v1/session", api.preflight)
 	routes.HandleFunc("OPTIONS /v1/openings", api.preflight)
 	routes.HandleFunc("/", api.notFound)
 
@@ -117,7 +124,7 @@ func (api *API) preflight(writer http.ResponseWriter, _ *http.Request) {
 }
 
 func (api *API) notFound(writer http.ResponseWriter, request *http.Request) {
-	if request.URL.Path == "/healthz" || request.URL.Path == "/readyz" || request.URL.Path == "/v1/openings" {
+	if request.URL.Path == "/healthz" || request.URL.Path == "/readyz" || request.URL.Path == "/v1/openings" || request.URL.Path == "/v1/auth/github/start" || request.URL.Path == "/v1/auth/github/callback" || request.URL.Path == "/v1/session" {
 		writeError(writer, http.StatusMethodNotAllowed, apiError{Code: "method_not_allowed", Message: "This method is not supported for the requested resource."})
 		return
 	}
@@ -129,8 +136,9 @@ func (api *API) cors(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.Header.Get("Origin") == api.allowedOrigin {
 			writer.Header().Set("Access-Control-Allow-Origin", api.allowedOrigin)
-			writer.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+			writer.Header().Set("Access-Control-Allow-Methods", "GET, DELETE, OPTIONS")
 			writer.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type")
+			writer.Header().Set("Access-Control-Allow-Credentials", "true")
 			writer.Header().Set("Vary", "Origin")
 		}
 		next.ServeHTTP(writer, request)

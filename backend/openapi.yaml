@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: Branch-Out API
-  version: 0.1.0
-  description: Read-only foundation for Branch-Out project discovery.
+  version: 0.2.0
+  description: PostgreSQL-backed project discovery and GitHub authentication for Branch-Out.
 servers:
   - url: http://localhost:8080
 paths:
@@ -88,7 +88,112 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /v1/auth/github/start:
+    get:
+      operationId: startGitHubAuthentication
+      summary: Start GitHub OAuth authentication
+      description: Creates a single-use OAuth attempt with PKCE and redirects to GitHub.
+      responses:
+        '303':
+          description: Continue authentication at GitHub.
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri
+        '500':
+          description: Authentication could not be started.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: GitHub OAuth credentials are not configured.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /v1/auth/github/callback:
+    get:
+      operationId: finishGitHubAuthentication
+      summary: Complete GitHub OAuth authentication
+      description: Validates browser-bound state and PKCE, creates a session, and redirects to the frontend.
+      parameters:
+        - name: code
+          in: query
+          schema:
+            type: string
+        - name: state
+          in: query
+          schema:
+            type: string
+        - name: error
+          in: query
+          schema:
+            type: string
+      responses:
+        '303':
+          description: Authentication completed, was denied, or failed; inspect the frontend auth query value.
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri
+        '500':
+          description: The configured frontend redirect URL is invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /v1/session:
+    get:
+      operationId: getCurrentSession
+      summary: Get the authenticated Branch-Out user
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: The current authenticated user.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: No valid session is present.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: The session could not be loaded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    delete:
+      operationId: deleteCurrentSession
+      summary: Log out the current user
+      security:
+        - sessionCookie: []
+      responses:
+        '204':
+          description: The session was deleted or no session was present.
+        '500':
+          description: The session could not be deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
 components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: branch_out_session
   schemas:
     Status:
       type: object
@@ -179,3 +284,33 @@ components:
               type: string
             field:
               type: string
+    User:
+      type: object
+      required:
+        - id
+        - githubUserId
+        - githubLogin
+        - avatarUrl
+        - profileUrl
+      properties:
+        id:
+          type: integer
+          format: int64
+        githubUserId:
+          type: integer
+          format: int64
+        githubLogin:
+          type: string
+          minLength: 1
+          maxLength: 39
+        displayName:
+          type:
+            - string
+            - 'null'
+          maxLength: 100
+        avatarUrl:
+          type: string
+          format: uri
+        profileUrl:
+          type: string
+          format: uri

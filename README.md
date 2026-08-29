@@ -31,8 +31,9 @@ responsive discovery homepage split into three clear components:
 - **Footer:** product summary, navigation, and a clear team-responsibility note.
 
 The backend in [`backend`](backend) is a Go REST API with PostgreSQL-backed,
-filterable project-opening discovery, dependency-aware health checks, reversible
-migrations, typed SQLC queries, automated tests, and an OpenAPI contract.
+filterable project-opening discovery, GitHub OAuth, durable revocable sessions,
+dependency-aware health checks, reversible migrations, typed SQLC queries,
+automated tests, and an OpenAPI contract.
 
 ## Original brand identity
 
@@ -233,8 +234,8 @@ and backend systems.
 - The Go API exposes representative project openings, but the frontend still
   reads its matching local catalogue until the integration milestone.
 - API project openings are persisted in PostgreSQL but remain read-only.
-- The login panel is accessible and interactive, but GitHub OAuth remains
-  disabled until backend authentication is implemented.
+- The backend supports GitHub OAuth and durable sessions, but the accessible
+  frontend login panel remains an unconnected preview until frontend integration.
 - Profile onboarding creates only a device-local preview, not an authenticated
   account or public profile.
 - The early-access form confirms frontend input only and does not claim to store

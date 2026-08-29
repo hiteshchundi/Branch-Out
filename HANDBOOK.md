@@ -1,6 +1,6 @@
 # Branch-Out Handbook
 
-Updated: 28 August 2026
+Updated: 29 August 2026
 
 This handbook is the user guide for every feature currently available in the
 Branch-Out frontend. It is a living document and must be updated whenever a
@@ -17,8 +17,8 @@ claims with three understandable trust signals:
 3. **Collaboration Proven** — a teammate confirmed behavior observed in shared work.
 
 The current frontend is a local product preview. It uses representative project
-data and device-local drafts while the account and backend services are still to
-be built.
+data and device-local drafts while its existing backend services are connected
+to the interface one feature at a time.
 
 ## Quick start
 
@@ -95,10 +95,11 @@ preference.
 
 **What it is:** A preview of the future GitHub-first member access panel.
 
-**How to use it:** Select **Log in** to inspect the panel. GitHub authentication
-is intentionally disabled until the backend authentication feature exists. The
-current panel never asks for or stores credentials. Select **Preview profile
-setup** to open the device-local onboarding flow described below.
+**How to use it:** Select **Log in** to inspect the panel. The backend now has
+GitHub authentication, but this frontend control remains intentionally disabled
+until the integration step connects it. The current panel never asks for or
+stores credentials. Select **Preview profile setup** to open the device-local
+onboarding flow described below.
 
 Close the panel with its close button, by selecting the shaded area outside it,
 or by pressing `Escape`.
@@ -106,8 +107,8 @@ or by pressing `Escape`.
 ## Profile onboarding preview
 
 **What it is:** A three-step preview of the profile information Branch-Out will
-collect after GitHub authentication is implemented. It creates a local draft,
-not an account or public profile.
+collect after GitHub authentication is connected to the frontend. It creates a
+local draft, not an account or public profile.
 
 ### Step 1: Identity
 
@@ -563,7 +564,7 @@ production credentials into any frontend preview field.
 
 ## Backend foundation
 
-The repository now includes a small Go REST API under `backend`. It provides
+The repository includes a small Go REST API under `backend`. It provides
 liveness and readiness checks plus `GET /v1/openings`, whose optional `query`,
 `role`, `compensation`, and `commitment` filters follow the discovery controls in
 the interface. Structured filter values are validated and failures use a stable
@@ -576,15 +577,18 @@ development data. The API verifies PostgreSQL during startup; its readiness rout
 returns HTTP 503 when the database cannot be reached. The in-memory repository
 remains only as a fast test double.
 
-This milestone remains read-only. It does not accept writes, identify visitors,
-or expose private information. The OpenAPI contract, database commands, rollback
-instructions, and operating details live in `backend/README.md`.
+The API also supports GitHub OAuth and durable, revocable application sessions.
+It stores users, one-time OAuth attempts, and hashed session tokens in
+PostgreSQL; GitHub access tokens are not retained. This backend capability is not
+yet connected to the frontend login panel. Project discovery remains read-only.
+The OpenAPI contract, database commands, rollback instructions, authentication
+configuration, and operating details live in `backend/README.md`.
 
 ## Current limitations
 
 - Project and owner information is representative data duplicated in the
   frontend and PostgreSQL until frontend integration lands.
-- GitHub login is not connected.
+- GitHub login exists in the backend but is not connected to the frontend.
 - Profile onboarding creates a local draft only; it does not identify or
   authenticate the visitor.
 - Opening drafts cannot be published.
