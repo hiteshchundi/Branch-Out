@@ -93,13 +93,20 @@ preference.
 
 ### Log in
 
-**What it is:** A preview of the future GitHub-first member access panel.
+**What it is:** GitHub-first member access backed by a durable Branch-Out
+session.
 
-**How to use it:** Select **Log in** to inspect the panel. The backend now has
-GitHub authentication, but this frontend control remains intentionally disabled
-until the integration step connects it. The current panel never asks for or
-stores credentials. Select **Preview profile setup** to open the device-local
-onboarding flow described below.
+**How to use it:** Select **Log in**, then **Continue with GitHub**. GitHub asks
+for authorization and returns to Branch-Out. The header shows the member's
+display name or GitHub login after the session is confirmed. Open it to view the
+public GitHub profile, log out, or continue to the device-local profile preview.
+Branch-Out never asks the frontend to collect a GitHub password or access token.
+
+The backend must be running with a configured GitHub OAuth app. If the API cannot
+be reached, the panel explains that sign-in is unavailable. Callback, cancelled,
+expired, and failed sign-in outcomes are announced on the page, then removed
+from the browser address. Logging out revokes the server session and clears the
+browser cookie.
 
 Close the panel with its close button, by selecting the shaded area outside it,
 or by pressing `Escape`.
@@ -107,8 +114,8 @@ or by pressing `Escape`.
 ## Profile onboarding preview
 
 **What it is:** A three-step preview of the profile information Branch-Out will
-collect after GitHub authentication is connected to the frontend. It creates a
-local draft, not an account or public profile.
+collect alongside a GitHub-backed account. It creates a local draft, not a
+public profile, and is not yet attached to the authenticated account.
 
 ### Step 1: Identity
 
@@ -577,10 +584,11 @@ development data. The API verifies PostgreSQL during startup; its readiness rout
 returns HTTP 503 when the database cannot be reached. The in-memory repository
 remains only as a fast test double.
 
-The API also supports GitHub OAuth and durable, revocable application sessions.
+The API also supports GitHub OAuth and durable, revocable application sessions,
+and the frontend login panel now uses those routes.
 It stores users, one-time OAuth attempts, and hashed session tokens in
-PostgreSQL; GitHub access tokens are not retained. This backend capability is not
-yet connected to the frontend login panel. Project discovery remains read-only.
+PostgreSQL; GitHub access tokens are not retained. Project discovery remains
+read-only.
 The OpenAPI contract, database commands, rollback instructions, authentication
 configuration, and operating details live in `backend/README.md`.
 
@@ -588,7 +596,9 @@ configuration, and operating details live in `backend/README.md`.
 
 - Project and owner information is representative data duplicated in the
   frontend and PostgreSQL until frontend integration lands.
-- GitHub login exists in the backend but is not connected to the frontend.
+- GitHub login requires a configured OAuth app and a running API.
+- The authenticated identity is not yet connected to profile drafts or write
+  flows.
 - Profile onboarding creates a local draft only; it does not identify or
   authenticate the visitor.
 - Opening drafts cannot be published.

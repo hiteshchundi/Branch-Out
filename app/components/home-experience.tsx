@@ -2,6 +2,7 @@
 
 import {
   FormEvent,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -21,6 +22,12 @@ import {
   parseSavedProjectIds,
   SAVED_PROJECTS_STORAGE_KEY,
 } from '../data/saved-projects';
+import {
+  endCurrentSession,
+  getGitHubLoginURL,
+  loadCurrentUser,
+  type AuthenticatedUser,
+} from '../data/auth';
 import { CreateOpeningPanel } from './create-opening-panel';
 import { BrandLogo } from './brand-logo';
 import { OutcomeFeedbackPanel } from './outcome-feedback-panel';
@@ -53,11 +60,19 @@ function getSavedProjectsSnapshot() {
 }
 
 function LoginPanel({
+  isLoggingOut,
   onClose,
+  onLogout,
   onStartOnboarding,
+  sessionStatus,
+  user,
 }: {
+  isLoggingOut: boolean;
   onClose: () => void;
+  onLogout: () => void;
   onStartOnboarding: () => void;
+  sessionStatus: 'loading' | 'anonymous' | 'authenticated' | 'unavailable';
+  user: AuthenticatedUser | null;
 }) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLElement>(null);
@@ -83,17 +98,37 @@ function LoginPanel({
           ×
         </button>
         <span className="eyebrow">Member access</span>
-        <h2 id="login-title">Log in to Branch-Out</h2>
-        <p>
-          GitHub sign-in will connect profiles to real work evidence. Account
-          authentication will be activated with the backend onboarding feature.
-        </p>
-        <button className="github-button" disabled type="button">
-          Continue with GitHub
-          <span aria-hidden="true">↗</span>
-        </button>
-        <small>This preview never requests or stores account credentials.</small>
-        <div className="login-preview-divider"><span>Frontend preview</span></div>
+        <h2 id="login-title">{user ? 'Your Branch-Out account' : 'Log in to Branch-Out'}</h2>
+        {user ? (
+          <>
+            <div className="account-summary">
+              <span aria-hidden="true" className="account-avatar">
+                {(user.displayName || user.githubLogin).charAt(0).toUpperCase()}
+              </span>
+              <div>
+                <strong>{user.displayName || user.githubLogin}</strong>
+                <span>@{user.githubLogin}</span>
+              </div>
+            </div>
+            <a className="github-button" href={user.profileUrl} rel="noreferrer" target="_blank">
+              View GitHub profile <span aria-hidden="true">↗</span>
+            </a>
+            <button className="secondary-button account-logout-button" disabled={isLoggingOut} onClick={onLogout} type="button">
+              {isLoggingOut ? 'Logging out…' : 'Log out'}
+            </button>
+          </>
+        ) : (
+          <>
+            <p>Use GitHub to create or return to your Branch-Out account.</p>
+            <a className="github-button" href={getGitHubLoginURL()}>
+              Continue with GitHub <span aria-hidden="true">↗</span>
+            </a>
+            <small>Branch-Out requests only your public GitHub identity and never sees your password.</small>
+            {sessionStatus === 'loading' && <p className="login-state" role="status">Checking for an existing session…</p>}
+            {sessionStatus === 'unavailable' && <p className="login-state login-state-error" role="status">The Branch-Out API could not be reached. Start it before signing in.</p>}
+          </>
+        )}
+        <div className="login-preview-divider"><span>Profile details</span></div>
         <button className="secondary-button login-preview-button" onClick={onStartOnboarding} type="button">
           Preview profile setup
         </button>
@@ -205,6 +240,10 @@ export function HomeExperience() {
   const [savedProjectsMessage, setSavedProjectsMessage] = useState('');
   const [email, setEmail] = useState('');
   const [signupMessage, setSignupMessage] = useState('');
+  const [sessionStatus, setSessionStatus] = useState<'loading' | 'anonymous' | 'authenticated' | 'unavailable'>('loading');
+  const [authenticatedUser, setAuthenticatedUser] = useState<AuthenticatedUser | null>(null);
+  const [authenticationMessage, setAuthenticationMessage] = useState('');
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const projectTriggerRef = useRef<HTMLButtonElement | null>(null);
   const createOpeningTriggerRef = useRef<HTMLButtonElement>(null);
   const loginTriggerRef = useRef<HTMLButtonElement>(null);
@@ -231,6 +270,41 @@ export function HomeExperience() {
   const activeFilterCount = Number(filters.role !== 'All roles')
     + Number(filters.compensation !== 'All compensation')
     + Number(filters.commitment !== 'Any commitment');
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
+    const callbackStatus = new URL(window.location.href).searchParams.get('auth');
+    const callbackMessages: Record<string, string> = {
+      success: 'GitHub sign-in completed.',
+      denied: 'GitHub sign-in was cancelled.',
+      invalid_state: 'GitHub sign-in expired or could not be verified. Please try again.',
+      error: 'GitHub sign-in could not be completed. Please try again.',
+    };
+    if (callbackStatus && callbackMessages[callbackStatus]) {
+      queueMicrotask(() => {
+        if (active) setAuthenticationMessage(callbackMessages[callbackStatus]);
+      });
+      const cleanURL = new URL(window.location.href);
+      cleanURL.searchParams.delete('auth');
+      window.history.replaceState(window.history.state, '', `${cleanURL.pathname}${cleanURL.search}${cleanURL.hash}`);
+    }
+
+    loadCurrentUser(controller.signal)
+      .then((user) => {
+        if (!active) return;
+        setAuthenticatedUser(user);
+        setSessionStatus(user ? 'authenticated' : 'anonymous');
+      })
+      .catch((error: unknown) => {
+        if (!active || (error instanceof DOMException && error.name === 'AbortError')) return;
+        setSessionStatus('unavailable');
+      });
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, []);
 
   const updateFilter = <Key extends keyof ProjectFilters>(key: Key, value: ProjectFilters[Key]) => {
     setFilters((current) => ({ ...current, [key]: value }));
@@ -326,6 +400,21 @@ export function HomeExperience() {
     window.setTimeout(() => loginTriggerRef.current?.focus(), 0);
   };
 
+  const logout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await endCurrentSession();
+      setAuthenticatedUser(null);
+      setSessionStatus('anonymous');
+      setAuthenticationMessage('You have been logged out.');
+      closeLogin();
+    } catch {
+      setAuthenticationMessage('Logout could not be completed. Please try again.');
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
+
   // This frontend-only form gives clear feedback without pretending an account was created.
   const handleEarlyAccess = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -376,10 +465,17 @@ export function HomeExperience() {
             <span className="post-label-short">Post</span>
           </button>
           <button className="login-button" onClick={() => setIsLoginOpen(true)} ref={loginTriggerRef} type="button">
-            Log in
+            {authenticatedUser?.displayName || authenticatedUser?.githubLogin || 'Log in'}
           </button>
         </div>
       </header>
+
+      {authenticationMessage && (
+        <div className="authentication-notice" role="status">
+          <span>{authenticationMessage}</span>
+          <button aria-label="Dismiss authentication message" onClick={() => setAuthenticationMessage('')} type="button">×</button>
+        </div>
+      )}
 
       <main id="main-content" tabIndex={-1}>
         {/* Body: a focused product promise followed by proof-led discovery. */}
@@ -622,8 +718,12 @@ export function HomeExperience() {
 
       {isLoginOpen && (
         <LoginPanel
+          isLoggingOut={isLoggingOut}
           onClose={closeLogin}
+          onLogout={logout}
           onStartOnboarding={startProfileOnboarding}
+          sessionStatus={sessionStatus}
+          user={authenticatedUser}
         />
       )}
       {isProfileOnboardingOpen && <ProfileOnboardingPanel onClose={closeProfileOnboarding} />}

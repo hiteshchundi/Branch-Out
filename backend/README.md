@@ -96,8 +96,8 @@ not persisted.
 
 For an HTTPS deployment, set `BRANCH_OUT_COOKIE_SECURE=true`, use HTTPS callback
 and frontend URLs, and keep the client secret outside the repository. The
-frontend login control is not connected to these routes yet; it remains an
-explicit preview until the frontend integration milestone.
+frontend uses these routes through `NEXT_PUBLIC_BRANCH_OUT_API_URL`, which
+defaults to `http://localhost:8080`.
 
 ## Verify
 
@@ -143,5 +143,5 @@ conflicting filters, ordering, and cancellation.
 
 The memory repository remains as a fast domain-test double. Runtime traffic uses
 PostgreSQL. Authentication can create or update an account and revoke its
-sessions; project openings remain read-only, and the frontend has not yet been
-wired to the backend routes.
+sessions; the frontend uses those authentication routes, while project openings
+remain read-only.

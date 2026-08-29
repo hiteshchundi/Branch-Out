@@ -68,6 +68,9 @@ pnpm dev
 
 Then open the local address printed by the development server.
 
+The frontend calls `http://localhost:8080` by default. Set
+`NEXT_PUBLIC_BRANCH_OUT_API_URL` to the API origin when it runs elsewhere.
+
 Run PostgreSQL migrations and the API in a second terminal (Go 1.26 or newer is
 required):
 
@@ -80,7 +83,9 @@ go run ./cmd/api
 
 The API listens on `http://localhost:8080` by default. See
 [`backend/README.md`](backend/README.md) for configuration, request examples,
-the OpenAPI contract, and backend-specific checks.
+the OpenAPI contract, GitHub OAuth app setup, and backend-specific checks. With
+OAuth credentials configured, **Log in** sends the browser through GitHub and
+returns to an authenticated Branch-Out session.
 
 ## Quality checks
 
@@ -125,8 +130,10 @@ make vet
 
 ## Profile onboarding
 
-The login panel includes a clearly labelled **Preview profile setup** action. It
-opens a three-step local draft for:
+The login panel supports GitHub sign-in, displays the returning member, links to
+their public GitHub profile, and can revoke the current session. It also includes
+a clearly labelled **Preview profile setup** action that opens a three-step local
+draft for:
 
 1. Display name, primary role, bio, and timezone
 2. Weekly availability, preferred project duration, working style, and
@@ -134,9 +141,10 @@ opens a three-step local draft for:
 3. Skills, a required HTTPS GitHub profile, an optional portfolio, and a short
    explanation of the applicant's evidence
 
-The preview never requests credentials or claims to authenticate the visitor.
-It validates unsafe or unrelated evidence links, saves the profile draft only in
-the current browser, and presents a profile preview without creating an account.
+GitHub authentication never asks the frontend to handle a password or access
+token. The separate profile preview validates unsafe or unrelated evidence
+links, saves its draft only in the current browser, and does not publish a
+profile or attach the draft to the authenticated account.
 
 ## Project discovery
 
@@ -234,8 +242,10 @@ and backend systems.
 - The Go API exposes representative project openings, but the frontend still
   reads its matching local catalogue until the integration milestone.
 - API project openings are persisted in PostgreSQL but remain read-only.
-- The backend supports GitHub OAuth and durable sessions, but the accessible
-  frontend login panel remains an unconnected preview until frontend integration.
+- GitHub login and logout are connected, but the OAuth app must be configured in
+  the backend environment before sign-in is available.
+- Authenticated GitHub identity is not yet connected to the device-local profile
+  onboarding draft or other write flows.
 - Profile onboarding creates only a device-local preview, not an authenticated
   account or public profile.
 - The early-access form confirms frontend input only and does not claim to store

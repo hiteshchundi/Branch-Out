@@ -1,12 +1,14 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HomeExperience } from './home-experience';
 import { SAVED_PROJECTS_STORAGE_KEY } from '../data/saved-projects';
 
 describe('HomeExperience', () => {
   beforeEach(() => {
     localStorage.clear();
+    window.history.replaceState({}, '', '/');
     document.documentElement.removeAttribute('data-theme');
+    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
     vi.stubGlobal(
       'matchMedia',
       vi.fn().mockReturnValue({
@@ -15,6 +17,10 @@ describe('HomeExperience', () => {
         removeEventListener: vi.fn(),
       }),
     );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('renders the three main page regions', () => {
@@ -80,6 +86,67 @@ describe('HomeExperience', () => {
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /^log in$/i })).toHaveFocus();
     });
+  });
+
+  it('offers the real backend GitHub sign-in route', () => {
+    render(<HomeExperience />);
+
+    fireEvent.click(screen.getByRole('button', { name: /^log in$/i }));
+    expect(screen.getByRole('link', { name: /continue with github/i })).toHaveAttribute(
+      'href',
+      'http://localhost:8080/v1/auth/github/start',
+    );
+  });
+
+  it('shows the authenticated GitHub member and logs out', async () => {
+    const authenticatedUser = {
+      id: 7,
+      githubUserId: 42,
+      githubLogin: 'branch-builder',
+      displayName: 'Branch Builder',
+      avatarUrl: 'https://avatars.githubusercontent.com/u/42',
+      profileUrl: 'https://github.com/branch-builder',
+    };
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: authenticatedUser }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    vi.stubGlobal('fetch', fetcher);
+    render(<HomeExperience />);
+
+    const accountButton = await screen.findByRole('button', { name: 'Branch Builder' });
+    fireEvent.click(accountButton);
+    const account = screen.getByRole('dialog', { name: /your branch-out account/i });
+    expect(account).toHaveTextContent('@branch-builder');
+    expect(within(account).getByRole('link', { name: /view github profile/i })).toHaveAttribute(
+      'href',
+      'https://github.com/branch-builder',
+    );
+
+    fireEvent.click(within(account).getByRole('button', { name: /^log out$/i }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^log in$/i })).toBeInTheDocument();
+    });
+    expect(screen.getByRole('status')).toHaveTextContent('You have been logged out.');
+    expect(fetcher).toHaveBeenLastCalledWith('http://localhost:8080/v1/session', {
+      credentials: 'include',
+      method: 'DELETE',
+    });
+  });
+
+  it('reports and removes the OAuth callback result from the address', async () => {
+    window.history.replaceState({}, '', '/?auth=denied');
+    render(<HomeExperience />);
+
+    expect(await screen.findByRole('status')).toHaveTextContent('GitHub sign-in was cancelled.');
+    expect(window.location.search).toBe('');
+  });
+
+  it('explains when the session API cannot be reached', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('network unavailable')));
+    render(<HomeExperience />);
+
+    fireEvent.click(screen.getByRole('button', { name: /^log in$/i }));
+    expect(await screen.findByText(/api could not be reached/i)).toBeInTheDocument();
   });
 
   it('starts profile onboarding from the login preview', () => {
