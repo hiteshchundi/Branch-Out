@@ -2,6 +2,7 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -13,8 +14,13 @@ import (
 
 type API struct {
 	repository    openings.Repository
+	readiness     ReadinessChecker
 	allowedOrigin string
 	logger        *slog.Logger
+}
+
+type ReadinessChecker interface {
+	Ping(context.Context) error
 }
 
 type listResponse struct {
@@ -38,8 +44,8 @@ type apiError struct {
 	Field   string `json:"field,omitempty"`
 }
 
-func New(repository openings.Repository, allowedOrigin string, logger *slog.Logger) http.Handler {
-	api := &API{repository: repository, allowedOrigin: allowedOrigin, logger: logger}
+func New(repository openings.Repository, readiness ReadinessChecker, allowedOrigin string, logger *slog.Logger) http.Handler {
+	api := &API{repository: repository, readiness: readiness, allowedOrigin: allowedOrigin, logger: logger}
 	routes := http.NewServeMux()
 	routes.HandleFunc("GET /healthz", api.health)
 	routes.HandleFunc("GET /readyz", api.ready)
@@ -54,8 +60,13 @@ func (api *API) health(writer http.ResponseWriter, _ *http.Request) {
 	writeJSON(writer, http.StatusOK, statusResponse{Status: "ok"})
 }
 
-func (api *API) ready(writer http.ResponseWriter, _ *http.Request) {
-	// Readiness will include a database ping when PostgreSQL is introduced.
+func (api *API) ready(writer http.ResponseWriter, request *http.Request) {
+	if err := api.readiness.Ping(request.Context()); err != nil {
+		api.logger.Warn("readiness check failed", "error", err)
+		writeJSON(writer, http.StatusServiceUnavailable, statusResponse{Status: "unavailable"})
+		return
+	}
+
 	writeJSON(writer, http.StatusOK, statusResponse{Status: "ready"})
 }
 

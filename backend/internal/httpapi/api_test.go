@@ -16,7 +16,7 @@ import (
 const allowedOrigin = "http://localhost:3000"
 
 func testAPI(repository openings.Repository) http.Handler {
-	return New(repository, allowedOrigin, slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)))
+	return New(repository, readyChecker{}, allowedOrigin, slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)))
 }
 
 func TestStatusRoutes(t *testing.T) {
@@ -37,6 +37,28 @@ func TestStatusRoutes(t *testing.T) {
 				t.Errorf("status body = %q, want %q", body.Status, wantStatus)
 			}
 		})
+	}
+}
+
+func TestReadinessReturnsUnavailableWhenDependencyFails(t *testing.T) {
+	api := New(
+		openings.NewMemoryRepository(nil),
+		readyChecker{err: errors.New("database unavailable")},
+		allowedOrigin,
+		slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)),
+	)
+	response := httptest.NewRecorder()
+	api.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/readyz", nil))
+
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503", response.Code)
+	}
+	var body statusResponse
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Status != "unavailable" {
+		t.Errorf("status body = %q, want unavailable", body.Status)
 	}
 }
 
@@ -161,4 +183,10 @@ type failingRepository struct{}
 
 func (failingRepository) List(context.Context, openings.Filters) ([]openings.Opening, error) {
 	return nil, errors.New("repository unavailable")
+}
+
+type readyChecker struct{ err error }
+
+func (checker readyChecker) Ping(context.Context) error {
+	return checker.err
 }

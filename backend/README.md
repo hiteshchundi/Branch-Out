@@ -1,18 +1,34 @@
 # Branch-Out API
 
-This directory contains the modular Go API for Branch-Out. The first milestone
-is intentionally dependency-free and read-only: it establishes stable HTTP and
-domain boundaries before PostgreSQL, GitHub OAuth, and write workflows arrive.
+This directory contains the modular Go API for Branch-Out. Project-opening
+discovery is backed by PostgreSQL through pgx and SQLC-generated typed queries.
+Goose migrations own the schema and representative development data.
 
 ## Requirements
 
-- Go 1.23 or newer
+- Go 1.26 or newer
+- Docker with Compose, or a reachable PostgreSQL 18 instance
 
 ## Run locally
+
+Start PostgreSQL and apply every migration:
+
+```bash
+make db-up
+make migrate-up
+```
+
+Then start the API:
 
 ```bash
 go run ./cmd/api
 ```
+
+The Compose service uses local-only development credentials and persists its
+data in the `branch_out_postgres_data` volume. `make db-down` stops PostgreSQL
+without deleting that volume. If PostgreSQL runs elsewhere, pass its connection
+string to Make and the API through `DATABASE_URL` and
+`BRANCH_OUT_DATABASE_URL` respectively.
 
 Configuration uses environment variables:
 
@@ -20,6 +36,11 @@ Configuration uses environment variables:
 | --- | --- | --- |
 | `BRANCH_OUT_API_ADDRESS` | `:8080` | API listen address |
 | `BRANCH_OUT_ALLOWED_ORIGIN` | `http://localhost:3000` | Exact frontend origin allowed by CORS |
+| `BRANCH_OUT_DATABASE_URL` | `postgres://branch_out:branch_out@localhost:5432/branch_out?sslmode=disable` | PostgreSQL connection string |
+
+The API validates its database connection before listening. `/readyz` also
+checks PostgreSQL on every request and returns HTTP 503 with
+`{"status":"unavailable"}` when the dependency cannot be reached.
 
 ## API
 
@@ -52,24 +73,43 @@ The complete contract is in [`openapi.yaml`](openapi.yaml).
 
 ## Verify
 
+Run unit tests and static analysis:
+
 ```bash
-go test ./...
-go vet ./...
+make test
+make vet
 ```
+
+With a migrated local database running, exercise the real pgx repository:
+
+```bash
+make test-integration
+```
+
+Regenerate typed database code after changing a migration or query:
+
+```bash
+make generate
+```
+
+SQLC `v1.31.1` and Goose `v3.27.3` are pinned in the Makefile so contributors
+generate and migrate with the same tool versions. Generated files under
+`internal/database` are committed and must not be edited by hand.
 
 The tests cover liveness, readiness, CORS preflight behavior, response shape,
 combined discovery filtering, invalid filters, unsupported methods, and unknown
-routes.
+routes. PostgreSQL integration tests cover full-catalogue retrieval, text search,
+combined structured filters, conflicting filters, ordering, and cancellation.
 
 ## Package boundaries
 
 - `cmd/api` composes configuration, domain service, and HTTP transport.
 - `internal/config` owns environment parsing and safe defaults.
+- `internal/database` contains SQLC-generated pgx query code.
 - `internal/openings` owns project-opening types, filtering, and the repository
-  contract.
+  contract, including memory and PostgreSQL implementations.
 - `internal/httpapi` owns REST routing, JSON responses, CORS, and server errors.
 
-The in-memory repository is a deliberate seam, not a persistence strategy. The
-next backend milestone should add PostgreSQL migrations and a pgx/SQLC-backed
-repository behind the existing domain contract, then make readiness reflect the
-database connection.
+The memory repository remains as a fast domain-test double. Runtime traffic uses
+PostgreSQL. This milestone is still read-only: authenticated accounts and
+project-opening write operations belong to later backend milestones.

@@ -1,0 +1,21 @@
+-- +goose Up
+INSERT INTO project_openings (
+    id, title, summary, skills, role, compensation, commitment, commitment_band,
+    duration, timezone, freshness, stage, desired_outcome, first_milestone,
+    owner_contribution, owner_name, owner_signal, confidentiality, display_order
+) VALUES
+    ('climate-data-explorer', 'Frontend engineer for a climate data explorer', 'Turn open emissions data into a fast, understandable planning tool for local teams.', ARRAY['TypeScript', 'React', 'Data visualization'], 'Engineering', 'Fixed bounty', '6–8 hrs/week', '6–8 hrs/week', '6 weeks', 'UTC to UTC+4', 'Posted 2h ago', 'Working prototype', 'A responsive explorer that turns regional emissions data into decisions a local planning team can explain.', 'Build and document the interactive region-comparison view using the existing API.', 'Data model, API, user interviews, and a deployed internal prototype are ready.', 'Maya Chen', 'Collaboration Proven · 3 projects', 'Public project with limited repository access during the trial.', 1),
+    ('accessible-finance', 'Product designer for an accessible finance app', 'Shape a privacy-first cash-flow experience for freelancers with variable income.', ARRAY['Product design', 'Figma', 'Accessibility'], 'Design', 'Paid', '5 hrs/week', 'Under 6 hrs/week', '4 weeks', 'UTC+1 to UTC+5:30', 'Posted yesterday', 'Validated concept', 'A tested mobile-first flow that helps freelancers see upcoming cash gaps without exposing bank credentials.', 'Review six interview notes and produce a clickable weekly cash-flow prototype.', 'Research synthesis, compliance constraints, and the first information architecture are complete.', 'Noah Williams', 'Work Demonstrated · 2 shipped products', 'Limited details until both people accept a short confidentiality agreement.', 2),
+    ('research-assistant', 'Full-stack builder for an AI research assistant', 'Prototype a citation-first workspace that helps small research teams review evidence.', ARRAY['Next.js', 'Python', 'LLM evaluation'], 'Engineering', 'Revenue share', '8–10 hrs/week', '8+ hrs/week', '8 weeks', 'UTC-5 to UTC+1', 'Posted 2 days ago', 'Private alpha', 'A reliable evidence-review loop where every generated claim stays connected to a source passage.', 'Implement the citation inspection flow against a fixed evaluation set of 40 documents.', 'Retrieval service, evaluation rubric, and five alpha teams are already in place.', 'Elena García', 'Skill Screened · AI evaluation', 'Confidential dataset; the trial uses a sandbox and synthetic documents.', 3),
+    ('open-source-onboarding', 'UX researcher for open-source contributor onboarding', 'Find the friction that stops capable developers from making their first useful contribution.', ARRAY['User research', 'Journey mapping', 'Open source'], 'Research', 'Portfolio', '4–5 hrs/week', 'Under 6 hrs/week', '3 weeks', 'UTC-2 to UTC+5:30', 'Posted 3 days ago', 'Active community', 'A prioritized onboarding plan grounded in interviews with new and recently retained contributors.', 'Run three structured interviews and deliver a friction map with supporting evidence.', 'Recruiting access, analytics, community moderation, and an interview guide are provided.', 'Arjun Mehta', 'Collaboration Proven · 5 projects', 'Public research; participants remain anonymous in published notes.', 4),
+    ('developer-portfolio', 'Visual designer for a calm developer portfolio system', 'Create a reusable visual language for engineers who want their work—not decoration—to lead.', ARRAY['Visual design', 'Design systems', 'Typography'], 'Design', 'Fixed bounty', '6 hrs/week', '6–8 hrs/week', '5 weeks', 'UTC+3 to UTC+8', 'Posted 4 days ago', 'Design brief', 'A flexible portfolio kit with restrained typography, accessible themes, and strong project storytelling.', 'Establish typography, spacing, and color tokens, then apply them to one case-study page.', 'Content model, component inventory, and three complete case studies are available.', 'Sofia Kim', 'Work Demonstrated · design engineering', 'Public project; all reusable assets will have an explicit open-source license.', 5);
+
+-- +goose Down
+DELETE FROM project_openings
+WHERE id IN (
+    'climate-data-explorer',
+    'accessible-finance',
+    'research-assistant',
+    'open-source-onboarding',
+    'developer-portfolio'
+);

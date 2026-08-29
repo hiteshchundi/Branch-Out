@@ -30,9 +30,9 @@ responsive discovery homepage split into three clear components:
   and an early-access interaction.
 - **Footer:** product summary, navigation, and a clear team-responsibility note.
 
-The first backend milestone is also available in [`backend`](backend): a
-dependency-free Go REST API with health/readiness checks, filterable project
-opening discovery, automated tests, and an OpenAPI contract.
+The backend in [`backend`](backend) is a Go REST API with PostgreSQL-backed,
+filterable project-opening discovery, dependency-aware health checks, reversible
+migrations, typed SQLC queries, automated tests, and an OpenAPI contract.
 
 ## Original brand identity
 
@@ -49,7 +49,7 @@ while hiding only the text name. The same geometry is available in
 - Tailwind CSS tooling with a small custom design-token layer
 - Vinext/Vite development and production builds
 - Vitest, Testing Library, and jsdom for automated frontend tests
-- Go REST API, with PostgreSQL persistence planned for the next backend milestone
+- Go REST API with PostgreSQL, pgx, SQLC, and Goose
 
 ## Local development
 
@@ -67,10 +67,13 @@ pnpm dev
 
 Then open the local address printed by the development server.
 
-Run the API in a second terminal (Go 1.23 or newer is required):
+Run PostgreSQL migrations and the API in a second terminal (Go 1.26 or newer is
+required):
 
 ```bash
 cd backend
+make db-up
+make migrate-up
 go run ./cmd/api
 ```
 
@@ -115,8 +118,8 @@ Run the backend checks separately:
 
 ```bash
 cd backend
-go test ./...
-go vet ./...
+make test
+make vet
 ```
 
 ## Profile onboarding
@@ -229,7 +232,7 @@ and backend systems.
 
 - The Go API exposes representative project openings, but the frontend still
   reads its matching local catalogue until the integration milestone.
-- API project openings remain in memory until PostgreSQL persistence is added.
+- API project openings are persisted in PostgreSQL but remain read-only.
 - The login panel is accessible and interactive, but GitHub OAuth remains
   disabled until backend authentication is implemented.
 - Profile onboarding creates only a device-local preview, not an authenticated

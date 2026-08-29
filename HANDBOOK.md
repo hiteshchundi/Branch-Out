@@ -570,15 +570,20 @@ the interface. Structured filter values are validated and failures use a stable
 JSON error shape. Cross-origin access is limited to one configured frontend
 origin.
 
-This milestone deliberately uses an in-memory repository so the transport and
-domain contracts can be exercised before PostgreSQL is introduced. It does not
-accept writes, identify visitors, or expose private information. The OpenAPI
-contract and operating instructions live in `backend/README.md`.
+Runtime discovery now reads from PostgreSQL through pgx and SQLC-generated typed
+queries. Versioned Goose migrations create the schema and load representative
+development data. The API verifies PostgreSQL during startup; its readiness route
+returns HTTP 503 when the database cannot be reached. The in-memory repository
+remains only as a fast test double.
+
+This milestone remains read-only. It does not accept writes, identify visitors,
+or expose private information. The OpenAPI contract, database commands, rollback
+instructions, and operating details live in `backend/README.md`.
 
 ## Current limitations
 
 - Project and owner information is representative data duplicated in the
-  frontend and API until frontend integration and PostgreSQL persistence land.
+  frontend and PostgreSQL until frontend integration lands.
 - GitHub login is not connected.
 - Profile onboarding creates a local draft only; it does not identify or
   authenticate the visitor.
@@ -589,8 +594,8 @@ contract and operating instructions live in `backend/README.md`.
   moderated, or published.
 - Saved openings do not synchronize between browsers or devices.
 - Early-access email addresses are not transmitted or stored.
-- There is no database, account, notification, or moderation flow yet; the first
-  read-only backend API is present but is not connected to the interface.
+- PostgreSQL-backed discovery exists, but there is no account, notification, or
+  moderation flow yet and the frontend is not connected to the API.
 
 ## Handbook maintenance rule
 

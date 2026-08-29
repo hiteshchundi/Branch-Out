@@ -28,6 +28,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Status'
+        '503':
+          description: A required dependency is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Status'
   /v1/openings:
     get:
       operationId: listOpenings

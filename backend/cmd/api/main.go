@@ -11,16 +11,31 @@ import (
 	"time"
 
 	"github.com/hiteshchundi/branch-out/backend/internal/config"
+	"github.com/hiteshchundi/branch-out/backend/internal/database"
 	"github.com/hiteshchundi/branch-out/backend/internal/httpapi"
 	"github.com/hiteshchundi/branch-out/backend/internal/openings"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	cfg := config.FromEnvironment()
 
-	repository := openings.NewMemoryRepository(openings.Seed())
-	api := httpapi.New(repository, cfg.AllowedOrigin, logger)
+	databaseContext, cancelDatabase := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancelDatabase()
+	pool, err := pgxpool.New(databaseContext, cfg.DatabaseURL)
+	if err != nil {
+		logger.Error("database pool creation failed", "error", err)
+		os.Exit(1)
+	}
+	defer pool.Close()
+	if err := pool.Ping(databaseContext); err != nil {
+		logger.Error("database connection failed", "error", err)
+		os.Exit(1)
+	}
+
+	repository := openings.NewPostgresRepository(database.New(pool))
+	api := httpapi.New(repository, pool, cfg.AllowedOrigin, logger)
 	server := &http.Server{
 		Addr:              cfg.Address,
 		Handler:           api,
