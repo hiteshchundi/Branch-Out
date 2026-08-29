@@ -589,6 +589,11 @@ and the frontend login panel now uses those routes.
 It stores users, one-time OAuth attempts, and hashed session tokens in
 PostgreSQL; GitHub access tokens are not retained. Project discovery remains
 read-only.
+
+Authenticated members can also create or replace a validated collaboration
+profile through the backend. The GitHub profile link comes from the authenticated
+identity rather than editable input. The visible onboarding form remains
+device-local until the next frontend integration milestone.
 The OpenAPI contract, database commands, rollback instructions, authentication
 configuration, and operating details live in `backend/README.md`.
 
@@ -597,8 +602,8 @@ configuration, and operating details live in `backend/README.md`.
 - Project and owner information is representative data duplicated in the
   frontend and PostgreSQL until frontend integration lands.
 - GitHub login requires a configured OAuth app and a running API.
-- The authenticated identity is not yet connected to profile drafts or write
-  flows.
+- The backend can persist an authenticated profile, but the visible onboarding
+  form is not yet connected to it.
 - Profile onboarding creates a local draft only; it does not identify or
   authenticate the visitor.
 - Opening drafts cannot be published.

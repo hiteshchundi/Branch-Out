@@ -86,24 +86,31 @@ func (api *API) finishGitHubAuth(writer http.ResponseWriter, request *http.Reque
 
 func (api *API) currentSession(writer http.ResponseWriter, request *http.Request) {
 	writer.Header().Set("Cache-Control", "no-store")
+	user, ok := api.requireUser(writer, request)
+	if !ok {
+		return
+	}
+	writeJSON(writer, http.StatusOK, sessionResponse{Data: user})
+}
+
+func (api *API) requireUser(writer http.ResponseWriter, request *http.Request) (auth.User, bool) {
 	cookie, err := request.Cookie(sessionCookieName)
 	if err != nil {
 		writeError(writer, http.StatusUnauthorized, apiError{Code: "authentication_required", Message: "Log in to continue."})
-		return
+		return auth.User{}, false
 	}
-
 	user, err := api.authentication.CurrentUser(request.Context(), cookie.Value)
 	if errors.Is(err, auth.ErrInvalidSession) {
 		http.SetCookie(writer, api.sessionCookie("", time.Unix(0, 0), -1))
 		writeError(writer, http.StatusUnauthorized, apiError{Code: "authentication_required", Message: "Log in to continue."})
-		return
+		return auth.User{}, false
 	}
 	if err != nil {
 		api.logger.Error("load current session failed", "error", err)
 		writeError(writer, http.StatusInternalServerError, apiError{Code: "internal_error", Message: "The session could not be loaded."})
-		return
+		return auth.User{}, false
 	}
-	writeJSON(writer, http.StatusOK, sessionResponse{Data: user})
+	return user, true
 }
 
 func (api *API) deleteSession(writer http.ResponseWriter, request *http.Request) {

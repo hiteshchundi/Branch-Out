@@ -15,6 +15,23 @@ type OauthAttempt struct {
 	CreatedAt    time.Time `db:"created_at" json:"created_at"`
 }
 
+type Profile struct {
+	UserID               int64     `db:"user_id" json:"user_id"`
+	DisplayName          string    `db:"display_name" json:"display_name"`
+	PrimaryRole          string    `db:"primary_role" json:"primary_role"`
+	Bio                  string    `db:"bio" json:"bio"`
+	Timezone             string    `db:"timezone" json:"timezone"`
+	WeeklyAvailability   string    `db:"weekly_availability" json:"weekly_availability"`
+	PreferredDuration    string    `db:"preferred_duration" json:"preferred_duration"`
+	WorkStyle            string    `db:"work_style" json:"work_style"`
+	CommunicationCadence string    `db:"communication_cadence" json:"communication_cadence"`
+	Skills               []string  `db:"skills" json:"skills"`
+	PortfolioUrl         *string   `db:"portfolio_url" json:"portfolio_url"`
+	EvidenceSummary      string    `db:"evidence_summary" json:"evidence_summary"`
+	CreatedAt            time.Time `db:"created_at" json:"created_at"`
+	UpdatedAt            time.Time `db:"updated_at" json:"updated_at"`
+}
+
 type ProjectOpening struct {
 	ID                string    `db:"id" json:"id"`
 	Title             string    `db:"title" json:"title"`

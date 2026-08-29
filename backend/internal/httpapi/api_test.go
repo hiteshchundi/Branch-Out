@@ -21,7 +21,7 @@ var defaultOptions = Options{
 }
 
 func testAPI(repository openings.Repository) http.Handler {
-	return New(repository, readyChecker{}, fakeAuthenticator{}, defaultOptions, slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)))
+	return New(repository, readyChecker{}, fakeAuthenticator{}, fakeProfileManager{}, defaultOptions, slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)))
 }
 
 func TestStatusRoutes(t *testing.T) {
@@ -49,7 +49,7 @@ func TestReadinessReturnsUnavailableWhenDependencyFails(t *testing.T) {
 	api := New(
 		openings.NewMemoryRepository(nil),
 		readyChecker{err: errors.New("database unavailable")},
-		fakeAuthenticator{}, defaultOptions,
+		fakeAuthenticator{}, fakeProfileManager{}, defaultOptions,
 		slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)),
 	)
 	response := httptest.NewRecorder()

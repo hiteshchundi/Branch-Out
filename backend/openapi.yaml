@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: Branch-Out API
   version: 0.2.0
-  description: PostgreSQL-backed project discovery and GitHub authentication for Branch-Out.
+  description: PostgreSQL-backed project discovery, GitHub authentication, and member profiles for Branch-Out.
 servers:
   - url: http://localhost:8080
 paths:
@@ -188,6 +188,81 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /v1/profile:
+    get:
+      operationId: getCurrentProfile
+      summary: Get the authenticated member's collaboration profile
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: The current member's profile.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Profile'
+        '401':
+          description: No valid session is present.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: The authenticated member has not completed a profile.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: The profile could not be loaded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    put:
+      operationId: putCurrentProfile
+      summary: Create or replace the authenticated member's collaboration profile
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfileInput'
+      responses:
+        '200':
+          description: The saved profile.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Profile'
+        '400':
+          description: The request or a profile field is invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: No valid session is present.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: The profile could not be saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
 components:
   securitySchemes:
     sessionCookie:
@@ -314,3 +389,81 @@ components:
         profileUrl:
           type: string
           format: uri
+    ProfileInput:
+      type: object
+      additionalProperties: false
+      required:
+        - displayName
+        - primaryRole
+        - bio
+        - timezone
+        - weeklyAvailability
+        - preferredDuration
+        - workStyle
+        - communicationCadence
+        - skills
+        - evidenceSummary
+      properties:
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 100
+        primaryRole:
+          type: string
+          enum: [Software developer, Product designer, UX researcher, Product builder]
+        bio:
+          type: string
+          minLength: 40
+          maxLength: 500
+        timezone:
+          type: string
+          minLength: 1
+          maxLength: 50
+        weeklyAvailability:
+          type: string
+          enum: [Under 6 hrs/week, 6–8 hrs/week, 8–12 hrs/week, 12+ hrs/week]
+        preferredDuration:
+          type: string
+          enum: [2–4 weeks, 5–8 weeks, 2–3 months]
+        workStyle:
+          type: string
+          enum: [Async-first, Balanced async and live, Live collaboration preferred]
+        communicationCadence:
+          type: string
+          enum: [Daily async update, Three updates per week, Weekly planning and demo]
+        skills:
+          type: array
+          minItems: 1
+          maxItems: 10
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 40
+        portfolioUrl:
+          type:
+            - string
+            - 'null'
+          format: uri
+        evidenceSummary:
+          type: string
+          minLength: 20
+          maxLength: 500
+    Profile:
+      allOf:
+        - $ref: '#/components/schemas/ProfileInput'
+        - type: object
+          required: [userId, githubUrl, createdAt, updatedAt]
+          properties:
+            userId:
+              type: integer
+              format: int64
+            githubUrl:
+              type: string
+              format: uri
+            createdAt:
+              type: string
+              format: date-time
+            updatedAt:
+              type: string
+              format: date-time

@@ -15,6 +15,7 @@ import (
 	"github.com/hiteshchundi/branch-out/backend/internal/database"
 	"github.com/hiteshchundi/branch-out/backend/internal/httpapi"
 	"github.com/hiteshchundi/branch-out/backend/internal/openings"
+	"github.com/hiteshchundi/branch-out/backend/internal/profile"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -43,7 +44,8 @@ func main() {
 			CallbackURL: cfg.GitHubCallbackURL,
 		}, nil),
 	)
-	api := httpapi.New(repository, pool, authentication, httpapi.Options{
+	profiles := profile.NewService(profile.NewPostgresStore(database.New(pool)))
+	api := httpapi.New(repository, pool, authentication, profiles, httpapi.Options{
 		AllowedOrigin: cfg.AllowedOrigin, FrontendURL: cfg.FrontendURL, CookieSecure: cfg.CookieSecure,
 	}, logger)
 	server := &http.Server{

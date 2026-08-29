@@ -1,8 +1,9 @@
 # Branch-Out API
 
 This directory contains the modular Go API for Branch-Out. Project-opening
-discovery is backed by PostgreSQL through pgx and SQLC-generated typed queries.
-Goose migrations own the schema and representative development data.
+discovery, GitHub-backed accounts, durable sessions, and collaboration profiles
+are backed by PostgreSQL through pgx and SQLC-generated typed queries. Goose
+migrations own the schema and representative development data.
 
 ## Requirements
 
@@ -55,6 +56,8 @@ checks PostgreSQL on every request and returns HTTP 503 with
 - `GET /v1/auth/github/callback` — complete GitHub authentication
 - `GET /v1/session` — return the authenticated user
 - `DELETE /v1/session` — sign out and revoke the current session
+- `GET /v1/profile` — return the authenticated member's collaboration profile
+- `PUT /v1/profile` — create or replace that collaboration profile
 - `GET /v1/openings` — list project openings
 
 Discovery accepts optional filters. Structured values use the labels already
@@ -99,6 +102,20 @@ and frontend URLs, and keep the client secret outside the repository. The
 frontend uses these routes through `NEXT_PUBLIC_BRANCH_OUT_API_URL`, which
 defaults to `http://localhost:8080`.
 
+## Collaboration profiles
+
+Profile routes require the session cookie established by GitHub authentication.
+`PUT /v1/profile` validates bounded text, supported collaboration preferences,
+one to ten unique skills, and an optional public HTTP or HTTPS portfolio URL.
+Unknown JSON fields and multiple request values are rejected. The GitHub profile
+URL is never accepted from the request; it is derived from the authenticated
+GitHub account to prevent a member from attaching another person's identity.
+
+`GET /v1/profile` returns HTTP 404 until the member has created a profile. A
+successful update replaces the editable profile fields while retaining its
+original creation time. The frontend onboarding form is still device-local and
+will be connected to these routes in the next integration milestone.
+
 ## Verify
 
 Run unit tests and static analysis:
@@ -128,8 +145,9 @@ The tests cover liveness, readiness, credentialed CORS behavior, the OAuth and
 session lifecycle, PKCE exchange behavior, response shape, combined discovery
 filtering, invalid filters, unsupported methods, and unknown routes. PostgreSQL
 integration tests cover single-use OAuth attempts, user upserts, session
-revocation, full-catalogue retrieval, text search, combined structured filters,
-conflicting filters, ordering, and cancellation.
+revocation, profile creation and replacement, authoritative GitHub identity,
+full-catalogue retrieval, text search, combined structured filters, conflicting
+filters, ordering, and cancellation.
 
 ## Package boundaries
 
@@ -139,9 +157,11 @@ conflicting filters, ordering, and cancellation.
 - `internal/auth` owns GitHub OAuth, users, and durable sessions.
 - `internal/openings` owns project-opening types, filtering, and the repository
   contract, including memory and PostgreSQL implementations.
+- `internal/profile` owns collaboration-profile validation and persistence.
 - `internal/httpapi` owns REST routing, JSON responses, CORS, and server errors.
 
 The memory repository remains as a fast domain-test double. Runtime traffic uses
 PostgreSQL. Authentication can create or update an account and revoke its
-sessions; the frontend uses those authentication routes, while project openings
-remain read-only.
+sessions. Authenticated members can persist a collaboration profile. The
+frontend uses the authentication routes but has not yet connected its profile
+form; project openings remain read-only.

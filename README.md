@@ -32,8 +32,9 @@ responsive discovery homepage split into three clear components:
 
 The backend in [`backend`](backend) is a Go REST API with PostgreSQL-backed,
 filterable project-opening discovery, GitHub OAuth, durable revocable sessions,
-dependency-aware health checks, reversible migrations, typed SQLC queries,
-automated tests, and an OpenAPI contract.
+authenticated collaboration-profile persistence, dependency-aware health
+checks, reversible migrations, typed SQLC queries, automated tests, and an
+OpenAPI contract.
 
 ## Original brand identity
 
@@ -245,7 +246,8 @@ and backend systems.
 - GitHub login and logout are connected, but the OAuth app must be configured in
   the backend environment before sign-in is available.
 - Authenticated GitHub identity is not yet connected to the device-local profile
-  onboarding draft or other write flows.
+  onboarding interface. The backend profile read/update endpoints are ready for
+  that integration.
 - Profile onboarding creates only a device-local preview, not an authenticated
   account or public profile.
 - The early-access form confirms frontend input only and does not claim to store
