@@ -36,3 +36,7 @@ next-env.d.ts
 /.wrangler/
 /outputs/
 /work/
+
+# Go backend build and coverage output
+/backend/bin/
+/backend/coverage.out

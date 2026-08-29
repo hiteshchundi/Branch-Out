@@ -561,9 +561,24 @@ This information stays in the browser profile on the current device. Clearing
 site data for the local Branch-Out address removes it. Do not enter sensitive or
 production credentials into any frontend preview field.
 
+## Backend foundation
+
+The repository now includes a small Go REST API under `backend`. It provides
+liveness and readiness checks plus `GET /v1/openings`, whose optional `query`,
+`role`, `compensation`, and `commitment` filters follow the discovery controls in
+the interface. Structured filter values are validated and failures use a stable
+JSON error shape. Cross-origin access is limited to one configured frontend
+origin.
+
+This milestone deliberately uses an in-memory repository so the transport and
+domain contracts can be exercised before PostgreSQL is introduced. It does not
+accept writes, identify visitors, or expose private information. The OpenAPI
+contract and operating instructions live in `backend/README.md`.
+
 ## Current limitations
 
-- Project and owner information is representative local data.
+- Project and owner information is representative data duplicated in the
+  frontend and API until frontend integration and PostgreSQL persistence land.
 - GitHub login is not connected.
 - Profile onboarding creates a local draft only; it does not identify or
   authenticate the visitor.
@@ -574,7 +589,8 @@ production credentials into any frontend preview field.
   moderated, or published.
 - Saved openings do not synchronize between browsers or devices.
 - Early-access email addresses are not transmitted or stored.
-- There is no backend API, database, account, notification, or moderation flow yet.
+- There is no database, account, notification, or moderation flow yet; the first
+  read-only backend API is present but is not connected to the interface.
 
 ## Handbook maintenance rule
 

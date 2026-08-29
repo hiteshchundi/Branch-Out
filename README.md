@@ -30,6 +30,10 @@ responsive discovery homepage split into three clear components:
   and an early-access interaction.
 - **Footer:** product summary, navigation, and a clear team-responsibility note.
 
+The first backend milestone is also available in [`backend`](backend): a
+dependency-free Go REST API with health/readiness checks, filterable project
+opening discovery, automated tests, and an OpenAPI contract.
+
 ## Original brand identity
 
 The Branch-Out mark was drawn from scratch for this repository and uses no
@@ -45,6 +49,7 @@ while hiding only the text name. The same geometry is available in
 - Tailwind CSS tooling with a small custom design-token layer
 - Vinext/Vite development and production builds
 - Vitest, Testing Library, and jsdom for automated frontend tests
+- Go REST API, with PostgreSQL persistence planned for the next backend milestone
 
 ## Local development
 
@@ -61,6 +66,17 @@ pnpm dev
 ```
 
 Then open the local address printed by the development server.
+
+Run the API in a second terminal (Go 1.23 or newer is required):
+
+```bash
+cd backend
+go run ./cmd/api
+```
+
+The API listens on `http://localhost:8080` by default. See
+[`backend/README.md`](backend/README.md) for configuration, request examples,
+the OpenAPI contract, and backend-specific checks.
 
 ## Quality checks
 
@@ -94,6 +110,14 @@ The final accessibility pass adds a keyboard skip link, visible focus states,
 focus containment and background-scroll locking for every dialog, consistent
 Escape behavior, focus restoration to the control that opened a flow, reduced
 motion support, and graceful theme switching when browser storage is blocked.
+
+Run the backend checks separately:
+
+```bash
+cd backend
+go test ./...
+go vet ./...
+```
 
 ## Profile onboarding
 
@@ -203,8 +227,9 @@ and backend systems.
 
 ## Current boundaries
 
-- Project openings and their detail records use representative local data until
-  the Go API is available.
+- The Go API exposes representative project openings, but the frontend still
+  reads its matching local catalogue until the integration milestone.
+- API project openings remain in memory until PostgreSQL persistence is added.
 - The login panel is accessible and interactive, but GitHub OAuth remains
   disabled until backend authentication is implemented.
 - Profile onboarding creates only a device-local preview, not an authenticated

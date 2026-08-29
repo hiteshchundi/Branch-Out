@@ -1,0 +1,175 @@
+openapi: 3.1.0
+info:
+  title: Branch-Out API
+  version: 0.1.0
+  description: Read-only foundation for Branch-Out project discovery.
+servers:
+  - url: http://localhost:8080
+paths:
+  /healthz:
+    get:
+      operationId: getHealth
+      summary: Check process liveness
+      responses:
+        '200':
+          description: The process is alive.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Status'
+  /readyz:
+    get:
+      operationId: getReadiness
+      summary: Check service readiness
+      responses:
+        '200':
+          description: The service can accept requests.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Status'
+  /v1/openings:
+    get:
+      operationId: listOpenings
+      summary: List project openings
+      parameters:
+        - name: query
+          in: query
+          description: Case-insensitive terms that must all match searchable opening fields.
+          schema:
+            type: string
+        - name: role
+          in: query
+          schema:
+            $ref: '#/components/schemas/Role'
+        - name: compensation
+          in: query
+          schema:
+            $ref: '#/components/schemas/Compensation'
+        - name: commitment
+          in: query
+          schema:
+            $ref: '#/components/schemas/CommitmentBand'
+      responses:
+        '200':
+          description: Matching project openings.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Opening'
+                  meta:
+                    type: object
+                    required: [count]
+                    properties:
+                      count:
+                        type: integer
+                        minimum: 0
+        '400':
+          description: A structured filter is invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: The catalogue could not be loaded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+components:
+  schemas:
+    Status:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+    Role:
+      type: string
+      enum: [Engineering, Design, Research]
+    Compensation:
+      type: string
+      enum: [Paid, Fixed bounty, Revenue share, Portfolio]
+    CommitmentBand:
+      type: string
+      enum: [Under 6 hrs/week, 6–8 hrs/week, 8+ hrs/week]
+    Opening:
+      type: object
+      required:
+        - id
+        - title
+        - summary
+        - skills
+        - role
+        - compensation
+        - commitment
+        - commitmentBand
+        - duration
+        - timezone
+        - freshness
+        - stage
+        - desiredOutcome
+        - firstMilestone
+        - ownerContribution
+        - ownerName
+        - ownerSignal
+        - confidentiality
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        summary:
+          type: string
+        skills:
+          type: array
+          items:
+            type: string
+        role:
+          $ref: '#/components/schemas/Role'
+        compensation:
+          $ref: '#/components/schemas/Compensation'
+        commitment:
+          type: string
+        commitmentBand:
+          $ref: '#/components/schemas/CommitmentBand'
+        duration:
+          type: string
+        timezone:
+          type: string
+        freshness:
+          type: string
+        stage:
+          type: string
+        desiredOutcome:
+          type: string
+        firstMilestone:
+          type: string
+        ownerContribution:
+          type: string
+        ownerName:
+          type: string
+        ownerSignal:
+          type: string
+        confidentiality:
+          type: string
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            field:
+              type: string
