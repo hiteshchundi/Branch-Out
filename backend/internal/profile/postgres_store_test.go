@@ -22,14 +22,18 @@ func TestPostgresStoreProfileLifecycle(t *testing.T) {
 		t.Fatalf("connect to PostgreSQL: %v", err)
 	}
 	t.Cleanup(pool.Close)
-	if _, err := pool.Exec(ctx, "TRUNCATE profiles, sessions, oauth_attempts, users RESTART IDENTITY CASCADE"); err != nil {
-		t.Fatalf("reset profile tables: %v", err)
+	const githubUserID int64 = 4_200_002
+	if _, err := pool.Exec(ctx, "DELETE FROM users WHERE github_user_id = $1", githubUserID); err != nil {
+		t.Fatalf("reset profile test user: %v", err)
 	}
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), "DELETE FROM users WHERE github_user_id = $1", githubUserID)
+	})
 
 	queries := database.New(pool)
 	name := "Asha Rao"
 	user, err := auth.NewPostgresStore(queries).UpsertGitHubUser(ctx, auth.GitHubUser{
-		ID: 42, Login: "asha-rao", Name: &name,
+		ID: githubUserID, Login: "asha-rao-profile-test", Name: &name,
 		AvatarURL: "https://avatars.githubusercontent.com/u/42", ProfileURL: "https://github.com/asha-rao",
 	})
 	if err != nil {

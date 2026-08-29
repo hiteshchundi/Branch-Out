@@ -45,7 +45,8 @@ func main() {
 		}, nil),
 	)
 	profiles := profile.NewService(profile.NewPostgresStore(database.New(pool)))
-	api := httpapi.New(repository, pool, authentication, profiles, httpapi.Options{
+	openingManager := openings.NewManager(repository, profiles)
+	api := httpapi.New(repository, openingManager, pool, authentication, profiles, httpapi.Options{
 		AllowedOrigin: cfg.AllowedOrigin, FrontendURL: cfg.FrontendURL, CookieSecure: cfg.CookieSecure,
 	}, logger)
 	server := &http.Server{

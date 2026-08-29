@@ -54,6 +54,8 @@ type ProjectOpening struct {
 	DisplayOrder      int32     `db:"display_order" json:"display_order"`
 	CreatedAt         time.Time `db:"created_at" json:"created_at"`
 	UpdatedAt         time.Time `db:"updated_at" json:"updated_at"`
+	OwnerUserID       *int64    `db:"owner_user_id" json:"owner_user_id"`
+	PublicationStatus string    `db:"publication_status" json:"publication_status"`
 }
 
 type Session struct {

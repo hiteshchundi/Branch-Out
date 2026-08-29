@@ -24,9 +24,13 @@ func TestPostgresStoreOAuthAndSessionLifecycle(t *testing.T) {
 		t.Fatalf("connect to PostgreSQL: %v", err)
 	}
 	t.Cleanup(pool.Close)
-	if _, err := pool.Exec(ctx, "TRUNCATE sessions, oauth_attempts, users RESTART IDENTITY CASCADE"); err != nil {
-		t.Fatalf("reset auth tables: %v", err)
+	const githubUserID int64 = 4_200_001
+	if _, err := pool.Exec(ctx, "DELETE FROM users WHERE github_user_id = $1", githubUserID); err != nil {
+		t.Fatalf("reset auth test user: %v", err)
 	}
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), "DELETE FROM users WHERE github_user_id = $1", githubUserID)
+	})
 
 	store := NewPostgresStore(database.New(pool))
 	stateHash := sha256.Sum256([]byte("state"))
@@ -43,7 +47,7 @@ func TestPostgresStoreOAuthAndSessionLifecycle(t *testing.T) {
 
 	name := "Asha Rao"
 	user, err := store.UpsertGitHubUser(ctx, GitHubUser{
-		ID: 42, Login: "asha-rao", Name: &name,
+		ID: githubUserID, Login: "asha-rao-auth-test", Name: &name,
 		AvatarURL:  "https://avatars.githubusercontent.com/u/42",
 		ProfileURL: "https://github.com/asha-rao",
 	})
@@ -52,7 +56,7 @@ func TestPostgresStoreOAuthAndSessionLifecycle(t *testing.T) {
 	}
 	updatedName := "Asha R."
 	updated, err := store.UpsertGitHubUser(ctx, GitHubUser{
-		ID: 42, Login: "asha-rao", Name: &updatedName,
+		ID: githubUserID, Login: "asha-rao-auth-test", Name: &updatedName,
 		AvatarURL:  "https://avatars.githubusercontent.com/u/42?v=2",
 		ProfileURL: "https://github.com/asha-rao",
 	})
@@ -65,7 +69,7 @@ func TestPostgresStoreOAuthAndSessionLifecycle(t *testing.T) {
 		t.Fatalf("CreateSession() error = %v", err)
 	}
 	current, err := store.GetSessionUser(ctx, tokenHash[:])
-	if err != nil || current.ID != user.ID || current.GitHubLogin != "asha-rao" {
+	if err != nil || current.ID != user.ID || current.GitHubLogin != "asha-rao-auth-test" {
 		t.Fatalf("GetSessionUser() = %#v, %v", current, err)
 	}
 	if err := store.DeleteSession(ctx, tokenHash[:]); err != nil {

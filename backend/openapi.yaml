@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: Branch-Out API
-  version: 0.2.0
-  description: PostgreSQL-backed project discovery, GitHub authentication, and member profiles for Branch-Out.
+  version: 0.3.0
+  description: PostgreSQL-backed project discovery, GitHub authentication, member profiles, and owner-managed opening drafts for Branch-Out.
 servers:
   - url: http://localhost:8080
 paths:
@@ -84,6 +84,150 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '500':
           description: The catalogue could not be loaded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    post:
+      operationId: createOpeningDraft
+      summary: Create an opening draft owned by the authenticated member
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpeningDraftInput'
+      responses:
+        '201':
+          description: The private owner draft was created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ManagedOpening'
+        '400':
+          description: The request or an opening field is invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: No valid session is present.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: The authenticated member must complete a profile first.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: The draft could not be created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /v1/openings/mine:
+    get:
+      operationId: listOwnedOpenings
+      summary: List openings owned by the authenticated member
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: The member's openings, including private drafts.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ManagedOpening'
+                  meta:
+                    type: object
+                    required: [count]
+                    properties:
+                      count:
+                        type: integer
+                        minimum: 0
+        '401':
+          description: No valid session is present.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: The owned openings could not be loaded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /v1/openings/{id}:
+    put:
+      operationId: updateOpeningDraft
+      summary: Replace an opening draft owned by the authenticated member
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpeningDraftInput'
+      responses:
+        '200':
+          description: The private owner draft was updated.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ManagedOpening'
+        '400':
+          description: The request or an opening field is invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: No valid session is present.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: No editable draft with this ID belongs to the member.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: The authenticated member must complete a profile first.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: The draft could not be updated.
           content:
             application/json:
               schema:
@@ -345,6 +489,75 @@ components:
           type: string
         confidentiality:
           type: string
+    ManagedOpening:
+      allOf:
+        - $ref: '#/components/schemas/Opening'
+        - type: object
+          required: [publicationStatus]
+          properties:
+            publicationStatus:
+              type: string
+              enum: [draft, published, closed]
+    OpeningDraftInput:
+      type: object
+      additionalProperties: false
+      required:
+        - projectName
+        - problem
+        - role
+        - skills
+        - commitment
+        - duration
+        - timezone
+        - compensation
+        - firstMilestone
+        - ownerContribution
+        - confidentiality
+      properties:
+        projectName:
+          type: string
+          minLength: 3
+          maxLength: 80
+        problem:
+          type: string
+          minLength: 20
+          maxLength: 240
+        role:
+          type: string
+          enum: [Frontend engineer, Backend engineer, Product designer, UX researcher]
+        skills:
+          type: array
+          minItems: 1
+          maxItems: 12
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 40
+        commitment:
+          type: string
+          enum: [Under 6 hrs/week, 6–8 hrs/week, 8+ hrs/week]
+        duration:
+          type: string
+          enum: [2–4 weeks, 5–8 weeks, 2–3 months]
+        timezone:
+          type: string
+          minLength: 3
+          maxLength: 80
+        compensation:
+          type: string
+          enum: [Paid, Fixed bounty, Revenue share, Unpaid / portfolio]
+        firstMilestone:
+          type: string
+          minLength: 20
+          maxLength: 500
+        ownerContribution:
+          type: string
+          minLength: 20
+          maxLength: 500
+        confidentiality:
+          type: string
+          enum: [Public, Limited details, Confidential after agreement]
     ErrorEnvelope:
       type: object
       required: [error]

@@ -1,9 +1,10 @@
 # Branch-Out API
 
 This directory contains the modular Go API for Branch-Out. Project-opening
-discovery, GitHub-backed accounts, durable sessions, and collaboration profiles
-are backed by PostgreSQL through pgx and SQLC-generated typed queries. Goose
-migrations own the schema and representative development data.
+discovery, GitHub-backed accounts, durable sessions, collaboration profiles,
+and owner-managed opening drafts are backed by PostgreSQL through pgx and
+SQLC-generated typed queries. Goose migrations own the schema and
+representative development data.
 
 ## Requirements
 
@@ -58,7 +59,10 @@ checks PostgreSQL on every request and returns HTTP 503 with
 - `DELETE /v1/session` — sign out and revoke the current session
 - `GET /v1/profile` — return the authenticated member's collaboration profile
 - `PUT /v1/profile` — create or replace that collaboration profile
-- `GET /v1/openings` — list project openings
+- `GET /v1/openings` — list published project openings
+- `POST /v1/openings` — create an authenticated member's private opening draft
+- `GET /v1/openings/mine` — list the authenticated member's openings
+- `PUT /v1/openings/{id}` — replace a private draft owned by that member
 
 Discovery accepts optional filters. Structured values use the labels already
 shown by the frontend.
@@ -80,6 +84,14 @@ Successful catalogue responses use a stable envelope:
 
 Invalid structured filters return HTTP 400 with a machine-readable code, a
 human-readable message, and the relevant field.
+
+Opening mutations require an authenticated session and completed collaboration
+profile. New openings always start as private `draft` records. An update matches
+the opening ID, authenticated owner, and draft state in one database statement;
+a missing, published, or differently owned opening returns the same HTTP 404
+response. Public discovery reads only `published` records, so drafts cannot
+appear in the catalogue. Publishing and closing transitions are intentionally
+outside this milestone.
 
 The complete contract is in [`openapi.yaml`](openapi.yaml).
 
@@ -143,11 +155,12 @@ generate and migrate with the same tool versions. Generated files under
 
 The tests cover liveness, readiness, credentialed CORS behavior, the OAuth and
 session lifecycle, PKCE exchange behavior, response shape, combined discovery
-filtering, invalid filters, unsupported methods, and unknown routes. PostgreSQL
-integration tests cover single-use OAuth attempts, user upserts, session
-revocation, profile creation and replacement, authoritative GitHub identity,
-full-catalogue retrieval, text search, combined structured filters, conflicting
-filters, ordering, and cancellation.
+filtering, opening-draft validation and authorization, invalid filters,
+unsupported methods, and unknown routes. PostgreSQL integration tests cover
+single-use OAuth attempts, user upserts, session revocation, profile creation
+and replacement, authoritative GitHub identity, owner-only draft updates, draft
+isolation from discovery, full-catalogue retrieval, text search, combined
+structured filters, conflicting filters, ordering, and cancellation.
 
 ## Package boundaries
 
@@ -155,13 +168,15 @@ filters, ordering, and cancellation.
 - `internal/config` owns environment parsing and safe defaults.
 - `internal/database` contains SQLC-generated pgx query code.
 - `internal/auth` owns GitHub OAuth, users, and durable sessions.
-- `internal/openings` owns project-opening types, filtering, and the repository
-  contract, including memory and PostgreSQL implementations.
+- `internal/openings` owns project-opening types, validation, ownership,
+  filtering, and the repository contract, including memory and PostgreSQL
+  implementations.
 - `internal/profile` owns collaboration-profile validation and persistence.
 - `internal/httpapi` owns REST routing, JSON responses, CORS, and server errors.
 
 The memory repository remains as a fast domain-test double. Runtime traffic uses
 PostgreSQL. Authentication can create or update an account and revoke its
 sessions. Authenticated members can persist a collaboration profile, and the
-frontend uses both authentication and profile routes. Project openings remain
-read-only.
+frontend uses both authentication and profile routes. The API can create, list,
+and edit owner drafts, while the frontend project-opening creator remains
+device-local until its next integration phase. No API can publish a draft yet.

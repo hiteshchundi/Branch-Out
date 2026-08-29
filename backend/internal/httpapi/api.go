@@ -15,6 +15,7 @@ import (
 
 type API struct {
 	repository     openings.Repository
+	openingManager OpeningManager
 	readiness      ReadinessChecker
 	authentication Authenticator
 	profiles       ProfileManager
@@ -30,6 +31,12 @@ type ReadinessChecker interface {
 type ProfileManager interface {
 	Get(context.Context, int64) (profile.Profile, error)
 	Save(context.Context, int64, profile.Input) (profile.Profile, error)
+}
+
+type OpeningManager interface {
+	ListOwned(context.Context, int64) ([]openings.ManagedOpening, error)
+	CreateDraft(context.Context, int64, openings.DraftInput) (openings.ManagedOpening, error)
+	UpdateDraft(context.Context, int64, string, openings.DraftInput) (openings.ManagedOpening, error)
 }
 
 type listResponse struct {
@@ -53,12 +60,15 @@ type apiError struct {
 	Field   string `json:"field,omitempty"`
 }
 
-func New(repository openings.Repository, readiness ReadinessChecker, authentication Authenticator, profiles ProfileManager, options Options, logger *slog.Logger) http.Handler {
-	api := &API{repository: repository, readiness: readiness, authentication: authentication, profiles: profiles, options: options, allowedOrigin: options.AllowedOrigin, logger: logger}
+func New(repository openings.Repository, openingManager OpeningManager, readiness ReadinessChecker, authentication Authenticator, profiles ProfileManager, options Options, logger *slog.Logger) http.Handler {
+	api := &API{repository: repository, openingManager: openingManager, readiness: readiness, authentication: authentication, profiles: profiles, options: options, allowedOrigin: options.AllowedOrigin, logger: logger}
 	routes := http.NewServeMux()
 	routes.HandleFunc("GET /healthz", api.health)
 	routes.HandleFunc("GET /readyz", api.ready)
 	routes.HandleFunc("GET /v1/openings", api.listOpenings)
+	routes.HandleFunc("POST /v1/openings", api.createOpeningDraft)
+	routes.HandleFunc("GET /v1/openings/mine", api.listOwnedOpenings)
+	routes.HandleFunc("PUT /v1/openings/{id}", api.updateOpeningDraft)
 	routes.HandleFunc("GET /v1/auth/github/start", api.startGitHubAuth)
 	routes.HandleFunc("GET /v1/auth/github/callback", api.finishGitHubAuth)
 	routes.HandleFunc("GET /v1/session", api.currentSession)
@@ -68,6 +78,8 @@ func New(repository openings.Repository, readiness ReadinessChecker, authenticat
 	routes.HandleFunc("OPTIONS /v1/session", api.preflight)
 	routes.HandleFunc("OPTIONS /v1/profile", api.preflight)
 	routes.HandleFunc("OPTIONS /v1/openings", api.preflight)
+	routes.HandleFunc("OPTIONS /v1/openings/mine", api.preflight)
+	routes.HandleFunc("OPTIONS /v1/openings/{id}", api.preflight)
 	routes.HandleFunc("/", api.notFound)
 
 	return api.recoverPanics(api.logRequests(api.cors(routes)))
@@ -146,7 +158,7 @@ func (api *API) cors(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.Header.Get("Origin") == api.allowedOrigin {
 			writer.Header().Set("Access-Control-Allow-Origin", api.allowedOrigin)
-			writer.Header().Set("Access-Control-Allow-Methods", "GET, PUT, DELETE, OPTIONS")
+			writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 			writer.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type")
 			writer.Header().Set("Access-Control-Allow-Credentials", "true")
 			writer.Header().Set("Vary", "Origin")

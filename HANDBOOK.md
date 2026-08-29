@@ -516,8 +516,9 @@ and restored the next time the project-opening creator is opened.
 ### Complete an opening draft
 
 Select **Complete draft** on the final step. A summary confirms that the draft is
-saved locally and ready for later review. It is not published. Publishing will
-be added after account onboarding and the project-opening API exist.
+saved locally and ready for later review. It is not published. The backend can
+now store private drafts for authenticated members with completed profiles, but
+this frontend flow remains local until that integration is connected.
 
 Use **Back** to return to a previous step. Close the creator with its close
 button, the shaded area, or `Escape`.
@@ -592,14 +593,19 @@ remains only as a fast test double.
 The API also supports GitHub OAuth and durable, revocable application sessions,
 and the frontend login panel now uses those routes.
 It stores users, one-time OAuth attempts, and hashed session tokens in
-PostgreSQL; GitHub access tokens are not retained. Project discovery remains
-read-only.
+PostgreSQL; GitHub access tokens are not retained. Public project discovery
+returns only published openings.
 
 Authenticated members can also create or replace a validated collaboration
 profile through the backend. The GitHub profile link comes from the authenticated
 identity rather than editable input. The visible onboarding form now loads and
 saves these profiles for authenticated members while retaining a local preview
 for signed-out visitors.
+Authenticated members with completed profiles can also create, list, and edit
+their own private opening drafts through the API. Ownership and draft status are
+checked together during updates, and private drafts never appear in public
+discovery. The visible project-opening creator is not yet connected to these
+routes, and no publish or close transition exists yet.
 The OpenAPI contract, database commands, rollback instructions, authentication
 configuration, and operating details live in `backend/README.md`.
 
@@ -610,7 +616,8 @@ configuration, and operating details live in `backend/README.md`.
 - GitHub login requires a configured OAuth app and a running API.
 - Authenticated profiles can be saved but are not yet public, searchable, or
   attached to applications. Signed-out profile previews remain local only.
-- Opening drafts cannot be published.
+- Opening drafts can be stored privately through the API but cannot be published
+  or closed, and the visible creator still uses browser-local storage.
 - Application drafts cannot be sent or reviewed by an owner.
 - Trial-agreement drafts cannot be sent, mutually accepted, or signed.
 - Outcome feedback and trust-signal candidates cannot be mutually confirmed,

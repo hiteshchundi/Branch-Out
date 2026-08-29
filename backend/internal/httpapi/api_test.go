@@ -21,7 +21,7 @@ var defaultOptions = Options{
 }
 
 func testAPI(repository openings.Repository) http.Handler {
-	return New(repository, readyChecker{}, fakeAuthenticator{}, fakeProfileManager{}, defaultOptions, slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)))
+	return New(repository, fakeOpeningManager{}, readyChecker{}, fakeAuthenticator{}, fakeProfileManager{}, defaultOptions, slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)))
 }
 
 func TestStatusRoutes(t *testing.T) {
@@ -48,6 +48,7 @@ func TestStatusRoutes(t *testing.T) {
 func TestReadinessReturnsUnavailableWhenDependencyFails(t *testing.T) {
 	api := New(
 		openings.NewMemoryRepository(nil),
+		fakeOpeningManager{},
 		readyChecker{err: errors.New("database unavailable")},
 		fakeAuthenticator{}, fakeProfileManager{}, defaultOptions,
 		slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)),
@@ -164,7 +165,7 @@ func TestUnsupportedMethodAndUnknownRoute(t *testing.T) {
 		wantStatus int
 		wantCode   string
 	}{
-		{name: "unsupported method", method: http.MethodPost, path: "/v1/openings", wantStatus: http.StatusMethodNotAllowed, wantCode: "method_not_allowed"},
+		{name: "unsupported method", method: http.MethodPatch, path: "/v1/openings", wantStatus: http.StatusMethodNotAllowed, wantCode: "method_not_allowed"},
 		{name: "unknown route", method: http.MethodGet, path: "/missing", wantStatus: http.StatusNotFound, wantCode: "not_found"},
 	}
 

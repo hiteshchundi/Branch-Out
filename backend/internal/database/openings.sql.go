@@ -9,6 +9,120 @@ import (
 	"context"
 )
 
+const createOwnedOpening = `-- name: CreateOwnedOpening :one
+INSERT INTO project_openings (
+    id, title, summary, skills, role, compensation, commitment,
+    commitment_band, duration, timezone, freshness, stage,
+    desired_outcome, first_milestone, owner_contribution, owner_name,
+    owner_signal, confidentiality, display_order, owner_user_id,
+    publication_status
+) VALUES (
+    $1, $2, $3, $4,
+    $5, $6, $7,
+    $8, $9, $10,
+    $11, $12, $13,
+    $14, $15,
+    $16, $17, $18,
+    0, $19, 'draft'
+)
+RETURNING
+    id, title, summary, skills, role, compensation, commitment,
+    commitment_band, duration, timezone, freshness, stage,
+    desired_outcome, first_milestone, owner_contribution, owner_name,
+    owner_signal, confidentiality, publication_status
+`
+
+type CreateOwnedOpeningParams struct {
+	ID                string   `db:"id" json:"id"`
+	Title             string   `db:"title" json:"title"`
+	Summary           string   `db:"summary" json:"summary"`
+	Skills            []string `db:"skills" json:"skills"`
+	Role              string   `db:"role" json:"role"`
+	Compensation      string   `db:"compensation" json:"compensation"`
+	Commitment        string   `db:"commitment" json:"commitment"`
+	CommitmentBand    string   `db:"commitment_band" json:"commitment_band"`
+	Duration          string   `db:"duration" json:"duration"`
+	Timezone          string   `db:"timezone" json:"timezone"`
+	Freshness         string   `db:"freshness" json:"freshness"`
+	Stage             string   `db:"stage" json:"stage"`
+	DesiredOutcome    string   `db:"desired_outcome" json:"desired_outcome"`
+	FirstMilestone    string   `db:"first_milestone" json:"first_milestone"`
+	OwnerContribution string   `db:"owner_contribution" json:"owner_contribution"`
+	OwnerName         string   `db:"owner_name" json:"owner_name"`
+	OwnerSignal       string   `db:"owner_signal" json:"owner_signal"`
+	Confidentiality   string   `db:"confidentiality" json:"confidentiality"`
+	OwnerUserID       *int64   `db:"owner_user_id" json:"owner_user_id"`
+}
+
+type CreateOwnedOpeningRow struct {
+	ID                string   `db:"id" json:"id"`
+	Title             string   `db:"title" json:"title"`
+	Summary           string   `db:"summary" json:"summary"`
+	Skills            []string `db:"skills" json:"skills"`
+	Role              string   `db:"role" json:"role"`
+	Compensation      string   `db:"compensation" json:"compensation"`
+	Commitment        string   `db:"commitment" json:"commitment"`
+	CommitmentBand    string   `db:"commitment_band" json:"commitment_band"`
+	Duration          string   `db:"duration" json:"duration"`
+	Timezone          string   `db:"timezone" json:"timezone"`
+	Freshness         string   `db:"freshness" json:"freshness"`
+	Stage             string   `db:"stage" json:"stage"`
+	DesiredOutcome    string   `db:"desired_outcome" json:"desired_outcome"`
+	FirstMilestone    string   `db:"first_milestone" json:"first_milestone"`
+	OwnerContribution string   `db:"owner_contribution" json:"owner_contribution"`
+	OwnerName         string   `db:"owner_name" json:"owner_name"`
+	OwnerSignal       string   `db:"owner_signal" json:"owner_signal"`
+	Confidentiality   string   `db:"confidentiality" json:"confidentiality"`
+	PublicationStatus string   `db:"publication_status" json:"publication_status"`
+}
+
+func (q *Queries) CreateOwnedOpening(ctx context.Context, arg CreateOwnedOpeningParams) (CreateOwnedOpeningRow, error) {
+	row := q.db.QueryRow(ctx, createOwnedOpening,
+		arg.ID,
+		arg.Title,
+		arg.Summary,
+		arg.Skills,
+		arg.Role,
+		arg.Compensation,
+		arg.Commitment,
+		arg.CommitmentBand,
+		arg.Duration,
+		arg.Timezone,
+		arg.Freshness,
+		arg.Stage,
+		arg.DesiredOutcome,
+		arg.FirstMilestone,
+		arg.OwnerContribution,
+		arg.OwnerName,
+		arg.OwnerSignal,
+		arg.Confidentiality,
+		arg.OwnerUserID,
+	)
+	var i CreateOwnedOpeningRow
+	err := row.Scan(
+		&i.ID,
+		&i.Title,
+		&i.Summary,
+		&i.Skills,
+		&i.Role,
+		&i.Compensation,
+		&i.Commitment,
+		&i.CommitmentBand,
+		&i.Duration,
+		&i.Timezone,
+		&i.Freshness,
+		&i.Stage,
+		&i.DesiredOutcome,
+		&i.FirstMilestone,
+		&i.OwnerContribution,
+		&i.OwnerName,
+		&i.OwnerSignal,
+		&i.Confidentiality,
+		&i.PublicationStatus,
+	)
+	return i, err
+}
+
 const listOpenings = `-- name: ListOpenings :many
 SELECT
     id,
@@ -31,7 +145,8 @@ SELECT
     confidentiality
 FROM project_openings
 WHERE
-    ($1::text = '' OR role = $1::text)
+    publication_status = 'published'
+    AND ($1::text = '' OR role = $1::text)
     AND ($2::text = '' OR compensation = $2::text)
     AND ($3::text = '' OR commitment_band = $3::text)
     AND (
@@ -125,4 +240,189 @@ func (q *Queries) ListOpenings(ctx context.Context, arg ListOpeningsParams) ([]L
 		return nil, err
 	}
 	return items, nil
+}
+
+const listOwnedOpenings = `-- name: ListOwnedOpenings :many
+SELECT
+    id, title, summary, skills, role, compensation, commitment,
+    commitment_band, duration, timezone, freshness, stage,
+    desired_outcome, first_milestone, owner_contribution, owner_name,
+    owner_signal, confidentiality, publication_status
+FROM project_openings
+WHERE owner_user_id = $1
+ORDER BY updated_at DESC, id
+`
+
+type ListOwnedOpeningsRow struct {
+	ID                string   `db:"id" json:"id"`
+	Title             string   `db:"title" json:"title"`
+	Summary           string   `db:"summary" json:"summary"`
+	Skills            []string `db:"skills" json:"skills"`
+	Role              string   `db:"role" json:"role"`
+	Compensation      string   `db:"compensation" json:"compensation"`
+	Commitment        string   `db:"commitment" json:"commitment"`
+	CommitmentBand    string   `db:"commitment_band" json:"commitment_band"`
+	Duration          string   `db:"duration" json:"duration"`
+	Timezone          string   `db:"timezone" json:"timezone"`
+	Freshness         string   `db:"freshness" json:"freshness"`
+	Stage             string   `db:"stage" json:"stage"`
+	DesiredOutcome    string   `db:"desired_outcome" json:"desired_outcome"`
+	FirstMilestone    string   `db:"first_milestone" json:"first_milestone"`
+	OwnerContribution string   `db:"owner_contribution" json:"owner_contribution"`
+	OwnerName         string   `db:"owner_name" json:"owner_name"`
+	OwnerSignal       string   `db:"owner_signal" json:"owner_signal"`
+	Confidentiality   string   `db:"confidentiality" json:"confidentiality"`
+	PublicationStatus string   `db:"publication_status" json:"publication_status"`
+}
+
+func (q *Queries) ListOwnedOpenings(ctx context.Context, ownerUserID *int64) ([]ListOwnedOpeningsRow, error) {
+	rows, err := q.db.Query(ctx, listOwnedOpenings, ownerUserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListOwnedOpeningsRow{}
+	for rows.Next() {
+		var i ListOwnedOpeningsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.Summary,
+			&i.Skills,
+			&i.Role,
+			&i.Compensation,
+			&i.Commitment,
+			&i.CommitmentBand,
+			&i.Duration,
+			&i.Timezone,
+			&i.Freshness,
+			&i.Stage,
+			&i.DesiredOutcome,
+			&i.FirstMilestone,
+			&i.OwnerContribution,
+			&i.OwnerName,
+			&i.OwnerSignal,
+			&i.Confidentiality,
+			&i.PublicationStatus,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updateOwnedDraft = `-- name: UpdateOwnedDraft :one
+UPDATE project_openings SET
+    title = $1,
+    summary = $2,
+    skills = $3,
+    role = $4,
+    compensation = $5,
+    commitment = $6,
+    commitment_band = $7,
+    duration = $8,
+    timezone = $9,
+    desired_outcome = $10,
+    first_milestone = $11,
+    owner_contribution = $12,
+    owner_name = $13,
+    confidentiality = $14,
+    updated_at = now()
+WHERE id = $15
+  AND owner_user_id = $16
+  AND publication_status = 'draft'
+RETURNING
+    id, title, summary, skills, role, compensation, commitment,
+    commitment_band, duration, timezone, freshness, stage,
+    desired_outcome, first_milestone, owner_contribution, owner_name,
+    owner_signal, confidentiality, publication_status
+`
+
+type UpdateOwnedDraftParams struct {
+	Title             string   `db:"title" json:"title"`
+	Summary           string   `db:"summary" json:"summary"`
+	Skills            []string `db:"skills" json:"skills"`
+	Role              string   `db:"role" json:"role"`
+	Compensation      string   `db:"compensation" json:"compensation"`
+	Commitment        string   `db:"commitment" json:"commitment"`
+	CommitmentBand    string   `db:"commitment_band" json:"commitment_band"`
+	Duration          string   `db:"duration" json:"duration"`
+	Timezone          string   `db:"timezone" json:"timezone"`
+	DesiredOutcome    string   `db:"desired_outcome" json:"desired_outcome"`
+	FirstMilestone    string   `db:"first_milestone" json:"first_milestone"`
+	OwnerContribution string   `db:"owner_contribution" json:"owner_contribution"`
+	OwnerName         string   `db:"owner_name" json:"owner_name"`
+	Confidentiality   string   `db:"confidentiality" json:"confidentiality"`
+	ID                string   `db:"id" json:"id"`
+	OwnerUserID       *int64   `db:"owner_user_id" json:"owner_user_id"`
+}
+
+type UpdateOwnedDraftRow struct {
+	ID                string   `db:"id" json:"id"`
+	Title             string   `db:"title" json:"title"`
+	Summary           string   `db:"summary" json:"summary"`
+	Skills            []string `db:"skills" json:"skills"`
+	Role              string   `db:"role" json:"role"`
+	Compensation      string   `db:"compensation" json:"compensation"`
+	Commitment        string   `db:"commitment" json:"commitment"`
+	CommitmentBand    string   `db:"commitment_band" json:"commitment_band"`
+	Duration          string   `db:"duration" json:"duration"`
+	Timezone          string   `db:"timezone" json:"timezone"`
+	Freshness         string   `db:"freshness" json:"freshness"`
+	Stage             string   `db:"stage" json:"stage"`
+	DesiredOutcome    string   `db:"desired_outcome" json:"desired_outcome"`
+	FirstMilestone    string   `db:"first_milestone" json:"first_milestone"`
+	OwnerContribution string   `db:"owner_contribution" json:"owner_contribution"`
+	OwnerName         string   `db:"owner_name" json:"owner_name"`
+	OwnerSignal       string   `db:"owner_signal" json:"owner_signal"`
+	Confidentiality   string   `db:"confidentiality" json:"confidentiality"`
+	PublicationStatus string   `db:"publication_status" json:"publication_status"`
+}
+
+func (q *Queries) UpdateOwnedDraft(ctx context.Context, arg UpdateOwnedDraftParams) (UpdateOwnedDraftRow, error) {
+	row := q.db.QueryRow(ctx, updateOwnedDraft,
+		arg.Title,
+		arg.Summary,
+		arg.Skills,
+		arg.Role,
+		arg.Compensation,
+		arg.Commitment,
+		arg.CommitmentBand,
+		arg.Duration,
+		arg.Timezone,
+		arg.DesiredOutcome,
+		arg.FirstMilestone,
+		arg.OwnerContribution,
+		arg.OwnerName,
+		arg.Confidentiality,
+		arg.ID,
+		arg.OwnerUserID,
+	)
+	var i UpdateOwnedDraftRow
+	err := row.Scan(
+		&i.ID,
+		&i.Title,
+		&i.Summary,
+		&i.Skills,
+		&i.Role,
+		&i.Compensation,
+		&i.Commitment,
+		&i.CommitmentBand,
+		&i.Duration,
+		&i.Timezone,
+		&i.Freshness,
+		&i.Stage,
+		&i.DesiredOutcome,
+		&i.FirstMilestone,
+		&i.OwnerContribution,
+		&i.OwnerName,
+		&i.OwnerSignal,
+		&i.Confidentiality,
+		&i.PublicationStatus,
+	)
+	return i, err
 }

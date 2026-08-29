@@ -33,8 +33,8 @@ responsive discovery homepage split into three clear components:
 The backend in [`backend`](backend) is a Go REST API with PostgreSQL-backed,
 filterable project-opening discovery, GitHub OAuth, durable revocable sessions,
 authenticated collaboration-profile persistence, dependency-aware health
-checks, reversible migrations, typed SQLC queries, automated tests, and an
-OpenAPI contract.
+checks, private owner-managed project-opening drafts, reversible migrations,
+typed SQLC queries, automated tests, and an OpenAPI contract.
 
 ## Original brand identity
 
@@ -186,8 +186,10 @@ The **Post a project** action opens a three-step draft flow covering:
 
 Each step validates its own fields and provides accessible error messages. A
 partial or completed draft can be saved on the current device and restored when
-the flow is reopened. The interface clearly states that local completion is not
-publication; publishing will be connected after account onboarding exists.
+the flow is reopened. The backend now supports private drafts owned by
+authenticated members with completed profiles, but this creator is not connected
+to those routes yet. The interface therefore continues to state that local
+completion is not publication.
 
 ## Proof-led applications
 
@@ -244,7 +246,8 @@ and backend systems.
 
 - The Go API exposes representative project openings, but the frontend still
   reads its matching local catalogue until the integration milestone.
-- API project openings are persisted in PostgreSQL but remain read-only.
+- The API can create, list, and edit private opening drafts for their
+  authenticated owner; it cannot publish or close them yet.
 - GitHub login and logout are connected, but the OAuth app must be configured in
   the backend environment before sign-in is available.
 - Authenticated profile onboarding loads and saves through the member account;
@@ -253,8 +256,8 @@ and backend systems.
   applications.
 - The early-access form confirms frontend input only and does not claim to store
   an email address.
-- Project-opening drafts are stored only in the current browser until the backend
-  project-opening API is implemented.
+- The visible project-opening creator still stores drafts only in the current
+  browser until its backend integration phase is completed.
 - Application drafts are stored separately for each project in the current
   browser and are not submitted to another person.
 - Trial-agreement drafts stay in the current browser and are not sent or
