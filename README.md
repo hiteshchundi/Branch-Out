@@ -245,8 +245,9 @@ and backend systems.
 
 - The Go API exposes representative project openings, but the frontend still
   reads its matching local catalogue until the integration milestone.
-- The API can create, list, and edit private opening drafts for their
-  authenticated owner; it cannot publish or close them yet.
+- The API can create, list, edit, publish, and close openings for their
+  authenticated owner. The publish and close controls are not connected to the
+  frontend yet.
 - GitHub login and logout are connected, but the OAuth app must be configured in
   the backend environment before sign-in is available.
 - Authenticated profile onboarding loads and saves through the member account;
@@ -256,8 +257,8 @@ and backend systems.
 - The early-access form confirms frontend input only and does not claim to store
   an email address.
 - The project-opening creator stores signed-out previews in the current browser
-  and authenticated drafts in the member account. It cannot publish or close an
-  opening yet.
+  and authenticated drafts in the member account. Publishing and closing require
+  the API until the next frontend integration phase.
 - Application drafts are stored separately for each project in the current
   browser and are not submitted to another person.
 - Trial-agreement drafts stay in the current browser and are not sent or

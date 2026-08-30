@@ -76,6 +76,39 @@ RETURNING
     desired_outcome, first_milestone, owner_contribution, owner_name,
     owner_signal, confidentiality, publication_status;
 
+-- name: PublishOwnedDraft :one
+UPDATE project_openings SET
+    publication_status = 'published',
+    freshness = 'Published just now',
+    stage = 'Open for collaborators',
+    published_at = now(),
+    closed_at = NULL,
+    updated_at = now()
+WHERE id = sqlc.arg(id)
+  AND owner_user_id = sqlc.arg(owner_user_id)
+  AND publication_status = 'draft'
+RETURNING
+    id, title, summary, skills, role, compensation, commitment,
+    commitment_band, duration, timezone, freshness, stage,
+    desired_outcome, first_milestone, owner_contribution, owner_name,
+    owner_signal, confidentiality, publication_status;
+
+-- name: CloseOwnedOpening :one
+UPDATE project_openings SET
+    publication_status = 'closed',
+    freshness = 'Closed',
+    stage = 'Closed',
+    closed_at = now(),
+    updated_at = now()
+WHERE id = sqlc.arg(id)
+  AND owner_user_id = sqlc.arg(owner_user_id)
+  AND publication_status = 'published'
+RETURNING
+    id, title, summary, skills, role, compensation, commitment,
+    commitment_band, duration, timezone, freshness, stage,
+    desired_outcome, first_milestone, owner_contribution, owner_name,
+    owner_signal, confidentiality, publication_status;
+
 -- name: UpdateOwnedDraft :one
 UPDATE project_openings SET
     title = sqlc.arg(title),

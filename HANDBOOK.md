@@ -526,7 +526,8 @@ creating a duplicate.
 Signed-out visitors select **Complete draft** on the final step; a summary
 confirms that the draft is saved locally. Authenticated members select **Save
 private draft**; the summary confirms that it is stored in their account. Neither
-action publishes the opening, and publishing or closing is not available yet.
+action publishes the opening. The backend supports owner-only publishing and
+closing, but those controls are not yet exposed in the visible creator.
 
 Use **Back** to return to a previous step. Close the creator with its close
 button, the shaded area, or `Escape`.
@@ -614,8 +615,11 @@ Authenticated members with completed profiles can also create, list, and edit
 their own private opening drafts through the API. Ownership and draft status are
 checked together during updates, and private drafts never appear in public
 discovery. The visible project-opening creator now loads and saves the member's
-most recently updated private draft through these routes. No publish or close
-transition exists yet.
+most recently updated private draft through these routes. The API can atomically
+publish an owned draft and close an owned published opening, recording both
+lifecycle times. Published openings enter public discovery; closed openings
+leave it. The visible creator does not yet expose those two controls, and the API
+does not yet support reopening or moderation.
 The OpenAPI contract, database commands, rollback instructions, authentication
 configuration, and operating details live in `backend/README.md`.
 
@@ -626,8 +630,9 @@ configuration, and operating details live in `backend/README.md`.
 - GitHub login requires a configured OAuth app and a running API.
 - Authenticated profiles can be saved but are not yet public, searchable, or
   attached to applications. Signed-out profile previews remain local only.
-- Authenticated opening drafts can be stored privately but cannot be published
-  or closed. Signed-out opening previews remain browser-local.
+- Authenticated opening drafts can be published or closed through the API, but
+  those controls are not yet visible in the frontend. Reopening and moderation
+  do not exist. Signed-out opening previews remain browser-local.
 - Application drafts cannot be sent or reviewed by an owner.
 - Trial-agreement drafts cannot be sent, mutually accepted, or signed.
 - Outcome feedback and trust-signal candidates cannot be mutually confirmed,

@@ -37,6 +37,8 @@ type OpeningManager interface {
 	ListOwned(context.Context, int64) ([]openings.ManagedOpening, error)
 	CreateDraft(context.Context, int64, openings.DraftInput) (openings.ManagedOpening, error)
 	UpdateDraft(context.Context, int64, string, openings.DraftInput) (openings.ManagedOpening, error)
+	PublishDraft(context.Context, int64, string) (openings.ManagedOpening, error)
+	CloseOpening(context.Context, int64, string) (openings.ManagedOpening, error)
 }
 
 type listResponse struct {
@@ -69,6 +71,8 @@ func New(repository openings.Repository, openingManager OpeningManager, readines
 	routes.HandleFunc("POST /v1/openings", api.createOpeningDraft)
 	routes.HandleFunc("GET /v1/openings/mine", api.listOwnedOpenings)
 	routes.HandleFunc("PUT /v1/openings/{id}", api.updateOpeningDraft)
+	routes.HandleFunc("POST /v1/openings/{id}/publish", api.publishOpeningDraft)
+	routes.HandleFunc("POST /v1/openings/{id}/close", api.closeOpening)
 	routes.HandleFunc("GET /v1/auth/github/start", api.startGitHubAuth)
 	routes.HandleFunc("GET /v1/auth/github/callback", api.finishGitHubAuth)
 	routes.HandleFunc("GET /v1/session", api.currentSession)
@@ -80,6 +84,8 @@ func New(repository openings.Repository, openingManager OpeningManager, readines
 	routes.HandleFunc("OPTIONS /v1/openings", api.preflight)
 	routes.HandleFunc("OPTIONS /v1/openings/mine", api.preflight)
 	routes.HandleFunc("OPTIONS /v1/openings/{id}", api.preflight)
+	routes.HandleFunc("OPTIONS /v1/openings/{id}/publish", api.preflight)
+	routes.HandleFunc("OPTIONS /v1/openings/{id}/close", api.preflight)
 	routes.HandleFunc("/", api.notFound)
 
 	return api.recoverPanics(api.logRequests(api.cors(routes)))

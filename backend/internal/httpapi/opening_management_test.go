@@ -17,6 +17,7 @@ func TestOpeningManagementRequiresAuthentication(t *testing.T) {
 	api := openingManagementTestAPI(fakeOpeningManager{}, fakeAuthenticator{currentErr: auth.ErrInvalidSession})
 	for _, target := range []struct{ method, path string }{
 		{http.MethodGet, "/v1/openings/mine"}, {http.MethodPost, "/v1/openings"}, {http.MethodPut, "/v1/openings/draft-id"},
+		{http.MethodPost, "/v1/openings/draft-id/publish"}, {http.MethodPost, "/v1/openings/draft-id/close"},
 	} {
 		response := httptest.NewRecorder()
 		api.ServeHTTP(response, httptest.NewRequest(target.method, target.path, bytes.NewBufferString("{}")))
@@ -118,6 +119,41 @@ func TestListAndUpdateOwnedOpeningDrafts(t *testing.T) {
 	}
 }
 
+func TestPublishAndCloseOwnedOpening(t *testing.T) {
+	calls := &openingManagerCalls{}
+	manager := fakeOpeningManager{calls: calls, result: openings.ManagedOpening{PublicationStatus: "published"}}
+	api := openingManagementTestAPI(manager, fakeAuthenticator{user: auth.User{ID: 7}})
+
+	for _, test := range []struct {
+		path       string
+		transition string
+	}{
+		{path: "/v1/openings/draft-id/publish", transition: "publish"},
+		{path: "/v1/openings/draft-id/close", transition: "close"},
+	} {
+		response := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodPost, test.path, nil)
+		request.AddCookie(&http.Cookie{Name: sessionCookieName, Value: "session"})
+		api.ServeHTTP(response, request)
+		if response.Code != http.StatusOK || calls.userID != 7 || calls.id != "draft-id" || calls.transition != test.transition {
+			t.Fatalf("%s response = %d, calls %#v", test.transition, response.Code, calls)
+		}
+	}
+}
+
+func TestOpeningLifecycleHidesInvalidTransition(t *testing.T) {
+	api := openingManagementTestAPI(fakeOpeningManager{err: openings.ErrTransitionNotFound}, fakeAuthenticator{user: auth.User{ID: 7}})
+	request := httptest.NewRequest(http.MethodPost, "/v1/openings/not-owned/publish", nil)
+	request.AddCookie(&http.Cookie{Name: sessionCookieName, Value: "session"})
+	response := httptest.NewRecorder()
+	api.ServeHTTP(response, request)
+	var envelope errorEnvelope
+	_ = json.NewDecoder(response.Body).Decode(&envelope)
+	if response.Code != http.StatusNotFound || envelope.Error.Code != "opening_transition_not_found" {
+		t.Fatalf("response = %d, %#v", response.Code, envelope)
+	}
+}
+
 func validOpeningDraftRequest() openings.DraftInput {
 	return openings.DraftInput{
 		ProjectName: "Climate mapper", Problem: "Help local teams understand climate risks with clear regional data.",
@@ -134,7 +170,7 @@ func openingManagementTestAPI(manager fakeOpeningManager, authentication fakeAut
 
 type openingManagerCalls struct {
 	listUserID, userID int64
-	id                 string
+	id, transition     string
 	input              openings.DraftInput
 }
 type fakeOpeningManager struct {
@@ -159,6 +195,18 @@ func (fake fakeOpeningManager) CreateDraft(_ context.Context, userID int64, inpu
 func (fake fakeOpeningManager) UpdateDraft(_ context.Context, userID int64, id string, input openings.DraftInput) (openings.ManagedOpening, error) {
 	if fake.calls != nil {
 		fake.calls.userID, fake.calls.id, fake.calls.input = userID, id, input
+	}
+	return fake.result, fake.err
+}
+func (fake fakeOpeningManager) PublishDraft(_ context.Context, userID int64, id string) (openings.ManagedOpening, error) {
+	if fake.calls != nil {
+		fake.calls.userID, fake.calls.id, fake.calls.transition = userID, id, "publish"
+	}
+	return fake.result, fake.err
+}
+func (fake fakeOpeningManager) CloseOpening(_ context.Context, userID int64, id string) (openings.ManagedOpening, error) {
+	if fake.calls != nil {
+		fake.calls.userID, fake.calls.id, fake.calls.transition = userID, id, "close"
 	}
 	return fake.result, fake.err
 }

@@ -12,7 +12,10 @@ import (
 	"github.com/hiteshchundi/branch-out/backend/internal/profile"
 )
 
-var ErrDraftNotFound = errors.New("opening draft not found")
+var (
+	ErrDraftNotFound      = errors.New("opening draft not found")
+	ErrTransitionNotFound = errors.New("opening transition not found")
+)
 
 type DraftFieldError struct {
 	Field   string
@@ -49,6 +52,8 @@ type DraftStore interface {
 	ListOwned(context.Context, int64) ([]ManagedOpening, error)
 	CreateDraft(context.Context, draftRecord) (ManagedOpening, error)
 	UpdateDraft(context.Context, string, draftRecord) (ManagedOpening, error)
+	PublishDraft(context.Context, int64, string) (ManagedOpening, error)
+	CloseOpening(context.Context, int64, string) (ManagedOpening, error)
 }
 
 type OwnerProfileLookup interface {
@@ -90,6 +95,20 @@ func (manager *Manager) UpdateDraft(ctx context.Context, userID int64, id string
 		return ManagedOpening{}, err
 	}
 	return manager.store.UpdateDraft(ctx, id, record)
+}
+
+func (manager *Manager) PublishDraft(ctx context.Context, userID int64, id string) (ManagedOpening, error) {
+	if strings.TrimSpace(id) == "" {
+		return ManagedOpening{}, ErrTransitionNotFound
+	}
+	return manager.store.PublishDraft(ctx, userID, id)
+}
+
+func (manager *Manager) CloseOpening(ctx context.Context, userID int64, id string) (ManagedOpening, error) {
+	if strings.TrimSpace(id) == "" {
+		return ManagedOpening{}, ErrTransitionNotFound
+	}
+	return manager.store.CloseOpening(ctx, userID, id)
 }
 
 func (manager *Manager) buildRecord(ctx context.Context, userID int64, input DraftInput) (draftRecord, error) {

@@ -83,6 +83,71 @@ func TestPostgresOwnerDraftLifecycle(t *testing.T) {
 	if !errors.Is(err, ErrDraftNotFound) {
 		t.Fatalf("other owner's UpdateDraft() error = %v, want ErrDraftNotFound", err)
 	}
+
+	_, err = manager.PublishDraft(ctx, secondUser.ID, created.ID)
+	if !errors.Is(err, ErrTransitionNotFound) {
+		t.Fatalf("other owner's PublishDraft() error = %v, want ErrTransitionNotFound", err)
+	}
+	published, err := manager.PublishDraft(ctx, firstUser.ID, created.ID)
+	if err != nil {
+		t.Fatalf("PublishDraft() error = %v", err)
+	}
+	if published.PublicationStatus != "published" || published.Stage != "Open for collaborators" || published.Freshness != "Published just now" {
+		t.Fatalf("published opening = %#v", published)
+	}
+	public, err = repository.List(ctx, Filters{})
+	if err != nil {
+		t.Fatalf("List() after publish error = %v", err)
+	}
+	foundPublished := false
+	for _, opening := range public {
+		if opening.ID == created.ID {
+			foundPublished = true
+		}
+	}
+	if !foundPublished {
+		t.Fatal("published owner opening was not discoverable")
+	}
+	if _, err := manager.UpdateDraft(ctx, firstUser.ID, created.ID, input); !errors.Is(err, ErrDraftNotFound) {
+		t.Fatalf("published UpdateDraft() error = %v, want ErrDraftNotFound", err)
+	}
+	if _, err := manager.PublishDraft(ctx, firstUser.ID, created.ID); !errors.Is(err, ErrTransitionNotFound) {
+		t.Fatalf("repeated PublishDraft() error = %v, want ErrTransitionNotFound", err)
+	}
+
+	_, err = manager.CloseOpening(ctx, secondUser.ID, created.ID)
+	if !errors.Is(err, ErrTransitionNotFound) {
+		t.Fatalf("other owner's CloseOpening() error = %v, want ErrTransitionNotFound", err)
+	}
+	closed, err := manager.CloseOpening(ctx, firstUser.ID, created.ID)
+	if err != nil {
+		t.Fatalf("CloseOpening() error = %v", err)
+	}
+	if closed.PublicationStatus != "closed" || closed.Stage != "Closed" || closed.Freshness != "Closed" {
+		t.Fatalf("closed opening = %#v", closed)
+	}
+	public, err = repository.List(ctx, Filters{})
+	if err != nil {
+		t.Fatalf("List() after close error = %v", err)
+	}
+	for _, opening := range public {
+		if opening.ID == created.ID {
+			t.Fatal("closed owner opening remained publicly discoverable")
+		}
+	}
+	if _, err := manager.CloseOpening(ctx, firstUser.ID, created.ID); !errors.Is(err, ErrTransitionNotFound) {
+		t.Fatalf("repeated CloseOpening() error = %v, want ErrTransitionNotFound", err)
+	}
+	var hasPublishedAt, hasClosedAt bool
+	if err := pool.QueryRow(ctx, `
+		SELECT published_at IS NOT NULL, closed_at IS NOT NULL
+		FROM project_openings WHERE id = $1
+	`, created.ID).Scan(&hasPublishedAt, &hasClosedAt); err != nil {
+		t.Fatalf("load lifecycle timestamps: %v", err)
+	}
+	if !hasPublishedAt || !hasClosedAt {
+		t.Fatalf("lifecycle timestamps = published %t, closed %t", hasPublishedAt, hasClosedAt)
+	}
 }
 
 func createDraftTestUser(

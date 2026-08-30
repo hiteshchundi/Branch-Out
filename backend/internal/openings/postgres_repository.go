@@ -77,6 +77,50 @@ func (repository *PostgresRepository) UpdateDraft(ctx context.Context, id string
 	), nil
 }
 
+func (repository *PostgresRepository) PublishDraft(ctx context.Context, userID int64, id string) (ManagedOpening, error) {
+	return repository.transition(ctx, repository.queries.PublishOwnedDraft, database.PublishOwnedDraftParams{
+		ID: id, OwnerUserID: &userID,
+	})
+}
+
+func (repository *PostgresRepository) CloseOpening(ctx context.Context, userID int64, id string) (ManagedOpening, error) {
+	row, err := repository.queries.CloseOwnedOpening(ctx, database.CloseOwnedOpeningParams{
+		ID: id, OwnerUserID: &userID,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ManagedOpening{}, ErrTransitionNotFound
+	}
+	if err != nil {
+		return ManagedOpening{}, err
+	}
+	return managedOpening(
+		row.ID, row.Title, row.Summary, row.Skills, row.Role, row.Compensation,
+		row.Commitment, row.CommitmentBand, row.Duration, row.Timezone, row.Freshness,
+		row.Stage, row.DesiredOutcome, row.FirstMilestone, row.OwnerContribution,
+		row.OwnerName, row.OwnerSignal, row.Confidentiality, row.PublicationStatus,
+	), nil
+}
+
+func (repository *PostgresRepository) transition(
+	ctx context.Context,
+	operation func(context.Context, database.PublishOwnedDraftParams) (database.PublishOwnedDraftRow, error),
+	params database.PublishOwnedDraftParams,
+) (ManagedOpening, error) {
+	row, err := operation(ctx, params)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ManagedOpening{}, ErrTransitionNotFound
+	}
+	if err != nil {
+		return ManagedOpening{}, err
+	}
+	return managedOpening(
+		row.ID, row.Title, row.Summary, row.Skills, row.Role, row.Compensation,
+		row.Commitment, row.CommitmentBand, row.Duration, row.Timezone, row.Freshness,
+		row.Stage, row.DesiredOutcome, row.FirstMilestone, row.OwnerContribution,
+		row.OwnerName, row.OwnerSignal, row.Confidentiality, row.PublicationStatus,
+	), nil
+}
+
 func managedOpening(
 	id, title, summary string, skills []string, role, compensation, commitment,
 	commitmentBand, duration, timezone, freshness, stage, desiredOutcome,

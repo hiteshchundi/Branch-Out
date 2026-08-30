@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: Branch-Out API
-  version: 0.3.0
-  description: PostgreSQL-backed project discovery, GitHub authentication, member profiles, and owner-managed opening drafts for Branch-Out.
+  version: 0.4.0
+  description: PostgreSQL-backed project discovery, GitHub authentication, member profiles, and owner-managed opening lifecycles for Branch-Out.
 servers:
   - url: http://localhost:8080
 paths:
@@ -228,6 +228,92 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '500':
           description: The draft could not be updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /v1/openings/{id}/publish:
+    post:
+      operationId: publishOwnedOpening
+      summary: Publish an opening draft owned by the authenticated member
+      description: Atomically changes an owned draft to published so it becomes publicly discoverable.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The opening is published.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ManagedOpening'
+        '401':
+          description: No valid session is present.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: No owned draft is available for this transition.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: The opening could not be published.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /v1/openings/{id}/close:
+    post:
+      operationId: closeOwnedOpening
+      summary: Close a published opening owned by the authenticated member
+      description: Atomically changes an owned published opening to closed so it leaves public discovery.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The opening is closed.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ManagedOpening'
+        '401':
+          description: No valid session is present.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: No owned published opening is available for this transition.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: The opening could not be closed.
           content:
             application/json:
               schema:

@@ -6,6 +6,8 @@ package database
 
 import (
 	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type OauthAttempt struct {
@@ -33,29 +35,31 @@ type Profile struct {
 }
 
 type ProjectOpening struct {
-	ID                string    `db:"id" json:"id"`
-	Title             string    `db:"title" json:"title"`
-	Summary           string    `db:"summary" json:"summary"`
-	Skills            []string  `db:"skills" json:"skills"`
-	Role              string    `db:"role" json:"role"`
-	Compensation      string    `db:"compensation" json:"compensation"`
-	Commitment        string    `db:"commitment" json:"commitment"`
-	CommitmentBand    string    `db:"commitment_band" json:"commitment_band"`
-	Duration          string    `db:"duration" json:"duration"`
-	Timezone          string    `db:"timezone" json:"timezone"`
-	Freshness         string    `db:"freshness" json:"freshness"`
-	Stage             string    `db:"stage" json:"stage"`
-	DesiredOutcome    string    `db:"desired_outcome" json:"desired_outcome"`
-	FirstMilestone    string    `db:"first_milestone" json:"first_milestone"`
-	OwnerContribution string    `db:"owner_contribution" json:"owner_contribution"`
-	OwnerName         string    `db:"owner_name" json:"owner_name"`
-	OwnerSignal       string    `db:"owner_signal" json:"owner_signal"`
-	Confidentiality   string    `db:"confidentiality" json:"confidentiality"`
-	DisplayOrder      int32     `db:"display_order" json:"display_order"`
-	CreatedAt         time.Time `db:"created_at" json:"created_at"`
-	UpdatedAt         time.Time `db:"updated_at" json:"updated_at"`
-	OwnerUserID       *int64    `db:"owner_user_id" json:"owner_user_id"`
-	PublicationStatus string    `db:"publication_status" json:"publication_status"`
+	ID                string             `db:"id" json:"id"`
+	Title             string             `db:"title" json:"title"`
+	Summary           string             `db:"summary" json:"summary"`
+	Skills            []string           `db:"skills" json:"skills"`
+	Role              string             `db:"role" json:"role"`
+	Compensation      string             `db:"compensation" json:"compensation"`
+	Commitment        string             `db:"commitment" json:"commitment"`
+	CommitmentBand    string             `db:"commitment_band" json:"commitment_band"`
+	Duration          string             `db:"duration" json:"duration"`
+	Timezone          string             `db:"timezone" json:"timezone"`
+	Freshness         string             `db:"freshness" json:"freshness"`
+	Stage             string             `db:"stage" json:"stage"`
+	DesiredOutcome    string             `db:"desired_outcome" json:"desired_outcome"`
+	FirstMilestone    string             `db:"first_milestone" json:"first_milestone"`
+	OwnerContribution string             `db:"owner_contribution" json:"owner_contribution"`
+	OwnerName         string             `db:"owner_name" json:"owner_name"`
+	OwnerSignal       string             `db:"owner_signal" json:"owner_signal"`
+	Confidentiality   string             `db:"confidentiality" json:"confidentiality"`
+	DisplayOrder      int32              `db:"display_order" json:"display_order"`
+	CreatedAt         time.Time          `db:"created_at" json:"created_at"`
+	UpdatedAt         time.Time          `db:"updated_at" json:"updated_at"`
+	OwnerUserID       *int64             `db:"owner_user_id" json:"owner_user_id"`
+	PublicationStatus string             `db:"publication_status" json:"publication_status"`
+	PublishedAt       pgtype.Timestamptz `db:"published_at" json:"published_at"`
+	ClosedAt          pgtype.Timestamptz `db:"closed_at" json:"closed_at"`
 }
 
 type Session struct {

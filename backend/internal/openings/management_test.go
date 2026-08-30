@@ -98,6 +98,25 @@ func TestManagerUpdatesDraftForCurrentOwner(t *testing.T) {
 	}
 }
 
+func TestManagerDelegatesOwnerLifecycleTransitions(t *testing.T) {
+	store := &fakeDraftStore{
+		published: ManagedOpening{PublicationStatus: "published"},
+		closed:    ManagedOpening{PublicationStatus: "closed"},
+	}
+	manager := NewManager(store, fakeOwnerProfile{})
+	published, err := manager.PublishDraft(context.Background(), 7, "draft-id")
+	if err != nil || published.PublicationStatus != "published" || store.publishedUserID != 7 || store.publishedID != "draft-id" {
+		t.Fatalf("PublishDraft() = %#v, %v; store %#v", published, err, store)
+	}
+	closed, err := manager.CloseOpening(context.Background(), 7, "draft-id")
+	if err != nil || closed.PublicationStatus != "closed" || store.closedUserID != 7 || store.closedID != "draft-id" {
+		t.Fatalf("CloseOpening() = %#v, %v; store %#v", closed, err, store)
+	}
+	if _, err := manager.PublishDraft(context.Background(), 7, " "); !errors.Is(err, ErrTransitionNotFound) {
+		t.Fatalf("blank PublishDraft() error = %v", err)
+	}
+}
+
 type fakeOwnerProfile struct {
 	profile profile.Profile
 	err     error
@@ -108,9 +127,10 @@ func (fake fakeOwnerProfile) Get(context.Context, int64) (profile.Profile, error
 }
 
 type fakeDraftStore struct {
-	record           draftRecord
-	id               string
-	created, updated ManagedOpening
+	record                              draftRecord
+	id, publishedID, closedID           string
+	publishedUserID, closedUserID       int64
+	created, updated, published, closed ManagedOpening
 }
 
 func (store *fakeDraftStore) ListOwned(context.Context, int64) ([]ManagedOpening, error) {
@@ -123,4 +143,12 @@ func (store *fakeDraftStore) CreateDraft(_ context.Context, record draftRecord) 
 func (store *fakeDraftStore) UpdateDraft(_ context.Context, id string, record draftRecord) (ManagedOpening, error) {
 	store.id, store.record = id, record
 	return store.updated, nil
+}
+func (store *fakeDraftStore) PublishDraft(_ context.Context, userID int64, id string) (ManagedOpening, error) {
+	store.publishedUserID, store.publishedID = userID, id
+	return store.published, nil
+}
+func (store *fakeDraftStore) CloseOpening(_ context.Context, userID int64, id string) (ManagedOpening, error) {
+	store.closedUserID, store.closedID = userID, id
+	return store.closed, nil
 }

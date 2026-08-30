@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -73,6 +74,31 @@ func (api *API) updateOpeningDraft(writer http.ResponseWriter, request *http.Req
 	writeJSON(writer, http.StatusOK, managedOpeningResponse{Data: result})
 }
 
+func (api *API) publishOpeningDraft(writer http.ResponseWriter, request *http.Request) {
+	api.transitionOpening(writer, request, api.openingManager.PublishDraft)
+}
+
+func (api *API) closeOpening(writer http.ResponseWriter, request *http.Request) {
+	api.transitionOpening(writer, request, api.openingManager.CloseOpening)
+}
+
+func (api *API) transitionOpening(
+	writer http.ResponseWriter,
+	request *http.Request,
+	transition func(context.Context, int64, string) (openings.ManagedOpening, error),
+) {
+	writer.Header().Set("Cache-Control", "no-store")
+	user, ok := api.requireUser(writer, request)
+	if !ok {
+		return
+	}
+	result, err := transition(request.Context(), user.ID, request.PathValue("id"))
+	if api.writeOpeningManagementError(writer, err) {
+		return
+	}
+	writeJSON(writer, http.StatusOK, managedOpeningResponse{Data: result})
+}
+
 func decodeOpeningInput(writer http.ResponseWriter, request *http.Request) (openings.DraftInput, bool) {
 	var input openings.DraftInput
 	decoder := json.NewDecoder(http.MaxBytesReader(writer, request.Body, maximumOpeningBody))
@@ -97,12 +123,14 @@ func (api *API) writeOpeningManagementError(writer http.ResponseWriter, err erro
 	case errors.As(err, &fieldError):
 		writeError(writer, http.StatusBadRequest, apiError{Code: "invalid_opening", Message: fieldError.Message, Field: fieldError.Field})
 	case errors.Is(err, profile.ErrNotFound):
-		writeError(writer, http.StatusConflict, apiError{Code: "profile_required", Message: "Complete your account profile before creating an opening."})
+		writeError(writer, http.StatusConflict, apiError{Code: "profile_required", Message: "Complete your account profile before saving an opening."})
 	case errors.Is(err, openings.ErrDraftNotFound):
 		writeError(writer, http.StatusNotFound, apiError{Code: "opening_draft_not_found", Message: "That editable opening draft was not found."})
+	case errors.Is(err, openings.ErrTransitionNotFound):
+		writeError(writer, http.StatusNotFound, apiError{Code: "opening_transition_not_found", Message: "That opening is not available for this lifecycle change."})
 	default:
-		api.logger.Error("manage opening draft failed", "error", err)
-		writeError(writer, http.StatusInternalServerError, apiError{Code: "internal_error", Message: "The opening draft could not be saved."})
+		api.logger.Error("manage opening failed", "error", err)
+		writeError(writer, http.StatusInternalServerError, apiError{Code: "internal_error", Message: "The opening request could not be completed."})
 	}
 	return true
 }

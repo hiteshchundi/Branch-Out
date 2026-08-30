@@ -63,6 +63,8 @@ checks PostgreSQL on every request and returns HTTP 503 with
 - `POST /v1/openings` — create an authenticated member's private opening draft
 - `GET /v1/openings/mine` — list the authenticated member's openings
 - `PUT /v1/openings/{id}` — replace a private draft owned by that member
+- `POST /v1/openings/{id}/publish` — publish an owned draft
+- `POST /v1/openings/{id}/close` — close an owned published opening
 
 Discovery accepts optional filters. Structured values use the labels already
 shown by the frontend.
@@ -90,8 +92,12 @@ profile. New openings always start as private `draft` records. An update matches
 the opening ID, authenticated owner, and draft state in one database statement;
 a missing, published, or differently owned opening returns the same HTTP 404
 response. Public discovery reads only `published` records, so drafts cannot
-appear in the catalogue. Publishing and closing transitions are intentionally
-outside this milestone.
+appear in the catalogue. Publishing atomically changes an owned draft to
+`published`; closing atomically changes an owned published opening to `closed`.
+Both transitions record lifecycle timestamps and use the same HTTP 404 response
+for a missing opening, another member's opening, or an invalid current state.
+Closed openings leave discovery immediately. Reopening and moderation are
+intentionally outside this milestone.
 
 The complete contract is in [`openapi.yaml`](openapi.yaml).
 
@@ -180,4 +186,5 @@ sessions. Authenticated members can persist a collaboration profile, and the
 frontend uses authentication, profile, and owner-draft routes. The
 project-opening creator loads and saves the authenticated member's most recently
 updated private draft while retaining a device-local preview for signed-out
-visitors. No API can publish a draft yet.
+visitors. The API supports publishing and closing, but the frontend does not yet
+expose those lifecycle controls.
