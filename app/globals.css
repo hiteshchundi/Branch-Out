@@ -1691,6 +1691,13 @@ main:focus {
   text-align: center;
 }
 
+.opening-loading {
+  color: var(--muted);
+  margin: 58px auto 18px;
+  min-height: 180px;
+  text-align: center;
+}
+
 .complete-mark {
   align-items: center;
   background: var(--accent-soft);

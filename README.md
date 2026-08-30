@@ -186,10 +186,9 @@ The **Post a project** action opens a three-step draft flow covering:
 
 Each step validates its own fields and provides accessible error messages. A
 partial or completed draft can be saved on the current device and restored when
-the flow is reopened. The backend now supports private drafts owned by
-authenticated members with completed profiles, but this creator is not connected
-to those routes yet. The interface therefore continues to state that local
-completion is not publication.
+the flow is reopened for signed-out visitors. Authenticated members with a
+completed profile load and save their most recently updated private draft through
+their Branch-Out account. Neither path publishes the opening.
 
 ## Proof-led applications
 
@@ -256,8 +255,9 @@ and backend systems.
   applications.
 - The early-access form confirms frontend input only and does not claim to store
   an email address.
-- The visible project-opening creator still stores drafts only in the current
-  browser until its backend integration phase is completed.
+- The project-opening creator stores signed-out previews in the current browser
+  and authenticated drafts in the member account. It cannot publish or close an
+  opening yet.
 - Application drafts are stored separately for each project in the current
   browser and are not submitted to another person.
 - Trial-agreement drafts stay in the current browser and are not sent or

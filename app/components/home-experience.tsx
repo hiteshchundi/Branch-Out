@@ -727,7 +727,13 @@ export function HomeExperience() {
         />
       )}
       {isProfileOnboardingOpen && <ProfileOnboardingPanel authenticatedUser={authenticatedUser} key={authenticatedUser?.id ?? 'anonymous'} onClose={closeProfileOnboarding} />}
-      {isCreateOpeningOpen && <CreateOpeningPanel onClose={closeCreateOpening} />}
+      {isCreateOpeningOpen && (
+        <CreateOpeningPanel
+          authenticatedUser={authenticatedUser}
+          key={authenticatedUser?.id ?? 'anonymous'}
+          onClose={closeCreateOpening}
+        />
+      )}
       {selectedProject && (
         <ProjectDetailPanel
           isSaved={savedProjectIds.includes(selectedProject.id)}

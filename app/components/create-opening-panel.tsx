@@ -1,6 +1,14 @@
 'use client';
 
 import { FormEvent, useEffect, useRef, useState } from 'react';
+import type { AuthenticatedUser } from '../data/auth';
+import {
+  createOpeningDraft,
+  listOwnedOpeningDrafts,
+  OpeningDraftAPIError,
+  updateOpeningDraft,
+  type OpeningDraftInput,
+} from '../data/opening-drafts';
 import { useAccessibleDialog } from './use-accessible-dialog';
 
 export const OPENING_DRAFT_STORAGE_KEY = 'branch-out-opening-draft';
@@ -42,6 +50,14 @@ const stepFields: DraftField[][] = [
   ['firstMilestone', 'ownerContribution', 'confidentiality'],
 ];
 
+const supportedValues: Partial<Record<DraftField, string[]>> = {
+  role: ['Frontend engineer', 'Backend engineer', 'Product designer', 'UX researcher'],
+  commitment: ['Under 6 hrs/week', '6–8 hrs/week', '8+ hrs/week'],
+  duration: ['2–4 weeks', '5–8 weeks', '2–3 months'],
+  compensation: ['Paid', 'Fixed bounty', 'Revenue share', 'Unpaid / portfolio'],
+  confidentiality: ['Public', 'Limited details', 'Confidential after agreement'],
+};
+
 const fieldLabels: Record<DraftField, string> = {
   projectName: 'Project name',
   problem: 'Problem and desired outcome',
@@ -77,23 +93,78 @@ export function validateOpeningStep(draft: OpeningDraft, step: number): Validati
   return stepFields[step].reduce<ValidationErrors>((errors, field) => {
     const value = draft[field].trim();
     if (!value) errors[field] = `${fieldLabels[field]} is required.`;
+    if (value && supportedValues[field] && !supportedValues[field]?.includes(value)) {
+      errors[field] = `Select a supported ${fieldLabels[field].toLowerCase()}.`;
+    }
+    if (field === 'projectName' && value && (value.length < 3 || value.length > 80)) {
+      errors[field] = 'Project name should contain 3 to 80 characters.';
+    }
     if ((field === 'problem' || field === 'firstMilestone' || field === 'ownerContribution') && value && value.length < 20) {
       errors[field] = `${fieldLabels[field]} should be at least 20 characters.`;
     }
+    if (field === 'problem' && value.length > 240) errors[field] = 'Use 240 characters or fewer.';
+    if ((field === 'firstMilestone' || field === 'ownerContribution') && value.length > 500) {
+      errors[field] = 'Use 500 characters or fewer.';
+    }
+    if (field === 'timezone' && value && (value.length < 3 || value.length > 80)) {
+      errors[field] = 'Timezone overlap should contain 3 to 80 characters.';
+    }
+    if (field === 'skills' && value) {
+      const skills = value.split(',').map((skill) => skill.trim()).filter(Boolean);
+      const normalized = skills.map((skill) => skill.toLowerCase());
+      if (skills.length > 12) errors[field] = 'Add no more than 12 skills.';
+      else if (skills.some((skill) => skill.length > 40)) errors[field] = 'Keep each skill to 40 characters or fewer.';
+      else if (new Set(normalized).size !== normalized.length) errors[field] = 'List each skill only once.';
+    }
     return errors;
   }, {});
+}
+
+function validateOpeningDraft(draft: OpeningDraft) {
+  return stepFields.reduce<ValidationErrors>(
+    (allErrors, _, index) => ({ ...allErrors, ...validateOpeningStep(draft, index) }),
+    {},
+  );
+}
+
+function toAPIInput(draft: OpeningDraft): OpeningDraftInput {
+  return {
+    ...draft,
+    projectName: draft.projectName.trim(),
+    problem: draft.problem.trim(),
+    skills: draft.skills.split(',').map((skill) => skill.trim()).filter(Boolean),
+    timezone: draft.timezone.trim(),
+    firstMilestone: draft.firstMilestone.trim(),
+    ownerContribution: draft.ownerContribution.trim(),
+  };
+}
+
+function fromAPIInput(input: OpeningDraftInput): OpeningDraft {
+  return { ...input, skills: input.skills.join(', ') };
 }
 
 function FieldError({ field, errors }: { field: DraftField; errors: ValidationErrors }) {
   return errors[field] ? <span className="field-error" id={`${field}-error`}>{errors[field]}</span> : null;
 }
 
-export function CreateOpeningPanel({ onClose }: { onClose: () => void }) {
-  const [draft, setDraft] = useState<OpeningDraft>(loadSavedDraft);
+export function CreateOpeningPanel({
+  authenticatedUser = null,
+  onClose,
+}: {
+  authenticatedUser?: AuthenticatedUser | null;
+  onClose: () => void;
+}) {
+  const isAuthenticated = authenticatedUser !== null;
+  const [draft, setDraft] = useState<OpeningDraft>(() => isAuthenticated ? emptyDraft : loadSavedDraft());
   const [step, setStep] = useState(0);
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [saveMessage, setSaveMessage] = useState('');
   const [isComplete, setIsComplete] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [openingID, setOpeningID] = useState<string | null>(null);
+  const [loadStatus, setLoadStatus] = useState<'local' | 'loading' | 'ready' | 'error'>(
+    isAuthenticated ? 'loading' : 'local',
+  );
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLElement>(null);
   const stepHeadingRef = useRef<HTMLHeadingElement>(null);
@@ -104,22 +175,94 @@ export function CreateOpeningPanel({ onClose }: { onClose: () => void }) {
     if (step > 0) stepHeadingRef.current?.focus();
   }, [step]);
 
+  useEffect(() => {
+    if (!authenticatedUser) return;
+    const controller = new AbortController();
+    let active = true;
+    listOwnedOpeningDrafts(controller.signal)
+      .then((drafts) => {
+        if (!active) return;
+        if (drafts[0]) {
+          setOpeningID(drafts[0].id);
+          setDraft(fromAPIInput(drafts[0].input));
+        }
+        setLoadStatus('ready');
+      })
+      .catch((error: unknown) => {
+        if (!active || (error instanceof DOMException && error.name === 'AbortError')) return;
+        setLoadStatus('error');
+        setSaveMessage(
+          error instanceof OpeningDraftAPIError && error.status === 401
+            ? 'Your session expired. Log in again before saving an opening.'
+            : 'Your account drafts could not be loaded. Close and reopen this panel to retry.',
+        );
+      });
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [authenticatedUser]);
+
   const updateDraft = (field: DraftField, value: string) => {
     setDraft((current) => ({ ...current, [field]: value }));
     setErrors((current) => ({ ...current, [field]: undefined }));
     setSaveMessage('');
   };
 
-  const saveDraft = () => {
+  const saveLocalDraft = () => {
     try {
       window.localStorage.setItem(OPENING_DRAFT_STORAGE_KEY, JSON.stringify(draft));
       setSaveMessage('Draft saved on this device.');
+      return true;
     } catch {
       setSaveMessage('This browser could not save the draft. Your current entries are still open.');
+      return false;
     }
   };
 
-  const handleStepSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const saveAccountDraft = async (complete: boolean) => {
+    const allErrors = validateOpeningDraft(draft);
+    if (Object.keys(allErrors).length > 0) {
+      setErrors(validateOpeningStep(draft, step));
+      setSaveMessage('Complete all three steps before saving this draft to your account.');
+      return false;
+    }
+    setIsSaving(true);
+    setSaveMessage('');
+    try {
+      const saved = openingID
+        ? await updateOpeningDraft(openingID, toAPIInput(draft))
+        : await createOpeningDraft(toAPIInput(draft));
+      setOpeningID(saved.id);
+      setDraft(fromAPIInput(saved.input));
+      if (complete) setIsComplete(true);
+      else setSaveMessage('Private draft saved to your account. It has not been published.');
+      return true;
+    } catch (error) {
+      if (error instanceof OpeningDraftAPIError && error.field && error.field in draft) {
+        setErrors((current) => ({ ...current, [error.field as DraftField]: 'Review this field and try again.' }));
+      }
+      setSaveMessage(
+        error instanceof OpeningDraftAPIError && error.status === 401
+          ? 'Your session expired. Log in again before saving this opening.'
+          : error instanceof OpeningDraftAPIError && error.status === 409
+            ? 'Complete your collaboration profile before saving an opening to your account.'
+            : error instanceof OpeningDraftAPIError && error.status === 404
+              ? 'This draft is no longer editable. Close and reopen the panel to reload your drafts.'
+              : 'Your opening draft could not be saved. Review the fields and try again.',
+      );
+      return false;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const saveDraft = async () => {
+    if (isAuthenticated) await saveAccountDraft(false);
+    else saveLocalDraft();
+  };
+
+  const handleStepSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const nextErrors = validateOpeningStep(draft, step);
     setErrors(nextErrors);
@@ -130,14 +273,8 @@ export function CreateOpeningPanel({ onClose }: { onClose: () => void }) {
       return;
     }
 
-    // Completing a frontend draft saves it locally without claiming it was published.
-    try {
-      window.localStorage.setItem(OPENING_DRAFT_STORAGE_KEY, JSON.stringify(draft));
-    } catch {
-      setSaveMessage('This browser could not save the completed draft.');
-      return;
-    }
-    setIsComplete(true);
+    if (isAuthenticated) await saveAccountDraft(true);
+    else if (saveLocalDraft()) setIsComplete(true);
   };
 
   const describedBy = (field: DraftField) => errors[field] ? `${field}-error` : undefined;
@@ -154,7 +291,7 @@ export function CreateOpeningPanel({ onClose }: { onClose: () => void }) {
       >
         <header className="create-opening-header">
           <div>
-            <span className="eyebrow">Create an opening</span>
+            <span className="eyebrow">{isAuthenticated ? 'Account opening' : 'Opening preview'}</span>
             <h2 id="create-opening-title">Start with a clear, safe first step.</h2>
           </div>
           <button
@@ -171,11 +308,12 @@ export function CreateOpeningPanel({ onClose }: { onClose: () => void }) {
         {isComplete ? (
           <div className="opening-complete" role="status">
             <span aria-hidden="true" className="complete-mark">✓</span>
-            <span className="eyebrow">Draft ready</span>
+            <span className="eyebrow">{isAuthenticated ? 'Private draft saved' : 'Draft ready'}</span>
             <h3>{draft.projectName}</h3>
             <p>
-              Your opening draft is saved on this device. After account onboarding is
-              connected, you will be able to review and publish it.
+              {isAuthenticated
+                ? 'Your opening draft is saved privately to your Branch-Out account. It has not been published.'
+                : 'Your opening draft is saved on this device. It has not been published.'}
             </p>
             <dl>
               <div><dt>Role</dt><dd>{draft.role}</dd></div>
@@ -185,6 +323,8 @@ export function CreateOpeningPanel({ onClose }: { onClose: () => void }) {
             </dl>
             <button className="primary-button" onClick={onClose} type="button">Return to openings</button>
           </div>
+        ) : loadStatus === 'loading' ? (
+          <div className="opening-loading" role="status">Loading your private opening draft…</div>
         ) : (
           <>
             {/* Progress labels keep the three-part form understandable at a glance. */}
@@ -246,7 +386,7 @@ export function CreateOpeningPanel({ onClose }: { onClose: () => void }) {
                   </label>
                   <label>Compensation
                     <select aria-describedby={describedBy('compensation')} aria-invalid={Boolean(errors.compensation)} onChange={(e) => updateDraft('compensation', e.target.value)} value={draft.compensation}>
-                      <option value="">Select compensation</option><option>Paid</option><option>Fixed bounty</option><option>Revenue share</option><option>Unpaid / portfolio</option><option>Exploratory</option>
+                      <option value="">Select compensation</option><option>Paid</option><option>Fixed bounty</option><option>Revenue share</option><option>Unpaid / portfolio</option>
                     </select>
                     <FieldError field="compensation" errors={errors} />
                   </label>
@@ -278,12 +418,12 @@ export function CreateOpeningPanel({ onClose }: { onClose: () => void }) {
 
               <footer className="opening-form-actions">
                 <div>
-                  <button className="secondary-button" onClick={saveDraft} type="button">Save draft</button>
+                  <button className="secondary-button" disabled={isSaving || loadStatus === 'error'} onClick={saveDraft} type="button">{isSaving ? 'Saving draft…' : 'Save draft'}</button>
                   {saveMessage && <span aria-live="polite" className="save-message">{saveMessage}</span>}
                 </div>
                 <div>
-                  {step > 0 && <button className="text-button" onClick={() => setStep((current) => current - 1)} type="button">Back</button>}
-                  <button className="primary-button" type="submit">{step === 2 ? 'Complete draft' : 'Continue'}</button>
+                  {step > 0 && <button className="text-button" disabled={isSaving} onClick={() => setStep((current) => current - 1)} type="button">Back</button>}
+                  <button className="primary-button" disabled={isSaving || loadStatus === 'error'} type="submit">{isSaving ? 'Saving draft…' : step === 2 ? (isAuthenticated ? 'Save private draft' : 'Complete draft') : 'Continue'}</button>
                 </div>
               </footer>
             </form>

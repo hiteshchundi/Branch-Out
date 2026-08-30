@@ -31,8 +31,9 @@ to the interface one feature at a time.
 4. Choose **Apply with proof** to prepare a project-specific application draft.
 5. Choose **Post a project** in the header to prepare a new opening draft.
 
-Nothing in the current frontend is published or sent to another person. Drafts
-are stored only in the current browser.
+Nothing in the current frontend is published or sent to another person. Most
+drafts are stored only in the current browser; authenticated project owners can
+store a private opening draft in their Branch-Out account.
 
 ## Header
 
@@ -510,15 +511,22 @@ credentials, repository access, and offboarding.
 
 ### Save an opening draft
 
-Select **Save draft** at any step. The current entries are saved on this device
-and restored the next time the project-opening creator is opened.
+Signed-out visitors can select **Save draft** at any step. The current entries
+are saved on this device and restored the next time the creator is opened.
+
+Authenticated members first see their most recently updated private account
+draft, if one exists. Complete all three steps, then select **Save draft** or
+**Save private draft** to create or update it. A completed collaboration profile
+is required because the owner identity shown on the opening comes from that
+profile. If drafts cannot be loaded, saving is disabled to avoid accidentally
+creating a duplicate.
 
 ### Complete an opening draft
 
-Select **Complete draft** on the final step. A summary confirms that the draft is
-saved locally and ready for later review. It is not published. The backend can
-now store private drafts for authenticated members with completed profiles, but
-this frontend flow remains local until that integration is connected.
+Signed-out visitors select **Complete draft** on the final step; a summary
+confirms that the draft is saved locally. Authenticated members select **Save
+private draft**; the summary confirms that it is stored in their account. Neither
+action publishes the opening, and publishing or closing is not available yet.
 
 Use **Back** to return to a previous step. Close the creator with its close
 button, the shaded area, or `Escape`.
@@ -565,7 +573,8 @@ The current frontend uses browser storage only for:
 
 - Light or dark theme preference
 - One profile-onboarding draft
-- One project-opening draft
+- One signed-out project-opening preview; authenticated opening drafts are stored
+  in the member account
 - One proof-led application draft per project
 - One two-week trial-agreement draft per project
 - One outcome-review draft per project
@@ -604,8 +613,9 @@ for signed-out visitors.
 Authenticated members with completed profiles can also create, list, and edit
 their own private opening drafts through the API. Ownership and draft status are
 checked together during updates, and private drafts never appear in public
-discovery. The visible project-opening creator is not yet connected to these
-routes, and no publish or close transition exists yet.
+discovery. The visible project-opening creator now loads and saves the member's
+most recently updated private draft through these routes. No publish or close
+transition exists yet.
 The OpenAPI contract, database commands, rollback instructions, authentication
 configuration, and operating details live in `backend/README.md`.
 
@@ -616,8 +626,8 @@ configuration, and operating details live in `backend/README.md`.
 - GitHub login requires a configured OAuth app and a running API.
 - Authenticated profiles can be saved but are not yet public, searchable, or
   attached to applications. Signed-out profile previews remain local only.
-- Opening drafts can be stored privately through the API but cannot be published
-  or closed, and the visible creator still uses browser-local storage.
+- Authenticated opening drafts can be stored privately but cannot be published
+  or closed. Signed-out opening previews remain browser-local.
 - Application drafts cannot be sent or reviewed by an owner.
 - Trial-agreement drafts cannot be sent, mutually accepted, or signed.
 - Outcome feedback and trust-signal candidates cannot be mutually confirmed,

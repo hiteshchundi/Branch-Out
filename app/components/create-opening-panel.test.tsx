@@ -1,5 +1,6 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { AuthenticatedUser } from '../data/auth';
 import {
   CreateOpeningPanel,
   OPENING_DRAFT_STORAGE_KEY,
@@ -21,6 +22,33 @@ const completeDraft: OpeningDraft = {
   confidentiality: 'Public',
 };
 
+const authenticatedUser: AuthenticatedUser = {
+  id: 7,
+  githubUserId: 42,
+  githubLogin: 'branch-builder',
+  displayName: 'Branch Builder',
+  avatarUrl: 'https://avatars.githubusercontent.com/u/42',
+  profileUrl: 'https://github.com/branch-builder',
+};
+
+function managedDraft(projectName = completeDraft.projectName) {
+  return {
+    id: '61616161-6161-4161-a161-616161616161',
+    title: `Frontend engineer for ${projectName}`,
+    summary: completeDraft.problem,
+    skills: ['TypeScript', 'React'],
+    commitment: completeDraft.commitment,
+    role: 'Engineering',
+    duration: completeDraft.duration,
+    timezone: completeDraft.timezone,
+    compensation: completeDraft.compensation,
+    firstMilestone: completeDraft.firstMilestone,
+    ownerContribution: completeDraft.ownerContribution,
+    confidentiality: 'Public project details; no private credentials or client-confidential material.',
+    publicationStatus: 'draft',
+  };
+}
+
 describe('validateOpeningStep', () => {
   it('validates only the requested step', () => {
     const errors = validateOpeningStep({ ...completeDraft, projectName: '' }, 0);
@@ -32,10 +60,18 @@ describe('validateOpeningStep', () => {
     expect(validateOpeningStep({ ...completeDraft, problem: 'Too short' }, 0).problem).toMatch(/20 characters/i);
     expect(validateOpeningStep({ ...completeDraft, firstMilestone: 'Tiny' }, 2).firstMilestone).toMatch(/20 characters/i);
   });
+
+  it('matches backend skill and text limits', () => {
+    expect(validateOpeningStep({ ...completeDraft, skills: 'React, react' }, 0).skills).toMatch(/only once/i);
+    expect(validateOpeningStep({ ...completeDraft, projectName: 'x' }, 0).projectName).toMatch(/3 to 80/i);
+    expect(validateOpeningStep({ ...completeDraft, timezone: 'x' }, 1).timezone).toMatch(/3 to 80/i);
+    expect(validateOpeningStep({ ...completeDraft, compensation: 'Exploratory' }, 1).compensation).toMatch(/supported/i);
+  });
 });
 
 describe('CreateOpeningPanel', () => {
   beforeEach(() => localStorage.clear());
+  afterEach(() => vi.unstubAllGlobals());
 
   it('shows accessible validation errors before advancing', () => {
     render(<CreateOpeningPanel onClose={vi.fn()} />);
@@ -71,6 +107,46 @@ describe('CreateOpeningPanel', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Draft ready');
     expect(screen.getByRole('status')).toHaveTextContent('Climate mapper');
     expect(localStorage.getItem(OPENING_DRAFT_STORAGE_KEY)).toContain('Fixed bounty');
+  });
+
+  it('loads and updates the authenticated member private draft', async () => {
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [managedDraft()], meta: { count: 1 } }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: managedDraft('Climate atlas') }), { status: 200 }));
+    vi.stubGlobal('fetch', fetcher);
+    render(<CreateOpeningPanel authenticatedUser={authenticatedUser} onClose={vi.fn()} />);
+
+    expect(screen.getByRole('status')).toHaveTextContent(/loading your private opening draft/i);
+    expect(await screen.findByLabelText(/project name/i)).toHaveValue('Climate mapper');
+    fireEvent.change(screen.getByLabelText(/project name/i), { target: { value: 'Climate atlas' } });
+    fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
+
+    expect(await screen.findByText(/private draft saved to your account/i)).toBeInTheDocument();
+    expect(fetcher).toHaveBeenLastCalledWith(
+      'http://localhost:8080/v1/openings/61616161-6161-4161-a161-616161616161',
+      expect.objectContaining({ method: 'PUT', credentials: 'include' }),
+    );
+    expect(localStorage.getItem(OPENING_DRAFT_STORAGE_KEY)).toBeNull();
+  });
+
+  it('explains that a collaboration profile is required for account drafts', async () => {
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [managedDraft()], meta: { count: 1 } }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { code: 'profile_required', message: 'required' } }), { status: 409 }));
+    vi.stubGlobal('fetch', fetcher);
+    render(<CreateOpeningPanel authenticatedUser={authenticatedUser} onClose={vi.fn()} />);
+    await screen.findByLabelText(/project name/i);
+
+    fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
+    expect(await screen.findByText(/complete your collaboration profile/i)).toBeInTheDocument();
+  });
+
+  it('blocks account saving when server drafts cannot be loaded', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: { code: 'internal_error' } }), { status: 500 })));
+    render(<CreateOpeningPanel authenticatedUser={authenticatedUser} onClose={vi.fn()} />);
+
+    expect(await screen.findByText(/account drafts could not be loaded/i)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('button', { name: /save draft/i })).toBeDisabled());
   });
 
   it('closes with Escape', () => {

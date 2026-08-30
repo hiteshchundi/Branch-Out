@@ -177,6 +177,7 @@ structured filters, conflicting filters, ordering, and cancellation.
 The memory repository remains as a fast domain-test double. Runtime traffic uses
 PostgreSQL. Authentication can create or update an account and revoke its
 sessions. Authenticated members can persist a collaboration profile, and the
-frontend uses both authentication and profile routes. The API can create, list,
-and edit owner drafts, while the frontend project-opening creator remains
-device-local until its next integration phase. No API can publish a draft yet.
+frontend uses authentication, profile, and owner-draft routes. The
+project-opening creator loads and saves the authenticated member's most recently
+updated private draft while retaining a device-local preview for signed-out
+visitors. No API can publish a draft yet.
