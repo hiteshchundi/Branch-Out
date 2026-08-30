@@ -1718,7 +1718,7 @@ main:focus {
   margin-bottom: 12px;
 }
 
-.opening-complete > p {
+.opening-complete-announcement > p {
   color: var(--muted);
   line-height: 1.65;
 }
@@ -1751,6 +1751,53 @@ main:focus {
   font-size: 0.82rem;
   font-weight: 700;
   margin: 0;
+}
+
+.opening-lifecycle-confirmation {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: grid;
+  gap: 16px;
+  margin: 0 0 22px;
+  padding: 18px;
+  text-align: left;
+}
+
+.opening-lifecycle-confirmation label {
+  align-items: flex-start;
+  color: var(--muted);
+  display: flex;
+  font-size: 0.82rem;
+  gap: 10px;
+  line-height: 1.55;
+}
+
+.opening-lifecycle-confirmation input {
+  flex: 0 0 auto;
+  margin-top: 3px;
+}
+
+.opening-lifecycle-confirmation button {
+  justify-self: start;
+}
+
+.danger-button {
+  border-color: color-mix(in srgb, #b43b3b 55%, var(--border));
+  color: #a43131;
+}
+
+[data-theme='dark'] .danger-button {
+  color: #ff9b9b;
+}
+
+.opening-complete-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 20px;
 }
 
 /* Proof-led applications ask for one relevant signal instead of resume-style volume. */

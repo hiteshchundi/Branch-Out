@@ -1,6 +1,6 @@
 # Branch-Out Handbook
 
-Updated: 29 August 2026
+Updated: 30 August 2026
 
 This handbook is the user guide for every feature currently available in the
 Branch-Out frontend. It is a living document and must be updated whenever a
@@ -31,9 +31,9 @@ to the interface one feature at a time.
 4. Choose **Apply with proof** to prepare a project-specific application draft.
 5. Choose **Post a project** in the header to prepare a new opening draft.
 
-Nothing in the current frontend is published or sent to another person. Most
-drafts are stored only in the current browser; authenticated project owners can
-store a private opening draft in their Branch-Out account.
+Applications, trials, feedback, and signed-out drafts are not sent or published.
+Authenticated project owners can store a private opening draft in their account,
+then explicitly publish or close that opening.
 
 ## Header
 
@@ -514,8 +514,8 @@ credentials, repository access, and offboarding.
 Signed-out visitors can select **Save draft** at any step. The current entries
 are saved on this device and restored the next time the creator is opened.
 
-Authenticated members first see their most recently updated private account
-draft, if one exists. Complete all three steps, then select **Save draft** or
+Authenticated members first see their most recently updated account opening, if
+one exists. Complete all three steps, then select **Save draft** or
 **Save private draft** to create or update it. A completed collaboration profile
 is required because the owner identity shown on the opening comes from that
 profile. If drafts cannot be loaded, saving is disabled to avoid accidentally
@@ -526,8 +526,21 @@ creating a duplicate.
 Signed-out visitors select **Complete draft** on the final step; a summary
 confirms that the draft is saved locally. Authenticated members select **Save
 private draft**; the summary confirms that it is stored in their account. Neither
-action publishes the opening. The backend supports owner-only publishing and
-closing, but those controls are not yet exposed in the visible creator.
+action publishes the opening. The visible creator supports owner-only publishing
+and closing.
+
+### Publish and close an opening
+
+After saving the final private draft, review its summary and select the public
+safety confirmation. **Publish opening** remains disabled until this confirmation
+is selected. Publishing makes the opening eligible for public discovery; saving
+alone never publishes it.
+
+A published opening loads in its management summary. To stop accepting
+collaborators, select the separate closure confirmation and then **Close
+opening**. Closure removes the opening from public discovery immediately. It
+cannot currently be reopened. A closed summary offers **Start another draft** so
+the owner can create a new opening without changing the closed record.
 
 Use **Back** to return to a previous step. Close the creator with its close
 button, the shaded area, or `Escape`.
@@ -614,12 +627,12 @@ for signed-out visitors.
 Authenticated members with completed profiles can also create, list, and edit
 their own private opening drafts through the API. Ownership and draft status are
 checked together during updates, and private drafts never appear in public
-discovery. The visible project-opening creator now loads and saves the member's
-most recently updated private draft through these routes. The API can atomically
-publish an owned draft and close an owned published opening, recording both
-lifecycle times. Published openings enter public discovery; closed openings
-leave it. The visible creator does not yet expose those two controls, and the API
-does not yet support reopening or moderation.
+discovery. The visible project-opening creator now loads and manages the member's
+most recently updated opening through these routes. It requires explicit,
+separate confirmations before asking the API to publish a private draft or close
+a published opening. The API records both lifecycle times. Published openings
+enter public discovery; closed openings leave it. The API does not yet support
+reopening or moderation.
 The OpenAPI contract, database commands, rollback instructions, authentication
 configuration, and operating details live in `backend/README.md`.
 
@@ -630,9 +643,8 @@ configuration, and operating details live in `backend/README.md`.
 - GitHub login requires a configured OAuth app and a running API.
 - Authenticated profiles can be saved but are not yet public, searchable, or
   attached to applications. Signed-out profile previews remain local only.
-- Authenticated opening drafts can be published or closed through the API, but
-  those controls are not yet visible in the frontend. Reopening and moderation
-  do not exist. Signed-out opening previews remain browser-local.
+- Authenticated openings can be drafted, published, and closed. Reopening and
+  moderation do not exist. Signed-out opening previews remain browser-local.
 - Application drafts cannot be sent or reviewed by an owner.
 - Trial-agreement drafts cannot be sent, mutually accepted, or signed.
 - Outcome feedback and trust-signal candidates cannot be mutually confirmed,

@@ -31,7 +31,10 @@ const authenticatedUser: AuthenticatedUser = {
   profileUrl: 'https://github.com/branch-builder',
 };
 
-function managedDraft(projectName = completeDraft.projectName) {
+function managedDraft(
+  projectName = completeDraft.projectName,
+  publicationStatus: 'draft' | 'published' | 'closed' = 'draft',
+) {
   return {
     id: '61616161-6161-4161-a161-616161616161',
     title: `Frontend engineer for ${projectName}`,
@@ -45,7 +48,7 @@ function managedDraft(projectName = completeDraft.projectName) {
     firstMilestone: completeDraft.firstMilestone,
     ownerContribution: completeDraft.ownerContribution,
     confidentiality: 'Public project details; no private credentials or client-confidential material.',
-    publicationStatus: 'draft',
+    publicationStatus,
   };
 }
 
@@ -116,7 +119,7 @@ describe('CreateOpeningPanel', () => {
     vi.stubGlobal('fetch', fetcher);
     render(<CreateOpeningPanel authenticatedUser={authenticatedUser} onClose={vi.fn()} />);
 
-    expect(screen.getByRole('status')).toHaveTextContent(/loading your private opening draft/i);
+    expect(screen.getByRole('status')).toHaveTextContent(/loading your latest opening/i);
     expect(await screen.findByLabelText(/project name/i)).toHaveValue('Climate mapper');
     fireEvent.change(screen.getByLabelText(/project name/i), { target: { value: 'Climate atlas' } });
     fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
@@ -126,7 +129,63 @@ describe('CreateOpeningPanel', () => {
       'http://localhost:8080/v1/openings/61616161-6161-4161-a161-616161616161',
       expect.objectContaining({ method: 'PUT', credentials: 'include' }),
     );
+    await waitFor(() => expect(screen.getByRole('button', { name: /save draft/i })).toBeEnabled());
     expect(localStorage.getItem(OPENING_DRAFT_STORAGE_KEY)).toBeNull();
+  });
+
+  it('requires explicit confirmation before publishing a private draft', async () => {
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [managedDraft()] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: managedDraft() }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: managedDraft(completeDraft.projectName, 'published') }), { status: 200 }));
+    vi.stubGlobal('fetch', fetcher);
+    render(<CreateOpeningPanel authenticatedUser={authenticatedUser} onClose={vi.fn()} />);
+    await screen.findByLabelText(/project name/i);
+
+    fireEvent.click(screen.getByRole('button', { name: /continue/i }));
+    fireEvent.click(screen.getByRole('button', { name: /continue/i }));
+    fireEvent.click(screen.getByRole('button', { name: /save private draft/i }));
+
+    const publishButton = await screen.findByRole('button', { name: /publish opening/i });
+    expect(publishButton).toBeDisabled();
+    fireEvent.click(screen.getByLabelText(/safe to publish publicly/i));
+    expect(publishButton).toBeEnabled();
+    fireEvent.click(publishButton);
+
+    expect(await screen.findByText('Published opening')).toBeInTheDocument();
+    expect(fetcher).toHaveBeenLastCalledWith(
+      `http://localhost:8080/v1/openings/${managedDraft().id}/publish`,
+      expect.objectContaining({ method: 'POST', credentials: 'include' }),
+    );
+  });
+
+  it('loads a published opening and requires separate confirmation to close it', async () => {
+    const published = managedDraft(completeDraft.projectName, 'published');
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [published] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: { ...published, publicationStatus: 'closed' } }), { status: 200 }));
+    vi.stubGlobal('fetch', fetcher);
+    render(<CreateOpeningPanel authenticatedUser={authenticatedUser} onClose={vi.fn()} />);
+
+    expect(await screen.findByText('Published opening')).toBeInTheDocument();
+    const closeButton = screen.getByRole('button', { name: /close opening/i });
+    expect(closeButton).toBeDisabled();
+    fireEvent.click(screen.getByLabelText(/reopening is not available/i));
+    fireEvent.click(closeButton);
+
+    expect(await screen.findByText('Opening closed')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /start another draft/i })).toBeInTheDocument();
+  });
+
+  it('starts a fresh draft after loading a closed opening', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      data: [managedDraft(completeDraft.projectName, 'closed')],
+    }), { status: 200 })));
+    render(<CreateOpeningPanel authenticatedUser={authenticatedUser} onClose={vi.fn()} />);
+
+    expect(await screen.findByText('Opening closed')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /start another draft/i }));
+    expect(screen.getByLabelText(/project name/i)).toHaveValue('');
   });
 
   it('explains that a collaboration profile is required for account drafts', async () => {

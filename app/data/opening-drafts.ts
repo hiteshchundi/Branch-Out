@@ -14,11 +14,15 @@ export type OpeningDraftInput = {
   confidentiality: string;
 };
 
-export type OwnedOpeningDraft = {
+export type PublicationStatus = 'draft' | 'published' | 'closed';
+
+export type OwnedOpening = {
   id: string;
-  publicationStatus: 'draft';
+  publicationStatus: PublicationStatus;
   input: OpeningDraftInput;
 };
+
+export type OwnedOpeningDraft = OwnedOpening & { publicationStatus: 'draft' };
 
 type APIEnvelope = { data?: unknown };
 type APIErrorEnvelope = { error?: { code?: unknown; message?: unknown; field?: unknown } };
@@ -60,10 +64,12 @@ function parseRoleAndProject(title: unknown) {
 }
 
 /** Converts the catalogue-shaped draft response back into the creator's controlled fields. */
-function parseOwnedOpening(value: unknown): OwnedOpeningDraft | null {
+function parseOwnedOpening(value: unknown): OwnedOpening {
   if (!value || typeof value !== 'object') throw new Error('The API returned an invalid opening draft.');
   const opening = value as Record<string, unknown>;
-  if (opening.publicationStatus !== 'draft') return null;
+  if (!['draft', 'published', 'closed'].includes(opening.publicationStatus as string)) {
+    throw new Error('The API returned an invalid opening draft.');
+  }
   const identity = parseRoleAndProject(opening.title);
   const compensation = opening.compensation === 'Portfolio' ? 'Unpaid / portfolio' : opening.compensation;
   const confidentiality = typeof opening.confidentiality === 'string'
@@ -96,7 +102,7 @@ function parseOwnedOpening(value: unknown): OwnedOpeningDraft | null {
   }
   return {
     id: opening.id as string,
-    publicationStatus: 'draft',
+    publicationStatus: opening.publicationStatus as PublicationStatus,
     input: {
       ...identity,
       problem: (opening.summary as string).trim(),
@@ -135,11 +141,16 @@ async function saveOpeningDraft(method: 'POST' | 'PUT', input: OpeningDraftInput
   if (!response.ok) throw await parseError(response);
   const body = await response.json() as APIEnvelope;
   const draft = parseOwnedOpening(body.data);
-  if (!draft) throw new Error('The API returned an invalid opening draft.');
+  if (draft.publicationStatus !== 'draft') throw new Error('The API returned an invalid opening draft.');
   return draft;
 }
 
 export async function listOwnedOpeningDrafts(signal?: AbortSignal): Promise<OwnedOpeningDraft[]> {
+  const openings = await listOwnedOpenings(signal);
+  return openings.filter((opening): opening is OwnedOpeningDraft => opening.publicationStatus === 'draft');
+}
+
+export async function listOwnedOpenings(signal?: AbortSignal): Promise<OwnedOpening[]> {
   const response = await fetch(`${getAPIBaseURL()}/v1/openings/mine`, {
     credentials: 'include',
     headers: { Accept: 'application/json' },
@@ -148,7 +159,7 @@ export async function listOwnedOpeningDrafts(signal?: AbortSignal): Promise<Owne
   if (!response.ok) throw await parseError(response);
   const body = await response.json() as APIEnvelope;
   if (!Array.isArray(body.data)) throw new Error('The API returned invalid opening drafts.');
-  return body.data.map(parseOwnedOpening).filter((draft): draft is OwnedOpeningDraft => draft !== null);
+  return body.data.map(parseOwnedOpening);
 }
 
 export function createOpeningDraft(input: OpeningDraftInput) {
@@ -157,4 +168,26 @@ export function createOpeningDraft(input: OpeningDraftInput) {
 
 export function updateOpeningDraft(id: string, input: OpeningDraftInput) {
   return saveOpeningDraft('PUT', input, id);
+}
+
+async function transitionOpening(id: string, transition: 'publish' | 'close'): Promise<OwnedOpening> {
+  const response = await fetch(
+    `${getAPIBaseURL()}/v1/openings/${encodeURIComponent(id)}/${transition}`,
+    {
+      credentials: 'include',
+      headers: { Accept: 'application/json' },
+      method: 'POST',
+    },
+  );
+  if (!response.ok) throw await parseError(response);
+  const body = await response.json() as APIEnvelope;
+  return parseOwnedOpening(body.data);
+}
+
+export function publishOpening(id: string) {
+  return transitionOpening(id, 'publish');
+}
+
+export function closeOpening(id: string) {
+  return transitionOpening(id, 'close');
 }

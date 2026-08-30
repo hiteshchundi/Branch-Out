@@ -1,8 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   createOpeningDraft,
+  closeOpening,
   listOwnedOpeningDrafts,
+  listOwnedOpenings,
   OpeningDraftAPIError,
+  publishOpening,
   updateOpeningDraft,
   type OpeningDraftInput,
 } from './opening-drafts';
@@ -42,7 +45,7 @@ afterEach(() => vi.unstubAllGlobals());
 describe('opening draft API client', () => {
   it('loads and maps the current member draft', async () => {
     const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      data: [responseDraft, { ...responseDraft, id: 'published-id', publicationStatus: 'published' }],
+      data: [responseDraft, { ...responseDraft, id: '71717171-7171-4171-a171-717171717171', publicationStatus: 'published' }],
       meta: { count: 2 },
     }), { status: 200 }));
     vi.stubGlobal('fetch', fetcher);
@@ -56,6 +59,27 @@ describe('opening draft API client', () => {
       'http://localhost:8080/v1/openings/mine',
       expect.objectContaining({ credentials: 'include' }),
     );
+  });
+
+  it('loads every owned lifecycle state for opening management', async () => {
+    const published = {
+      ...responseDraft,
+      id: '71717171-7171-4171-a171-717171717171',
+      publicationStatus: 'published',
+    };
+    const closed = {
+      ...responseDraft,
+      id: '81818181-8181-4181-a181-818181818181',
+      publicationStatus: 'closed',
+    };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      data: [published, closed],
+    }), { status: 200 })));
+
+    await expect(listOwnedOpenings()).resolves.toEqual([
+      { id: published.id, publicationStatus: 'published', input },
+      { id: closed.id, publicationStatus: 'closed', input },
+    ]);
   });
 
   it('creates a private draft with the session cookie', async () => {
@@ -77,6 +101,30 @@ describe('opening draft API client', () => {
     expect(fetcher).toHaveBeenCalledWith(
       'http://localhost:8080/v1/openings/draft%2Fid',
       expect.objectContaining({ method: 'PUT' }),
+    );
+  });
+
+  it('publishes an owned draft with an explicit lifecycle request', async () => {
+    const published = { ...responseDraft, publicationStatus: 'published' };
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: published }), { status: 200 }));
+    vi.stubGlobal('fetch', fetcher);
+
+    await expect(publishOpening('draft/id')).resolves.toMatchObject({ publicationStatus: 'published' });
+    expect(fetcher).toHaveBeenCalledWith(
+      'http://localhost:8080/v1/openings/draft%2Fid/publish',
+      expect.objectContaining({ method: 'POST', credentials: 'include' }),
+    );
+  });
+
+  it('closes an owned published opening with an explicit lifecycle request', async () => {
+    const closed = { ...responseDraft, publicationStatus: 'closed' };
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: closed }), { status: 200 }));
+    vi.stubGlobal('fetch', fetcher);
+
+    await expect(closeOpening(responseDraft.id)).resolves.toMatchObject({ publicationStatus: 'closed' });
+    expect(fetcher).toHaveBeenCalledWith(
+      `http://localhost:8080/v1/openings/${responseDraft.id}/close`,
+      expect.objectContaining({ method: 'POST', credentials: 'include' }),
     );
   });
 

@@ -17,8 +17,8 @@ the application changes.
 
 ## Frontend MVP status
 
-The frontend MVP is feature-complete and ready for backend integration. It is a
-responsive discovery homepage split into three clear components:
+The responsive frontend MVP is connected incrementally to the backend and is
+split into three clear components:
 
 - **Header:** original Branch-Out identity, navigation, functional project
   search, login and profile-onboarding preview, project-opening creator, and a
@@ -33,8 +33,9 @@ responsive discovery homepage split into three clear components:
 The backend in [`backend`](backend) is a Go REST API with PostgreSQL-backed,
 filterable project-opening discovery, GitHub OAuth, durable revocable sessions,
 authenticated collaboration-profile persistence, dependency-aware health
-checks, private owner-managed project-opening drafts, reversible migrations,
-typed SQLC queries, automated tests, and an OpenAPI contract.
+checks, owner-managed project-opening draft, publication, and closure states,
+reversible migrations, typed SQLC queries, automated tests, and an OpenAPI
+contract.
 
 ## Original brand identity
 
@@ -105,9 +106,10 @@ pnpm build
 
 The current tests cover text and structured project discovery filters, combined
 filter behavior, reset and empty states, complete project details, the three main
-page regions, login-panel behavior, project-opening validation and draft
-persistence, proof-led application validation and recovery, and theme preference
-persistence. Profile onboarding tests cover validation, draft recovery, safe
+page regions, login-panel behavior, project-opening validation, draft
+persistence, explicit publication and closure, proof-led application validation
+and recovery, and theme preference persistence. Profile onboarding tests cover
+validation, draft recovery, safe
 evidence links, and honest completion behavior. Saved-opening tests cover safe
 storage recovery, stale and malformed data, saving, filtering, removal, and
 two-to-three-opening comparison behavior. Trial-agreement tests cover step-level
@@ -187,8 +189,12 @@ The **Post a project** action opens a three-step draft flow covering:
 Each step validates its own fields and provides accessible error messages. A
 partial or completed draft can be saved on the current device and restored when
 the flow is reopened for signed-out visitors. Authenticated members with a
-completed profile load and save their most recently updated private draft through
-their Branch-Out account. Neither path publishes the opening.
+completed profile load and manage their most recently updated account opening.
+Saving remains private. After reviewing a completed draft, the owner must
+explicitly confirm that its details are safe for public release before selecting
+**Publish opening**. Published openings can be closed only after a separate
+confirmation; closure removes them from discovery and cannot currently be
+reversed. Signed-out drafts never publish.
 
 ## Proof-led applications
 

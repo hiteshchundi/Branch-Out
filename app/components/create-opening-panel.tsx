@@ -3,11 +3,14 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import type { AuthenticatedUser } from '../data/auth';
 import {
+  closeOpening,
   createOpeningDraft,
-  listOwnedOpeningDrafts,
+  listOwnedOpenings,
   OpeningDraftAPIError,
+  publishOpening,
   updateOpeningDraft,
   type OpeningDraftInput,
+  type PublicationStatus,
 } from '../data/opening-drafts';
 import { useAccessibleDialog } from './use-accessible-dialog';
 
@@ -161,7 +164,12 @@ export function CreateOpeningPanel({
   const [saveMessage, setSaveMessage] = useState('');
   const [isComplete, setIsComplete] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
   const [openingID, setOpeningID] = useState<string | null>(null);
+  const [openingStatus, setOpeningStatus] = useState<PublicationStatus | null>(null);
+  const [publishConfirmed, setPublishConfirmed] = useState(false);
+  const [closeConfirmed, setCloseConfirmed] = useState(false);
+  const [transitionMessage, setTransitionMessage] = useState('');
   const [loadStatus, setLoadStatus] = useState<'local' | 'loading' | 'ready' | 'error'>(
     isAuthenticated ? 'loading' : 'local',
   );
@@ -179,12 +187,13 @@ export function CreateOpeningPanel({
     if (!authenticatedUser) return;
     const controller = new AbortController();
     let active = true;
-    listOwnedOpeningDrafts(controller.signal)
-      .then((drafts) => {
+    listOwnedOpenings(controller.signal)
+      .then((openings) => {
         if (!active) return;
-        if (drafts[0]) {
-          setOpeningID(drafts[0].id);
-          setDraft(fromAPIInput(drafts[0].input));
+        if (openings[0]) {
+          setOpeningID(openings[0].id);
+          setOpeningStatus(openings[0].publicationStatus);
+          setDraft(fromAPIInput(openings[0].input));
         }
         setLoadStatus('ready');
       })
@@ -234,6 +243,7 @@ export function CreateOpeningPanel({
         ? await updateOpeningDraft(openingID, toAPIInput(draft))
         : await createOpeningDraft(toAPIInput(draft));
       setOpeningID(saved.id);
+      setOpeningStatus(saved.publicationStatus);
       setDraft(fromAPIInput(saved.input));
       if (complete) setIsComplete(true);
       else setSaveMessage('Private draft saved to your account. It has not been published.');
@@ -277,6 +287,61 @@ export function CreateOpeningPanel({
     else if (saveLocalDraft()) setIsComplete(true);
   };
 
+  const transitionErrorMessage = (error: unknown, action: 'published' | 'closed') => {
+    if (error instanceof OpeningDraftAPIError && error.status === 401) {
+      return `Your session expired. Log in again before this opening can be ${action}.`;
+    }
+    if (error instanceof OpeningDraftAPIError && error.status === 404) {
+      return 'This opening changed or is no longer available. Close and reopen the panel to refresh it.';
+    }
+    return `This opening could not be ${action}. Please try again.`;
+  };
+
+  const handlePublish = async () => {
+    if (!openingID || openingStatus !== 'draft' || !publishConfirmed) return;
+    setIsTransitioning(true);
+    setTransitionMessage('');
+    try {
+      const published = await publishOpening(openingID);
+      setOpeningStatus(published.publicationStatus);
+      setDraft(fromAPIInput(published.input));
+      setPublishConfirmed(false);
+      setTransitionMessage('Your opening is now visible in public discovery.');
+    } catch (error) {
+      setTransitionMessage(transitionErrorMessage(error, 'published'));
+    } finally {
+      setIsTransitioning(false);
+    }
+  };
+
+  const handleCloseOpening = async () => {
+    if (!openingID || openingStatus !== 'published' || !closeConfirmed) return;
+    setIsTransitioning(true);
+    setTransitionMessage('');
+    try {
+      const closed = await closeOpening(openingID);
+      setOpeningStatus(closed.publicationStatus);
+      setDraft(fromAPIInput(closed.input));
+      setCloseConfirmed(false);
+      setTransitionMessage('The opening has been removed from public discovery.');
+    } catch (error) {
+      setTransitionMessage(transitionErrorMessage(error, 'closed'));
+    } finally {
+      setIsTransitioning(false);
+    }
+  };
+
+  const startAnotherDraft = () => {
+    setDraft(emptyDraft);
+    setStep(0);
+    setErrors({});
+    setSaveMessage('');
+    setTransitionMessage('');
+    setOpeningID(null);
+    setOpeningStatus(null);
+    setIsComplete(false);
+  };
+
   const describedBy = (field: DraftField) => errors[field] ? `${field}-error` : undefined;
 
   return (
@@ -305,26 +370,84 @@ export function CreateOpeningPanel({
           </button>
         </header>
 
-        {isComplete ? (
-          <div className="opening-complete" role="status">
-            <span aria-hidden="true" className="complete-mark">✓</span>
-            <span className="eyebrow">{isAuthenticated ? 'Private draft saved' : 'Draft ready'}</span>
-            <h3>{draft.projectName}</h3>
-            <p>
-              {isAuthenticated
-                ? 'Your opening draft is saved privately to your Branch-Out account. It has not been published.'
-                : 'Your opening draft is saved on this device. It has not been published.'}
-            </p>
+        {isComplete || (isAuthenticated && openingStatus !== null && openingStatus !== 'draft') ? (
+          <div className="opening-complete">
+            <div className="opening-complete-announcement" role="status">
+              <span aria-hidden="true" className="complete-mark">✓</span>
+              <span className="eyebrow">
+                {openingStatus === 'published'
+                  ? 'Published opening'
+                  : openingStatus === 'closed'
+                    ? 'Opening closed'
+                    : isAuthenticated ? 'Private draft saved' : 'Draft ready'}
+              </span>
+              <h3>{draft.projectName}</h3>
+              <p>
+                {openingStatus === 'published'
+                  ? 'This opening is visible in public discovery. Close it when you are no longer accepting collaborators.'
+                  : openingStatus === 'closed'
+                    ? 'This opening is no longer visible in public discovery. Closed openings cannot be reopened.'
+                    : isAuthenticated
+                      ? 'Your opening draft is saved privately to your Branch-Out account. It has not been published.'
+                      : 'Your opening draft is saved on this device. It has not been published.'}
+              </p>
+            </div>
             <dl>
               <div><dt>Role</dt><dd>{draft.role}</dd></div>
               <div><dt>Commitment</dt><dd>{draft.commitment}</dd></div>
               <div><dt>Compensation</dt><dd>{draft.compensation}</dd></div>
               <div><dt>First milestone</dt><dd>{draft.firstMilestone}</dd></div>
             </dl>
-            <button className="primary-button" onClick={onClose} type="button">Return to openings</button>
+            {isAuthenticated && openingStatus === 'draft' && (
+              <div className="opening-lifecycle-confirmation">
+                <label>
+                  <input
+                    checked={publishConfirmed}
+                    onChange={(event) => setPublishConfirmed(event.target.checked)}
+                    type="checkbox"
+                  />
+                  <span>I reviewed this opening and confirm its details are safe to publish publicly.</span>
+                </label>
+                <button
+                  className="primary-button"
+                  disabled={!publishConfirmed || isTransitioning}
+                  onClick={handlePublish}
+                  type="button"
+                >
+                  {isTransitioning ? 'Publishing…' : 'Publish opening'}
+                </button>
+              </div>
+            )}
+            {isAuthenticated && openingStatus === 'published' && (
+              <div className="opening-lifecycle-confirmation">
+                <label>
+                  <input
+                    checked={closeConfirmed}
+                    onChange={(event) => setCloseConfirmed(event.target.checked)}
+                    type="checkbox"
+                  />
+                  <span>I understand closing removes this opening from public discovery and reopening is not available.</span>
+                </label>
+                <button
+                  className="secondary-button danger-button"
+                  disabled={!closeConfirmed || isTransitioning}
+                  onClick={handleCloseOpening}
+                  type="button"
+                >
+                  {isTransitioning ? 'Closing…' : 'Close opening'}
+                </button>
+              </div>
+            )}
+            {transitionMessage && <p aria-live="polite" className="save-message">{transitionMessage}</p>}
+            <div className="opening-complete-actions">
+              {isAuthenticated && openingStatus === 'closed' && (
+                <button className="secondary-button" onClick={startAnotherDraft} type="button">Start another draft</button>
+              )}
+              <button className="primary-button" onClick={onClose} type="button">Return to openings</button>
+            </div>
           </div>
         ) : loadStatus === 'loading' ? (
-          <div className="opening-loading" role="status">Loading your private opening draft…</div>
+          <div className="opening-loading" role="status">Loading your latest opening…</div>
         ) : (
           <>
             {/* Progress labels keep the three-part form understandable at a glance. */}
