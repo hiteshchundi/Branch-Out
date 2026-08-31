@@ -234,10 +234,12 @@ The **Plan trial** action inside each project detail opens a three-step draft:
 3. Minimum access, confidentiality handling, an ownership expectation to
    discuss, a clean exit plan, and mutual-review confirmation
 
-Each project keeps a separate device-local draft. Restored data is limited to
-known field types, each visible step validates independently, and completion
-clearly states that the draft has not been sent, accepted, or converted into a
-legal agreement.
+Signed-out visitors and signed-in members without an accepted application keep
+a separate device-local preview for each project. Once an application is
+accepted, the applicant can save one complete private proposal to their account
+and restore it on another device. The opening owner cannot see it yet. Each
+visible step validates independently, and completion clearly states that the
+proposal has not been sent, accepted, or converted into a legal agreement.
 
 ## Outcome feedback and trust candidates
 
@@ -282,8 +284,9 @@ and backend systems.
   make one irreversible accept/decline decision. Applicants can irreversibly
   withdraw a submission before that decision. Reapplication, messaging, and
   next-step coordination are not implemented.
-- Trial-agreement drafts stay in the current browser and are not sent or
-  accepted by another person.
+- Trial-agreement previews stay in the current browser until the applicant is
+  accepted. Accepted applicants can persist one private account proposal, but
+  sending it to the opening owner and mutual acceptance are not implemented.
 - Outcome-review drafts and trust candidates stay local and are not confirmed or
   published.
 - Saved openings stay only in the current browser and are not synchronized.

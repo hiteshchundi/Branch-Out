@@ -1,0 +1,149 @@
+package trialproposals
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"os"
+	"testing"
+	"time"
+
+	"github.com/hiteshchundi/branch-out/backend/internal/applications"
+	"github.com/hiteshchundi/branch-out/backend/internal/auth"
+	"github.com/hiteshchundi/branch-out/backend/internal/database"
+	"github.com/hiteshchundi/branch-out/backend/internal/openings"
+	"github.com/hiteshchundi/branch-out/backend/internal/profile"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+func TestPostgresTrialProposalLifecycle(t *testing.T) {
+	databaseURL := os.Getenv("BRANCH_OUT_TEST_DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("BRANCH_OUT_TEST_DATABASE_URL is not set")
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, databaseURL)
+	if err != nil {
+		t.Fatalf("connect to PostgreSQL: %v", err)
+	}
+	t.Cleanup(pool.Close)
+
+	queries := database.New(pool)
+	authStore := auth.NewPostgresStore(queries)
+	profileService := profile.NewService(profile.NewPostgresStore(queries))
+	openingManager := openings.NewManager(openings.NewPostgresRepository(queries), profileService)
+	applicationManager := applications.NewManager(applications.NewPostgresStore(queries), profileService)
+	manager := NewManager(NewPostgresStore(queries))
+
+	identifier := time.Now().UnixNano()
+	owner := createTrialTestUser(t, ctx, authStore, profileService, identifier, "Trial Owner")
+	applicant := createTrialTestUser(t, ctx, authStore, profileService, identifier+1, "Accepted Applicant")
+	otherApplicant := createTrialTestUser(t, ctx, authStore, profileService, identifier+2, "Other Applicant")
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), "DELETE FROM trial_proposals WHERE applicant_user_id = ANY($1)", []int64{applicant.ID, otherApplicant.ID})
+		_, _ = pool.Exec(context.Background(), "DELETE FROM applications WHERE applicant_user_id = ANY($1)", []int64{applicant.ID, otherApplicant.ID})
+		_, _ = pool.Exec(context.Background(), "DELETE FROM project_openings WHERE owner_user_id = $1", owner.ID)
+		_, _ = pool.Exec(context.Background(), "DELETE FROM users WHERE id = ANY($1)", []int64{owner.ID, applicant.ID, otherApplicant.ID})
+	})
+
+	opening, err := openingManager.CreateDraft(ctx, owner.ID, openings.DraftInput{
+		ProjectName: "Private trial proposal", Problem: "Test accepted-applicant trial proposal persistence and isolation.",
+		Role: "Backend engineer", Skills: []string{"Go", "PostgreSQL"}, Commitment: "6–8 hrs/week",
+		Duration: "2–4 weeks", Timezone: "UTC to UTC+4", Compensation: "Fixed bounty",
+		FirstMilestone:    "Build and test one bounded private trial proposal workflow.",
+		OwnerContribution: "The opening, review criteria, and test environment are prepared.", Confidentiality: "Public",
+	})
+	if err != nil {
+		t.Fatalf("CreateDraft() error = %v", err)
+	}
+	opening, err = openingManager.PublishDraft(ctx, owner.ID, opening.ID)
+	if err != nil {
+		t.Fatalf("PublishDraft() error = %v", err)
+	}
+
+	if _, err := manager.SaveOwnDraft(ctx, applicant.ID, opening.ID, validTrialInput()); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("pre-acceptance SaveOwnDraft() error = %v, want ErrUnavailable", err)
+	}
+	application, err := applicationManager.SaveDraft(ctx, applicant.ID, opening.ID, validApplicationInput())
+	if err != nil {
+		t.Fatalf("application SaveDraft() error = %v", err)
+	}
+	application, err = applicationManager.Submit(ctx, applicant.ID, opening.ID)
+	if err != nil {
+		t.Fatalf("application Submit() error = %v", err)
+	}
+	if _, err := applicationManager.Decide(ctx, owner.ID, opening.ID, application.ID, "accepted"); err != nil {
+		t.Fatalf("application Decide() error = %v", err)
+	}
+
+	proposal, err := manager.SaveOwnDraft(ctx, applicant.ID, opening.ID, validTrialInput())
+	if err != nil || proposal.Status != "draft" || proposal.ApplicationID != application.ID {
+		t.Fatalf("SaveOwnDraft() = %#v, %v", proposal, err)
+	}
+	loaded, err := manager.GetOwn(ctx, applicant.ID, opening.ID)
+	if err != nil || loaded.ID != proposal.ID {
+		t.Fatalf("GetOwn() = %#v, %v", loaded, err)
+	}
+	updatedInput := validTrialInput()
+	updatedInput.WeeklyHours = 10
+	updated, err := manager.SaveOwnDraft(ctx, applicant.ID, opening.ID, updatedInput)
+	if err != nil || updated.ID != proposal.ID || updated.Input.WeeklyHours != 10 {
+		t.Fatalf("updated SaveOwnDraft() = %#v, %v", updated, err)
+	}
+	if _, err := manager.GetOwn(ctx, otherApplicant.ID, opening.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("other applicant GetOwn() error = %v, want ErrNotFound", err)
+	}
+	if _, err := manager.SaveOwnDraft(ctx, otherApplicant.ID, opening.ID, validTrialInput()); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("other applicant SaveOwnDraft() error = %v, want ErrUnavailable", err)
+	}
+}
+
+func validTrialInput() Input {
+	return Input{
+		Outcome:     "Build a usable comparison flow with documented decisions.",
+		Deliverable: "A tested comparison component and implementation note.",
+		NonGoals:    "No production data access or deployment.",
+		StartDate:   "2026-09-01", EndDate: "2026-09-15", WeeklyHours: 8,
+		CheckInCadence: "Async update every two days", AccessLevel: "Limited repository access",
+		Confidentiality: "Synthetic data during trial", IPOwnership: "Open-source contribution under the project license",
+		ExitPlan: "Remove repository access and hand over all documented trial work.", TermsConfirmed: true,
+	}
+}
+
+func validApplicationInput() applications.Input {
+	return applications.Input{
+		Message:       "I can deliver the bounded milestone and document each implementation decision.",
+		WorkSampleURL: "https://github.com/example/comparison", WorkSampleContext: "A comparable tested collaboration workflow.",
+		Availability: "8 hours each week", AvailabilityConfirmed: true,
+		ProposedContribution: "Implement and test the private trial proposal flow.",
+	}
+}
+
+func createTrialTestUser(
+	t *testing.T,
+	ctx context.Context,
+	authStore *auth.PostgresStore,
+	profileService *profile.Service,
+	githubID int64,
+	displayName string,
+) auth.User {
+	t.Helper()
+	user, err := authStore.UpsertGitHubUser(ctx, auth.GitHubUser{
+		ID: githubID, Login: fmt.Sprintf("trial-user-%d", githubID), Name: &displayName,
+		AvatarURL: "https://avatars.example/trial", ProfileURL: "https://github.com/trial-user",
+	})
+	if err != nil {
+		t.Fatalf("create test user: %v", err)
+	}
+	_, err = profileService.Save(ctx, user.ID, profile.Input{
+		DisplayName: displayName, PrimaryRole: "Software developer",
+		Bio:      "I build dependable collaboration products with bounded milestones and clear evidence.",
+		Timezone: "Asia/Kolkata", WeeklyAvailability: "6–8 hrs/week", PreferredDuration: "2–4 weeks",
+		WorkStyle: "Async-first", CommunicationCadence: "Three updates per week",
+		Skills: []string{"Go", "PostgreSQL"}, EvidenceSummary: "Recent public work includes tested services and reviewed pull requests.",
+	})
+	if err != nil {
+		t.Fatalf("create test profile: %v", err)
+	}
+	return user
+}

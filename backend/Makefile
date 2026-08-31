@@ -26,7 +26,7 @@ test:
 	go test ./...
 
 test-integration:
-	BRANCH_OUT_TEST_DATABASE_URL="$(DATABASE_URL)" go test ./internal/auth ./internal/openings ./internal/profile -run Postgres -count=1
+	BRANCH_OUT_TEST_DATABASE_URL="$(DATABASE_URL)" go test ./internal/applications ./internal/auth ./internal/openings ./internal/profile ./internal/trialproposals -run Postgres -count=1
 
 vet:
 	go vet ./...

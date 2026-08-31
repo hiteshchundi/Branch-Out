@@ -444,14 +444,22 @@ responsible for appropriate contracts, IP terms, security, and offboarding.
 
 ### Save and complete the trial draft
 
-Select **Save draft** on any step. Each project has its own browser-local trial
-agreement and safely ignores malformed stored fields.
+Signed-out visitors and signed-in members whose applications are not accepted
+can select **Save draft** to keep a project-specific preview in the current
+browser. Branch-Out safely ignores malformed stored fields.
+
+After the opening owner accepts an application, the applicant sees **Save
+private proposal**. All three sections must then be complete because the
+proposal is stored as one validated account record. The private draft can be
+restored on another device, but the opening owner cannot see it in this phase.
 
 Select **Complete trial draft** after Safeguards. The completion summary shows
 the outcome, dates, weekly time, check-in cadence, access level, and exit plan.
-It explicitly states that the draft has not been sent, accepted, or turned into
-a legal agreement. Close the flow with its close button, the shaded area, or
-`Escape`.
+It explicitly states whether the draft is device-local or private to the
+applicant's account, and that it has not been sent, accepted, or turned into a
+legal agreement. Sending, owner review, mutual acceptance, and legal execution
+remain later lifecycle steps. Close the flow with its close button, the shaded
+area, or `Escape`.
 
 ## Review a trial outcome
 

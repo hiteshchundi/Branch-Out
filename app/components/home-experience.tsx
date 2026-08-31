@@ -820,7 +820,7 @@ export function HomeExperience() {
         <ProofApplicationPanel authenticatedUser={authenticatedUser} project={applicationProject} onClose={closeApplication} />
       )}
       {trialProject && (
-        <TrialAgreementPanel onClose={closeTrialAgreement} project={trialProject} />
+        <TrialAgreementPanel authenticatedUser={authenticatedUser} key={`${authenticatedUser?.id ?? 'anonymous'}:${trialProject.id}`} onClose={closeTrialAgreement} project={trialProject} />
       )}
       {outcomeProject && (
         <OutcomeFeedbackPanel onClose={closeOutcomeReview} project={outcomeProject} />

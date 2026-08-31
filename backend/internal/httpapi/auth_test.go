@@ -154,7 +154,7 @@ func TestCurrentSessionRequiresValidCookie(t *testing.T) {
 
 func authTestAPI(authentication Authenticator, options Options) http.Handler {
 	return New(
-		openings.NewMemoryRepository(nil), fakeOpeningManager{}, fakeApplicationManager{}, readyChecker{}, authentication, fakeProfileManager{}, options,
+		openings.NewMemoryRepository(nil), fakeOpeningManager{}, fakeApplicationManager{}, fakeTrialProposalManager{}, readyChecker{}, authentication, fakeProfileManager{}, options,
 		slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)),
 	)
 }

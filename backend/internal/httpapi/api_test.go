@@ -21,7 +21,7 @@ var defaultOptions = Options{
 }
 
 func testAPI(repository openings.Repository) http.Handler {
-	return New(repository, fakeOpeningManager{}, fakeApplicationManager{}, readyChecker{}, fakeAuthenticator{}, fakeProfileManager{}, defaultOptions, slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)))
+	return New(repository, fakeOpeningManager{}, fakeApplicationManager{}, fakeTrialProposalManager{}, readyChecker{}, fakeAuthenticator{}, fakeProfileManager{}, defaultOptions, slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)))
 }
 
 func TestStatusRoutes(t *testing.T) {
@@ -50,6 +50,7 @@ func TestReadinessReturnsUnavailableWhenDependencyFails(t *testing.T) {
 		openings.NewMemoryRepository(nil),
 		fakeOpeningManager{},
 		fakeApplicationManager{},
+		fakeTrialProposalManager{},
 		readyChecker{err: errors.New("database unavailable")},
 		fakeAuthenticator{}, fakeProfileManager{}, defaultOptions,
 		slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)),

@@ -172,7 +172,7 @@ func authenticatedApplicationRequest(method, target string, body io.Reader) *htt
 }
 
 func applicationTestAPI(manager fakeApplicationManager, authentication fakeAuthenticator) http.Handler {
-	return New(nil, fakeOpeningManager{}, manager, readyChecker{}, authentication, fakeProfileManager{}, defaultOptions, testLogger())
+	return New(nil, fakeOpeningManager{}, manager, fakeTrialProposalManager{}, readyChecker{}, authentication, fakeProfileManager{}, defaultOptions, testLogger())
 }
 
 type applicationManagerCalls struct {

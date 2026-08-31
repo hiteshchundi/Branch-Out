@@ -97,7 +97,7 @@ func profileTestAPI(manager fakeProfileManager) http.Handler {
 		manager.calls = &profileCalls{}
 	}
 	return New(
-		nil, fakeOpeningManager{}, fakeApplicationManager{}, readyChecker{}, fakeAuthenticator{user: auth.User{ID: 7}}, manager,
+		nil, fakeOpeningManager{}, fakeApplicationManager{}, fakeTrialProposalManager{}, readyChecker{}, fakeAuthenticator{user: auth.User{ID: 7}}, manager,
 		defaultOptions, testLogger(),
 	)
 }

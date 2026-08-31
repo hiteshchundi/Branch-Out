@@ -12,12 +12,14 @@ import (
 	"github.com/hiteshchundi/branch-out/backend/internal/applications"
 	"github.com/hiteshchundi/branch-out/backend/internal/openings"
 	"github.com/hiteshchundi/branch-out/backend/internal/profile"
+	"github.com/hiteshchundi/branch-out/backend/internal/trialproposals"
 )
 
 type API struct {
 	repository     openings.Repository
 	openingManager OpeningManager
 	applications   ApplicationManager
+	trialProposals TrialProposalManager
 	readiness      ReadinessChecker
 	authentication Authenticator
 	profiles       ProfileManager
@@ -52,6 +54,11 @@ type ApplicationManager interface {
 	Withdraw(context.Context, int64, string) (applications.Application, error)
 }
 
+type TrialProposalManager interface {
+	GetOwn(context.Context, int64, string) (trialproposals.Proposal, error)
+	SaveOwnDraft(context.Context, int64, string, trialproposals.Input) (trialproposals.Proposal, error)
+}
+
 type listResponse struct {
 	Data []openings.Opening `json:"data"`
 	Meta struct {
@@ -73,8 +80,8 @@ type apiError struct {
 	Field   string `json:"field,omitempty"`
 }
 
-func New(repository openings.Repository, openingManager OpeningManager, applicationManager ApplicationManager, readiness ReadinessChecker, authentication Authenticator, profiles ProfileManager, options Options, logger *slog.Logger) http.Handler {
-	api := &API{repository: repository, openingManager: openingManager, applications: applicationManager, readiness: readiness, authentication: authentication, profiles: profiles, options: options, allowedOrigin: options.AllowedOrigin, logger: logger}
+func New(repository openings.Repository, openingManager OpeningManager, applicationManager ApplicationManager, trialProposalManager TrialProposalManager, readiness ReadinessChecker, authentication Authenticator, profiles ProfileManager, options Options, logger *slog.Logger) http.Handler {
+	api := &API{repository: repository, openingManager: openingManager, applications: applicationManager, trialProposals: trialProposalManager, readiness: readiness, authentication: authentication, profiles: profiles, options: options, allowedOrigin: options.AllowedOrigin, logger: logger}
 	routes := http.NewServeMux()
 	routes.HandleFunc("GET /healthz", api.health)
 	routes.HandleFunc("GET /readyz", api.ready)
@@ -90,6 +97,8 @@ func New(repository openings.Repository, openingManager OpeningManager, applicat
 	routes.HandleFunc("POST /v1/openings/{id}/application/withdraw", api.withdrawApplication)
 	routes.HandleFunc("GET /v1/openings/{id}/applications", api.listSubmittedApplications)
 	routes.HandleFunc("POST /v1/openings/{id}/applications/{applicationId}/decision", api.decideApplication)
+	routes.HandleFunc("GET /v1/openings/{id}/trial-proposal", api.getOwnTrialProposal)
+	routes.HandleFunc("PUT /v1/openings/{id}/trial-proposal", api.saveOwnTrialProposal)
 	routes.HandleFunc("GET /v1/auth/github/start", api.startGitHubAuth)
 	routes.HandleFunc("GET /v1/auth/github/callback", api.finishGitHubAuth)
 	routes.HandleFunc("GET /v1/session", api.currentSession)
@@ -108,6 +117,7 @@ func New(repository openings.Repository, openingManager OpeningManager, applicat
 	routes.HandleFunc("OPTIONS /v1/openings/{id}/application/withdraw", api.preflight)
 	routes.HandleFunc("OPTIONS /v1/openings/{id}/applications", api.preflight)
 	routes.HandleFunc("OPTIONS /v1/openings/{id}/applications/{applicationId}/decision", api.preflight)
+	routes.HandleFunc("OPTIONS /v1/openings/{id}/trial-proposal", api.preflight)
 	routes.HandleFunc("/", api.notFound)
 
 	return api.recoverPanics(api.logRequests(api.cors(routes)))

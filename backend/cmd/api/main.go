@@ -17,6 +17,7 @@ import (
 	"github.com/hiteshchundi/branch-out/backend/internal/httpapi"
 	"github.com/hiteshchundi/branch-out/backend/internal/openings"
 	"github.com/hiteshchundi/branch-out/backend/internal/profile"
+	"github.com/hiteshchundi/branch-out/backend/internal/trialproposals"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -48,7 +49,8 @@ func main() {
 	profiles := profile.NewService(profile.NewPostgresStore(database.New(pool)))
 	openingManager := openings.NewManager(repository, profiles)
 	applicationManager := applications.NewManager(applications.NewPostgresStore(database.New(pool)), profiles)
-	api := httpapi.New(repository, openingManager, applicationManager, pool, authentication, profiles, httpapi.Options{
+	trialProposalManager := trialproposals.NewManager(trialproposals.NewPostgresStore(database.New(pool)))
+	api := httpapi.New(repository, openingManager, applicationManager, trialProposalManager, pool, authentication, profiles, httpapi.Options{
 		AllowedOrigin: cfg.AllowedOrigin, FrontendURL: cfg.FrontendURL, CookieSecure: cfg.CookieSecure,
 	}, logger)
 	server := &http.Server{

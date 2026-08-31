@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: Branch-Out API
-  version: 0.8.0
-  description: PostgreSQL-backed discovery, GitHub authentication, member profiles, owner-managed opening lifecycles, proof-led applications, private owner review, immutable decisions, and pre-decision applicant withdrawal for Branch-Out.
+  version: 0.9.0
+  description: PostgreSQL-backed discovery, GitHub authentication, member profiles, owner-managed opening lifecycles, proof-led applications, private owner review, immutable decisions, applicant withdrawal, and accepted-applicant trial proposal drafts for Branch-Out.
 servers:
   - url: http://localhost:8080
 paths:
@@ -408,6 +408,101 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '500':
           description: The application draft could not be saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /v1/openings/{id}/trial-proposal:
+    get:
+      operationId: getOwnTrialProposal
+      summary: Get the accepted applicant's private trial proposal
+      description: Returns only the current member's draft tied to an accepted application. Opening owners and other applicants cannot read it.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The accepted applicant's private proposal draft.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/TrialProposal'
+        '401':
+          description: No valid session is present.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: The current accepted applicant has no proposal for this opening.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: The proposal could not be loaded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    put:
+      operationId: saveOwnTrialProposal
+      summary: Create or replace the accepted applicant's private trial proposal
+      description: Requires the current member to have the immutable accepted application for this opening. The proposal remains private and is not sent to or accepted by the owner.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TrialProposalInput'
+      responses:
+        '200':
+          description: The complete private proposal draft was saved.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/TrialProposal'
+        '400':
+          description: The request or a proposal field is invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: No valid session is present.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: The current member has no accepted application for this opening.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: The proposal draft could not be saved.
           content:
             application/json:
               schema:
@@ -981,6 +1076,92 @@ components:
         decision:
           type: string
           enum: [accepted, declined]
+    TrialProposalInput:
+      type: object
+      additionalProperties: false
+      required:
+        - outcome
+        - deliverable
+        - nonGoals
+        - startDate
+        - endDate
+        - weeklyHours
+        - checkInCadence
+        - accessLevel
+        - confidentiality
+        - ipOwnership
+        - exitPlan
+        - termsConfirmed
+      properties:
+        outcome:
+          type: string
+          minLength: 20
+          maxLength: 500
+        deliverable:
+          type: string
+          minLength: 20
+          maxLength: 500
+        nonGoals:
+          type: string
+          minLength: 15
+          maxLength: 500
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+          description: Must be 13 to 15 calendar days after startDate.
+        weeklyHours:
+          type: integer
+          minimum: 1
+          maximum: 40
+        checkInCadence:
+          type: string
+          enum: [Async update every two days, Twice-weekly live check-in, Weekly review plus async updates]
+        accessLevel:
+          type: string
+          enum: [Sandbox or sample data only, Limited repository access, Time-limited production access]
+        confidentiality:
+          type: string
+          enum: [Public work only, Private after written agreement, Synthetic data during trial]
+        ipOwnership:
+          type: string
+          enum:
+            - Contributor retains pre-existing work; project owns trial deliverable
+            - Contributor licenses trial deliverable to the project
+            - Open-source contribution under the project license
+            - Custom written terms required before work starts
+        exitPlan:
+          type: string
+          minLength: 20
+          maxLength: 500
+        termsConfirmed:
+          type: boolean
+          const: true
+    TrialProposal:
+      type: object
+      required: [id, applicationId, openingId, input, status, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        applicationId:
+          type: string
+          format: uuid
+        openingId:
+          type: string
+        input:
+          $ref: '#/components/schemas/TrialProposalInput'
+        status:
+          type: string
+          const: draft
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
     Application:
       type: object
       required: [id, openingId, input, status, submittedAt, decidedAt, withdrawnAt, createdAt, updatedAt]

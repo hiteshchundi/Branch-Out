@@ -71,6 +71,8 @@ checks PostgreSQL on every request and returns HTTP 503 with
 - `POST /v1/openings/{id}/application/withdraw` — irreversibly withdraw the member's submitted application
 - `GET /v1/openings/{id}/applications` — privately list submitted applications for the opening owner
 - `POST /v1/openings/{id}/applications/{applicationId}/decision` — irreversibly accept or decline a submitted application
+- `GET /v1/openings/{id}/trial-proposal` — return the accepted applicant's private proposal draft
+- `PUT /v1/openings/{id}/trial-proposal` — create or replace that private proposal draft
 
 Discovery accepts optional filters. Structured values use the labels already
 shown by the frontend.
@@ -122,6 +124,15 @@ Before a decision, the applicant can atomically move their own `submitted`
 application to `withdrawn`; this records the withdrawal time and removes it from
 the owner's decision set while retaining it in private review. Reapplication,
 messaging, and next-step coordination are intentionally outside this milestone.
+
+Trial-proposal routes require an authenticated member whose application for the
+opening is already `accepted`. Eligibility, applicant identity, and opening
+identity are selected together inside the database write; client-supplied IDs
+are never trusted. One complete `draft` proposal is stored per accepted
+application, and later saves replace its bounded terms while retaining the same
+proposal ID. Reads are scoped to the same applicant and accepted application.
+The opening owner cannot read the proposal in this phase, and no send, review,
+mutual-acceptance, or legal-agreement transition is implied.
 
 The complete contract is in [`openapi.yaml`](openapi.yaml).
 
@@ -186,8 +197,9 @@ generate and migrate with the same tool versions. Generated files under
 The tests cover liveness, readiness, credentialed CORS behavior, the OAuth and
 session lifecycle, PKCE exchange behavior, response shape, combined discovery
 filtering, opening-draft validation and authorization, invalid filters,
-application validation and lifecycle authorization, unsupported methods, and
-unknown routes. PostgreSQL integration tests cover
+application validation and lifecycle authorization, accepted-applicant trial
+proposal validation and authorization, unsupported methods, and unknown routes.
+PostgreSQL integration tests cover
 single-use OAuth attempts, user upserts, session revocation, profile creation
 and replacement, authoritative GitHub identity, owner-only draft updates, draft
 isolation from discovery, full-catalogue retrieval, text search, combined
@@ -197,6 +209,9 @@ rejection, published-opening enforcement, submission, immutability, submitted-
 only owner review, non-owner rejection, irreversible owner decisions, and
 applicant-visible outcomes. Withdrawal coverage verifies applicant scoping,
 single-transition behavior, owner visibility, and decision exclusion.
+Trial-proposal integration coverage verifies pre-acceptance rejection, accepted
+application linkage, private applicant reads, replacement with a stable ID, and
+isolation from other members.
 
 ## Package boundaries
 
@@ -206,6 +221,8 @@ single-transition behavior, owner visibility, and decision exclusion.
 - `internal/auth` owns GitHub OAuth, users, and durable sessions.
 - `internal/applications` owns proof-led application validation, persistence,
   and the draft-to-submitted lifecycle.
+- `internal/trialproposals` owns accepted-applicant proposal validation,
+  persistence, and private applicant scoping.
 - `internal/openings` owns project-opening types, validation, ownership,
   filtering, and the repository contract, including memory and PostgreSQL
   implementations.
@@ -228,4 +245,6 @@ opening owners can privately review submitted applications and applicant proof;
 drafts remain applicant-only. Owners can accept or decline once, and applicants
 load that outcome through the same private application view. Applicants can
 withdraw before a decision; owners retain the historical withdrawn record but
-cannot decide it.
+cannot decide it. Accepted applicants can persist one private two-week trial
+proposal tied to that application; other members cannot load it. Proposal
+sending and mutual acceptance remain outside this milestone.

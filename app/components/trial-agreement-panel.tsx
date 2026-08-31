@@ -1,7 +1,14 @@
 'use client';
 
-import { FormEvent, useRef, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
+import type { AuthenticatedUser } from '../data/auth';
+import { loadOwnApplication } from '../data/applications';
 import type { ProjectOpening } from '../data/projects';
+import {
+  loadOwnTrialProposal,
+  saveOwnTrialProposal,
+  type TrialProposalInput,
+} from '../data/trial-proposals';
 import { useAccessibleDialog } from './use-accessible-dialog';
 
 export type TrialAgreementDraft = {
@@ -21,6 +28,7 @@ export type TrialAgreementDraft = {
 
 type DraftField = keyof TrialAgreementDraft;
 type TrialErrors = Partial<Record<DraftField, string>>;
+type AccountDraftStatus = 'local' | 'loading' | 'accepted' | 'preview' | 'error';
 
 export function trialAgreementStorageKey(projectId: string) {
   return `branch-out-trial-agreement:${projectId}`;
@@ -86,8 +94,11 @@ export function validateTrialStep(draft: TrialAgreementDraft, step: number): Tri
 
   if (step === 0) {
     if (draft.outcome.trim().length < 20) errors.outcome = 'Describe the trial outcome in at least 20 characters.';
+    else if (draft.outcome.length > 500) errors.outcome = 'Keep the trial outcome within 500 characters.';
     if (draft.deliverable.trim().length < 20) errors.deliverable = 'Define a reviewable deliverable in at least 20 characters.';
+    else if (draft.deliverable.length > 500) errors.deliverable = 'Keep the deliverable within 500 characters.';
     if (draft.nonGoals.trim().length < 15) errors.nonGoals = 'Name what is outside scope in at least 15 characters.';
+    else if (draft.nonGoals.length > 500) errors.nonGoals = 'Keep the non-goals within 500 characters.';
   }
 
   if (step === 1) {
@@ -111,10 +122,26 @@ export function validateTrialStep(draft: TrialAgreementDraft, step: number): Tri
     if (!draft.confidentiality) errors.confidentiality = 'Choose how confidential information is handled.';
     if (!draft.ipOwnership) errors.ipOwnership = 'Choose an ownership expectation to discuss.';
     if (draft.exitPlan.trim().length < 20) errors.exitPlan = 'Describe a clean exit in at least 20 characters.';
+    else if (draft.exitPlan.length > 500) errors.exitPlan = 'Keep the exit plan within 500 characters.';
     if (!draft.termsConfirmed) errors.termsConfirmed = 'Confirm that both people must review these terms.';
   }
 
   return errors;
+}
+
+function validateEntireDraft(draft: TrialAgreementDraft) {
+  return [0, 1, 2].reduce<TrialErrors>(
+    (allErrors, currentStep) => ({ ...allErrors, ...validateTrialStep(draft, currentStep) }),
+    {},
+  );
+}
+
+function toProposalInput(draft: TrialAgreementDraft): TrialProposalInput {
+  return { ...draft, weeklyHours: Number(draft.weeklyHours) };
+}
+
+function fromProposalInput(input: TrialProposalInput): TrialAgreementDraft {
+  return { ...input, weeklyHours: String(input.weeklyHours) };
 }
 
 function FieldError({ field, errors }: { field: DraftField; errors: TrialErrors }) {
@@ -124,9 +151,11 @@ function FieldError({ field, errors }: { field: DraftField; errors: TrialErrors 
 }
 
 export function TrialAgreementPanel({
+  authenticatedUser,
   onClose,
   project,
 }: {
+  authenticatedUser?: AuthenticatedUser | null;
   onClose: () => void;
   project: ProjectOpening;
 }) {
@@ -135,9 +164,32 @@ export function TrialAgreementPanel({
   const [errors, setErrors] = useState<TrialErrors>({});
   const [saveMessage, setSaveMessage] = useState('');
   const [isComplete, setIsComplete] = useState(false);
+  const [accountStatus, setAccountStatus] = useState<AccountDraftStatus>(authenticatedUser ? 'loading' : 'local');
+  const [isSaving, setIsSaving] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLElement>(null);
   useAccessibleDialog({ dialogRef, initialFocusRef: closeButtonRef, onClose });
+
+  useEffect(() => {
+    if (!authenticatedUser) return;
+
+    const controller = new AbortController();
+    void loadOwnApplication(project.id, controller.signal)
+      .then(async (application) => {
+        if (!application || application.status !== 'accepted') {
+          setAccountStatus('preview');
+          return;
+        }
+        const proposal = await loadOwnTrialProposal(project.id, controller.signal);
+        if (proposal) setDraft(fromProposalInput(proposal.input));
+        setAccountStatus('accepted');
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+        setAccountStatus('error');
+      });
+    return () => controller.abort();
+  }, [authenticatedUser, project.id]);
 
   const updateDraft = <Field extends DraftField>(field: Field, value: TrialAgreementDraft[Field]) => {
     setDraft((current) => ({ ...current, [field]: value }));
@@ -145,7 +197,7 @@ export function TrialAgreementPanel({
     setSaveMessage('');
   };
 
-  const persistDraft = () => {
+  const persistLocalDraft = () => {
     try {
       window.localStorage.setItem(trialAgreementStorageKey(project.id), JSON.stringify(draft));
       setSaveMessage('Trial agreement draft saved on this device.');
@@ -156,7 +208,34 @@ export function TrialAgreementPanel({
     }
   };
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const persistDraft = async () => {
+    if (accountStatus !== 'accepted') return persistLocalDraft();
+
+    const nextErrors = validateEntireDraft(draft);
+    if (Object.keys(nextErrors).length > 0) {
+      setErrors(nextErrors);
+      const firstInvalidStep = [0, 1, 2].find((candidate) => Object.keys(validateTrialStep(draft, candidate)).length > 0);
+      if (firstInvalidStep !== undefined) setStep(firstInvalidStep);
+      setSaveMessage('Complete every section before saving this private account draft.');
+      return false;
+    }
+
+    setIsSaving(true);
+    setSaveMessage('');
+    try {
+      const proposal = await saveOwnTrialProposal(project.id, toProposalInput(draft));
+      setDraft(fromProposalInput(proposal.input));
+      setSaveMessage('Private trial proposal saved to your Branch-Out account.');
+      return true;
+    } catch {
+      setSaveMessage('The private proposal could not be saved. Your entries remain open.');
+      return false;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const nextErrors = validateTrialStep(draft, step);
     setErrors(nextErrors);
@@ -165,7 +244,7 @@ export function TrialAgreementPanel({
       setStep((current) => current + 1);
       return;
     }
-    if (persistDraft()) setIsComplete(true);
+    if (await persistDraft()) setIsComplete(true);
   };
 
   const describedBy = (field: DraftField) => errors[field] ? `trial-${field}-error` : undefined;
@@ -180,12 +259,17 @@ export function TrialAgreementPanel({
 
         <div className="trial-project-context"><span>{project.stage}</span><strong>{project.title}</strong><small>{project.ownerName} · {project.commitment}</small></div>
 
+        {accountStatus === 'loading' && <p aria-live="polite" className="save-message">Checking your application and private draft…</p>}
+        {accountStatus === 'accepted' && <p className="save-message">Your application was accepted. This proposal is private to your account until a later send-and-accept step is added.</p>}
+        {accountStatus === 'preview' && <p className="save-message">Account saving unlocks after your application is accepted. This preview stays only on this device.</p>}
+        {accountStatus === 'error' && <p className="save-message">Your application could not be checked. This preview will stay only on this device.</p>}
+
         {isComplete ? (
           <div className="trial-complete" role="status">
             <span aria-hidden="true" className="complete-mark">✓</span>
             <span className="eyebrow">Draft ready for mutual review</span>
             <h3>The trial boundaries are clear.</h3>
-            <p>This draft is saved only on this device. It has not been sent, accepted, or turned into a legal agreement.</p>
+            <p>{accountStatus === 'accepted' ? 'This proposal is saved privately to your Branch-Out account.' : 'This draft is saved only on this device.'} It has not been sent, accepted, or turned into a legal agreement.</p>
             <dl>
               <div><dt>Outcome</dt><dd>{draft.outcome}</dd></div>
               <div><dt>Dates</dt><dd>{draft.startDate} to {draft.endDate}</dd></div>
@@ -228,8 +312,8 @@ export function TrialAgreementPanel({
               </div>}
 
               <footer className="trial-actions">
-                <div><button className="secondary-button" onClick={persistDraft} type="button">Save draft</button>{saveMessage && <span aria-live="polite" className="save-message">{saveMessage}</span>}</div>
-                <div>{step > 0 && <button className="text-button" onClick={() => setStep((current) => current - 1)} type="button">Back</button>}<button className="primary-button" type="submit">{step === 2 ? 'Complete trial draft' : 'Continue'}</button></div>
+                <div><button className="secondary-button" disabled={accountStatus === 'loading' || isSaving} onClick={() => void persistDraft()} type="button">{accountStatus === 'accepted' ? 'Save private proposal' : 'Save draft'}</button>{saveMessage && <span aria-live="polite" className="save-message">{saveMessage}</span>}</div>
+                <div>{step > 0 && <button className="text-button" onClick={() => setStep((current) => current - 1)} type="button">Back</button>}<button className="primary-button" disabled={accountStatus === 'loading' || isSaving} type="submit">{isSaving ? 'Saving…' : step === 2 ? 'Complete trial draft' : 'Continue'}</button></div>
               </footer>
             </form>
           </>
