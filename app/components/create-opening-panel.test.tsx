@@ -191,6 +191,7 @@ describe('CreateOpeningPanel', () => {
       openingId: published.id,
       status: 'submitted',
       submittedAt: '2026-08-31T08:00:00Z',
+      decidedAt: null,
       input: {
         message: 'I have built accessible climate dashboards for planning teams.',
         workSampleUrl: 'https://github.com/asha/climate',
@@ -207,7 +208,8 @@ describe('CreateOpeningPanel', () => {
     };
     const fetcher = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [published] }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [submitted], meta: { count: 1 } }), { status: 200 }));
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [submitted], meta: { count: 1 } }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: { ...submitted, status: 'accepted', decidedAt: '2026-08-31T09:00:00Z' } }), { status: 200 }));
     vi.stubGlobal('fetch', fetcher);
     render(<CreateOpeningPanel authenticatedUser={authenticatedUser} onClose={vi.fn()} />);
 
@@ -215,7 +217,19 @@ describe('CreateOpeningPanel', () => {
     expect(await screen.findByText('Asha Rao')).toBeInTheDocument();
     expect(screen.getByText(submitted.input.proposedContribution)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /view work sample/i })).toHaveAttribute('href', submitted.input.workSampleUrl);
-    expect(screen.getByText(/decisions and messaging are not available/i)).toBeInTheDocument();
+    const acceptButton = screen.getByRole('button', { name: /accept application/i });
+    fireEvent.click(acceptButton);
+    const confirmButton = screen.getByRole('button', { name: /confirm acceptance/i });
+    expect(confirmButton).toBeDisabled();
+    fireEvent.click(screen.getByLabelText(/acceptance cannot be reversed/i));
+    fireEvent.click(confirmButton);
+    expect(await screen.findByText('Accepted')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /accept application/i })).not.toBeInTheDocument();
+    expect(fetcher).toHaveBeenLastCalledWith(
+      `http://localhost:8080/v1/openings/${published.id}/applications/${submitted.id}/decision`,
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ decision: 'accepted' }) }),
+    );
+    expect(screen.getByText(/decisions are irreversible/i)).toBeInTheDocument();
   });
 
   it('starts a fresh draft after loading a closed opening', async () => {

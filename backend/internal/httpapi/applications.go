@@ -23,13 +23,43 @@ type ownerApplicationsResponse struct {
 	} `json:"meta"`
 }
 
+type applicationDecisionRequest struct {
+	Decision string `json:"decision"`
+}
+
+func (api *API) decideApplication(writer http.ResponseWriter, request *http.Request) {
+	writer.Header().Set("Cache-Control", "no-store")
+	user, ok := api.requireUser(writer, request)
+	if !ok {
+		return
+	}
+	var input applicationDecisionRequest
+	decoder := json.NewDecoder(http.MaxBytesReader(writer, request.Body, maximumApplicationBody))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil {
+		writeError(writer, http.StatusBadRequest, apiError{Code: "invalid_request", Message: "Provide an accepted or declined decision."})
+		return
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) || (input.Decision != "accepted" && input.Decision != "declined") {
+		writeError(writer, http.StatusBadRequest, apiError{Code: "invalid_decision", Message: "Decision must be accepted or declined."})
+		return
+	}
+	result, err := api.applications.Decide(
+		request.Context(), user.ID, request.PathValue("id"), request.PathValue("applicationId"), input.Decision,
+	)
+	if api.writeApplicationError(writer, err) {
+		return
+	}
+	writeJSON(writer, http.StatusOK, applicationResponse{Data: result})
+}
+
 func (api *API) listSubmittedApplications(writer http.ResponseWriter, request *http.Request) {
 	writer.Header().Set("Cache-Control", "no-store")
 	user, ok := api.requireUser(writer, request)
 	if !ok {
 		return
 	}
-	results, err := api.applications.ListSubmittedForOwner(request.Context(), user.ID, request.PathValue("id"))
+	results, err := api.applications.ListForOwner(request.Context(), user.ID, request.PathValue("id"))
 	if api.writeApplicationError(writer, err) {
 		return
 	}
@@ -112,6 +142,8 @@ func (api *API) writeApplicationError(writer http.ResponseWriter, err error) boo
 		writeError(writer, http.StatusConflict, apiError{Code: "application_unavailable", Message: "This application cannot be changed or submitted."})
 	case errors.Is(err, applications.ErrReviewNotFound):
 		writeError(writer, http.StatusNotFound, apiError{Code: "opening_not_found", Message: "This opening was not found."})
+	case errors.Is(err, applications.ErrDecisionUnavailable):
+		writeError(writer, http.StatusConflict, apiError{Code: "application_decision_unavailable", Message: "This application cannot be decided."})
 	default:
 		api.logger.Error("manage application failed", "error", err)
 		writeError(writer, http.StatusInternalServerError, apiError{Code: "internal_error", Message: "The application request could not be completed."})

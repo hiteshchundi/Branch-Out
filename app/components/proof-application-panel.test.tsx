@@ -28,7 +28,7 @@ const authenticatedUser: AuthenticatedUser = {
   profileUrl: 'https://github.com/branch-builder',
 };
 
-function managedApplication(status: 'draft' | 'submitted' = 'draft') {
+function managedApplication(status: 'draft' | 'submitted' | 'accepted' | 'declined' = 'draft') {
   return {
     id: '61616161-6161-4161-a161-616161616161',
     openingId: project.id,
@@ -139,6 +139,18 @@ describe('ProofApplicationPanel', () => {
 
     expect(await screen.findByText('Application submitted')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /submit application/i })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/short note/i)).not.toBeInTheDocument();
+  });
+
+  it('shows an owner decision to the applicant without restoring editing', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      data: managedApplication('accepted'),
+    }), { status: 200 })));
+    render(<ProofApplicationPanel authenticatedUser={authenticatedUser} project={project} onClose={vi.fn()} />);
+
+    expect(await screen.findByText('Application accepted')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent(/owner accepted/i);
+    expect(screen.getByRole('status')).toHaveTextContent(/messaging are not available/i);
     expect(screen.queryByLabelText(/short note/i)).not.toBeInTheDocument();
   });
 

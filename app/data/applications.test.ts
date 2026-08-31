@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   ApplicationAPIError,
+  decideApplication,
   listSubmittedApplications,
   loadOwnApplication,
   saveApplicationDraft,
@@ -61,6 +62,7 @@ describe('application API client', () => {
       ...application,
       status: 'submitted',
       submittedAt: '2026-08-31T08:00:00Z',
+      decidedAt: null,
       applicant: {
         displayName: 'Asha Rao', primaryRole: 'Software developer', skills: ['Go', 'React'],
         githubUrl: 'https://github.com/asha', portfolioUrl: null,
@@ -75,6 +77,18 @@ describe('application API client', () => {
     expect(fetcher).toHaveBeenCalledWith(
       'http://localhost:8080/v1/openings/opening%2Fid/applications',
       expect.objectContaining({ credentials: 'include' }),
+    );
+  });
+
+  it('sends an explicit owner decision for one submitted application', async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      data: { ...application, status: 'accepted', decidedAt: '2026-08-31T09:00:00Z' },
+    }), { status: 200 }));
+    vi.stubGlobal('fetch', fetcher);
+    await expect(decideApplication(application.openingId, application.id, 'accepted')).resolves.toMatchObject({ status: 'accepted' });
+    expect(fetcher).toHaveBeenCalledWith(
+      `http://localhost:8080/v1/openings/${application.openingId}/applications/${application.id}/decision`,
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ decision: 'accepted' }) }),
     );
   });
 

@@ -21,11 +21,35 @@ func TestApplicationRoutesRequireAuthentication(t *testing.T) {
 		{http.MethodPut, "/v1/openings/opening-id/application"},
 		{http.MethodPost, "/v1/openings/opening-id/application/submit"},
 		{http.MethodGet, "/v1/openings/opening-id/applications"},
+		{http.MethodPost, "/v1/openings/opening-id/applications/application-id/decision"},
 	} {
 		response := httptest.NewRecorder()
 		api.ServeHTTP(response, httptest.NewRequest(target.method, target.path, bytes.NewBufferString("{}")))
 		if response.Code != http.StatusUnauthorized {
 			t.Fatalf("%s %s = %d", target.method, target.path, response.Code)
+		}
+	}
+}
+
+func TestOpeningOwnerDecidesSubmittedApplication(t *testing.T) {
+	calls := &applicationManagerCalls{}
+	manager := fakeApplicationManager{calls: calls, result: applications.Application{ID: "application-id", Status: "accepted"}}
+	api := applicationTestAPI(manager, fakeAuthenticator{user: auth.User{ID: 22}})
+	response := httptest.NewRecorder()
+	api.ServeHTTP(response, authenticatedApplicationRequest(
+		http.MethodPost, "/v1/openings/opening-id/applications/application-id/decision", bytes.NewBufferString(`{"decision":"accepted"}`),
+	))
+	if response.Code != http.StatusOK || calls.operation != "decide" || calls.decision != "accepted" || calls.applicationID != "application-id" {
+		t.Fatalf("response = %d, calls %#v: %s", response.Code, calls, response.Body.String())
+	}
+
+	for _, body := range []string{`{"decision":"maybe"}`, `{"decision":"declined","extra":true}`, `{}`} {
+		invalid := httptest.NewRecorder()
+		api.ServeHTTP(invalid, authenticatedApplicationRequest(
+			http.MethodPost, "/v1/openings/opening-id/applications/application-id/decision", bytes.NewBufferString(body),
+		))
+		if invalid.Code != http.StatusBadRequest {
+			t.Fatalf("invalid decision %s = %d", body, invalid.Code)
 		}
 	}
 }
@@ -97,6 +121,7 @@ func TestApplicationRejectsInvalidRequestAndMapsDomainErrors(t *testing.T) {
 		{applications.ErrNotFound, http.StatusNotFound, "application_not_found"},
 		{applications.ErrUnavailable, http.StatusConflict, "application_unavailable"},
 		{applications.ErrReviewNotFound, http.StatusNotFound, "opening_not_found"},
+		{applications.ErrDecisionUnavailable, http.StatusConflict, "application_decision_unavailable"},
 	}
 	for _, test := range tests {
 		api := applicationTestAPI(fakeApplicationManager{err: test.err}, fakeAuthenticator{user: auth.User{ID: 7}})
@@ -138,10 +163,12 @@ func applicationTestAPI(manager fakeApplicationManager, authentication fakeAuthe
 }
 
 type applicationManagerCalls struct {
-	userID    int64
-	openingID string
-	operation string
-	input     applications.Input
+	userID        int64
+	openingID     string
+	operation     string
+	input         applications.Input
+	applicationID string
+	decision      string
 }
 
 type fakeApplicationManager struct {
@@ -172,9 +199,17 @@ func (fake fakeApplicationManager) Submit(_ context.Context, userID int64, openi
 	return fake.result, fake.err
 }
 
-func (fake fakeApplicationManager) ListSubmittedForOwner(_ context.Context, userID int64, openingID string) ([]applications.OwnerApplication, error) {
+func (fake fakeApplicationManager) ListForOwner(_ context.Context, userID int64, openingID string) ([]applications.OwnerApplication, error) {
 	if fake.calls != nil {
 		fake.calls.userID, fake.calls.openingID, fake.calls.operation = userID, openingID, "review"
 	}
 	return fake.reviewed, fake.err
+}
+
+func (fake fakeApplicationManager) Decide(_ context.Context, userID int64, openingID, applicationID, decision string) (applications.Application, error) {
+	if fake.calls != nil {
+		fake.calls.userID, fake.calls.openingID, fake.calls.applicationID = userID, openingID, applicationID
+		fake.calls.decision, fake.calls.operation = decision, "decide"
+	}
+	return fake.result, fake.err
 }

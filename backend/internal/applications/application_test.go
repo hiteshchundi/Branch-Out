@@ -92,15 +92,27 @@ func TestManagerGetsAndSubmitsOnlyCurrentUsersApplication(t *testing.T) {
 func TestManagerListsSubmittedApplicationsForOpeningOwner(t *testing.T) {
 	store := &fakeStore{reviewed: []OwnerApplication{{Application: Application{OpeningID: "opening-id", Status: "submitted"}}}}
 	manager := NewManager(store, fakeProfileLookup{})
-	results, err := manager.ListSubmittedForOwner(context.Background(), 11, " opening-id ")
+	results, err := manager.ListForOwner(context.Background(), 11, " opening-id ")
 	if err != nil || len(results) != 1 || results[0].Status != "submitted" {
 		t.Fatalf("ListSubmittedForOwner() = %#v, %v", results, err)
 	}
 	if store.userID != 11 || store.openingID != "opening-id" {
 		t.Fatalf("store scope = %d, %q", store.userID, store.openingID)
 	}
-	if _, err := manager.ListSubmittedForOwner(context.Background(), 11, " "); !errors.Is(err, ErrReviewNotFound) {
+	if _, err := manager.ListForOwner(context.Background(), 11, " "); !errors.Is(err, ErrReviewNotFound) {
 		t.Fatalf("blank opening error = %v", err)
+	}
+}
+
+func TestManagerDelegatesOnlySupportedOwnerDecisions(t *testing.T) {
+	store := &fakeStore{decided: Application{Status: "accepted"}}
+	manager := NewManager(store, fakeProfileLookup{})
+	result, err := manager.Decide(context.Background(), 11, " opening-id ", " application-id ", "accepted")
+	if err != nil || result.Status != "accepted" || store.userID != 11 || store.applicationID != "application-id" {
+		t.Fatalf("Decide() = %#v, %v; store %#v", result, err, store)
+	}
+	if _, err := manager.Decide(context.Background(), 11, "opening-id", "application-id", "maybe"); !errors.Is(err, ErrDecisionUnavailable) {
+		t.Fatalf("unsupported decision error = %v", err)
 	}
 }
 
@@ -117,7 +129,10 @@ type fakeStore struct {
 	record                Record
 	userID                int64
 	openingID             string
+	applicationID         string
+	decision              string
 	got, saved, submitted Application
+	decided               Application
 	reviewed              []OwnerApplication
 	err                   error
 }
@@ -137,7 +152,12 @@ func (store *fakeStore) Submit(_ context.Context, userID int64, openingID string
 	return store.submitted, store.err
 }
 
-func (store *fakeStore) ListSubmittedForOwner(_ context.Context, userID int64, openingID string) ([]OwnerApplication, error) {
+func (store *fakeStore) ListForOwner(_ context.Context, userID int64, openingID string) ([]OwnerApplication, error) {
 	store.userID, store.openingID = userID, openingID
 	return store.reviewed, store.err
+}
+
+func (store *fakeStore) Decide(_ context.Context, userID int64, openingID, applicationID, decision string) (Application, error) {
+	store.userID, store.openingID, store.applicationID, store.decision = userID, openingID, applicationID, decision
+	return store.decided, store.err
 }

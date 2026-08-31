@@ -13,7 +13,7 @@ export type ManagedApplication = {
   id: string;
   openingId: string;
   input: ApplicationInput;
-  status: 'draft' | 'submitted';
+  status: 'draft' | 'submitted' | 'accepted' | 'declined';
 };
 
 export type ApplicantProof = {
@@ -27,6 +27,7 @@ export type ApplicantProof = {
 
 export type OwnerApplication = ManagedApplication & {
   submittedAt: string;
+  decidedAt: string | null;
   applicant: ApplicantProof;
 };
 
@@ -60,7 +61,7 @@ function parseApplication(value: unknown): ManagedApplication {
   if (
     typeof application.id !== 'string'
     || typeof application.openingId !== 'string'
-    || !['draft', 'submitted'].includes(application.status as string)
+    || !['draft', 'submitted', 'accepted', 'declined'].includes(application.status as string)
     || !validInput(application.input)
   ) {
     throw new Error('The API returned an invalid application.');
@@ -78,8 +79,9 @@ function parseOwnerApplication(value: unknown): OwnerApplication {
   const raw = value as Record<string, unknown>;
   const applicant = raw.applicant as Record<string, unknown> | undefined;
   if (
-    application.status !== 'submitted'
+    application.status === 'draft'
     || typeof raw.submittedAt !== 'string'
+    || (raw.decidedAt !== null && typeof raw.decidedAt !== 'string')
     || !applicant
     || typeof applicant.displayName !== 'string'
     || typeof applicant.primaryRole !== 'string'
@@ -94,6 +96,7 @@ function parseOwnerApplication(value: unknown): OwnerApplication {
   return {
     ...application,
     submittedAt: raw.submittedAt,
+    decidedAt: raw.decidedAt as string | null,
     applicant: applicant as ApplicantProof,
   };
 }
@@ -155,4 +158,29 @@ export async function listSubmittedApplications(openingId: string, signal?: Abor
   const body = await response.json() as ApplicationEnvelope;
   if (!Array.isArray(body.data)) throw new Error('The API returned invalid owner applications.');
   return body.data.map(parseOwnerApplication);
+}
+
+export function decideApplication(
+  openingId: string,
+  applicationId: string,
+  decision: 'accepted' | 'declined',
+) {
+  return fetch(
+    `${getAPIBaseURL()}/v1/openings/${encodeURIComponent(openingId)}/applications/${encodeURIComponent(applicationId)}/decision`,
+    {
+      body: JSON.stringify({ decision }),
+      credentials: 'include',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      method: 'POST',
+    },
+  ).then(async (response) => {
+    if (!response.ok) throw await parseError(response);
+    const body = await response.json() as ApplicationEnvelope;
+    const application = parseApplication(body.data);
+    const raw = body.data as Record<string, unknown>;
+    if (application.status !== decision || typeof raw.decidedAt !== 'string') {
+      throw new Error('The API returned an invalid application decision.');
+    }
+    return { ...application, decidedAt: raw.decidedAt };
+  });
 }

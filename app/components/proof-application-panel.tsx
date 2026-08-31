@@ -8,6 +8,7 @@ import {
   saveApplicationDraft,
   submitApplication,
   type ApplicationInput,
+  type ManagedApplication,
 } from '../data/applications';
 import type { ProjectOpening } from '../data/projects';
 import { useAccessibleDialog } from './use-accessible-dialog';
@@ -89,7 +90,7 @@ export function ProofApplicationPanel({
   const [isComplete, setIsComplete] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [applicationStatus, setApplicationStatus] = useState<'draft' | 'submitted' | null>(null);
+  const [applicationStatus, setApplicationStatus] = useState<ManagedApplication['status'] | null>(null);
   const [submitConfirmed, setSubmitConfirmed] = useState(false);
   const [loadStatus, setLoadStatus] = useState<'local' | 'loading' | 'ready' | 'error'>(
     isAuthenticated ? 'loading' : 'local',
@@ -108,7 +109,7 @@ export function ProofApplicationPanel({
         if (application) {
           setDraft(application.input);
           setApplicationStatus(application.status);
-          if (application.status === 'submitted') setIsComplete(true);
+          if (application.status !== 'draft') setIsComplete(true);
         }
         setLoadStatus('ready');
       })
@@ -250,11 +251,19 @@ export function ProofApplicationPanel({
           <div className="application-complete">
             <div className="application-complete-announcement" role="status">
               <span aria-hidden="true" className="complete-mark">✓</span>
-              <span className="eyebrow">{applicationStatus === 'submitted' ? 'Application submitted' : 'Application ready'}</span>
-              <h3>{applicationStatus === 'submitted' ? 'Your application is submitted.' : 'Your proof-led draft is complete.'}</h3>
+              <span className="eyebrow">
+                {applicationStatus === 'accepted' ? 'Application accepted' : applicationStatus === 'declined' ? 'Application declined' : applicationStatus === 'submitted' ? 'Application submitted' : 'Application ready'}
+              </span>
+              <h3>
+                {applicationStatus === 'accepted' ? 'The opening owner accepted your application.' : applicationStatus === 'declined' ? 'The opening owner declined your application.' : applicationStatus === 'submitted' ? 'Your application is submitted.' : 'Your proof-led draft is complete.'}
+              </h3>
               <p>
-                {applicationStatus === 'submitted'
-                  ? 'It is stored in your Branch-Out account and can no longer be edited. The opening owner can review it privately; decisions and messaging are not available yet.'
+                {applicationStatus === 'accepted'
+                  ? 'This decision is stored in your Branch-Out account. Next-step coordination and messaging are not available yet.'
+                  : applicationStatus === 'declined'
+                    ? 'This decision is stored in your Branch-Out account. The application remains read-only and private to you and the opening owner.'
+                    : applicationStatus === 'submitted'
+                      ? 'It is stored in your Branch-Out account and can no longer be edited. The opening owner can review and decide it privately.'
                   : isAuthenticated
                     ? 'It is saved privately to your Branch-Out account and has not been submitted.'
                     : 'It is saved on this device and has not been sent.'}

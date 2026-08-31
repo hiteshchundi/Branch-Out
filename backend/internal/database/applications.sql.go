@@ -12,11 +12,66 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const decideApplicationForOwner = `-- name: DecideApplicationForOwner :one
+UPDATE applications AS application SET
+    status = $1,
+    decided_at = now(),
+    updated_at = now()
+FROM project_openings AS opening
+WHERE application.id = $2
+  AND application.opening_id = $3
+  AND application.status = 'submitted'
+  AND opening.id = application.opening_id
+  AND opening.owner_user_id = $4
+  AND $1::text IN ('accepted', 'declined')
+RETURNING
+    application.id, application.opening_id, application.applicant_user_id,
+    application.message, application.work_sample_url,
+    application.work_sample_context, application.availability,
+    application.availability_confirmed, application.proposed_contribution,
+    application.status, application.submitted_at, application.created_at,
+    application.updated_at, application.decided_at
+`
+
+type DecideApplicationForOwnerParams struct {
+	Decision      string `db:"decision" json:"decision"`
+	ApplicationID string `db:"application_id" json:"application_id"`
+	OpeningID     string `db:"opening_id" json:"opening_id"`
+	OwnerUserID   *int64 `db:"owner_user_id" json:"owner_user_id"`
+}
+
+func (q *Queries) DecideApplicationForOwner(ctx context.Context, arg DecideApplicationForOwnerParams) (Application, error) {
+	row := q.db.QueryRow(ctx, decideApplicationForOwner,
+		arg.Decision,
+		arg.ApplicationID,
+		arg.OpeningID,
+		arg.OwnerUserID,
+	)
+	var i Application
+	err := row.Scan(
+		&i.ID,
+		&i.OpeningID,
+		&i.ApplicantUserID,
+		&i.Message,
+		&i.WorkSampleUrl,
+		&i.WorkSampleContext,
+		&i.Availability,
+		&i.AvailabilityConfirmed,
+		&i.ProposedContribution,
+		&i.Status,
+		&i.SubmittedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DecidedAt,
+	)
+	return i, err
+}
+
 const getOwnApplication = `-- name: GetOwnApplication :one
 SELECT
     id, opening_id, applicant_user_id, message, work_sample_url,
     work_sample_context, availability, availability_confirmed,
-    proposed_contribution, status, submitted_at, created_at, updated_at
+    proposed_contribution, status, submitted_at, created_at, updated_at, decided_at
 FROM applications
 WHERE opening_id = $1
   AND applicant_user_id = $2
@@ -44,6 +99,7 @@ func (q *Queries) GetOwnApplication(ctx context.Context, arg GetOwnApplicationPa
 		&i.SubmittedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DecidedAt,
 	)
 	return i, err
 }
@@ -67,14 +123,14 @@ func (q *Queries) GetOwnedOpeningApplicationReviewScope(ctx context.Context, arg
 	return id, err
 }
 
-const listSubmittedApplicationsForOwner = `-- name: ListSubmittedApplicationsForOwner :many
+const listReviewableApplicationsForOwner = `-- name: ListReviewableApplicationsForOwner :many
 SELECT
     application.id, application.opening_id, application.applicant_user_id,
     application.message, application.work_sample_url,
     application.work_sample_context, application.availability,
     application.availability_confirmed, application.proposed_contribution,
     application.status, application.submitted_at, application.created_at,
-    application.updated_at,
+    application.updated_at, application.decided_at,
     profiles.display_name AS applicant_display_name,
     profiles.primary_role AS applicant_primary_role,
     profiles.skills AS applicant_skills,
@@ -87,16 +143,16 @@ JOIN profiles ON profiles.user_id = application.applicant_user_id
 JOIN users ON users.id = application.applicant_user_id
 WHERE application.opening_id = $1
   AND opening.owner_user_id = $2
-  AND application.status = 'submitted'
+  AND application.status IN ('submitted', 'accepted', 'declined')
 ORDER BY application.submitted_at ASC, application.id ASC
 `
 
-type ListSubmittedApplicationsForOwnerParams struct {
+type ListReviewableApplicationsForOwnerParams struct {
 	OpeningID   string `db:"opening_id" json:"opening_id"`
 	OwnerUserID *int64 `db:"owner_user_id" json:"owner_user_id"`
 }
 
-type ListSubmittedApplicationsForOwnerRow struct {
+type ListReviewableApplicationsForOwnerRow struct {
 	ID                       string             `db:"id" json:"id"`
 	OpeningID                string             `db:"opening_id" json:"opening_id"`
 	ApplicantUserID          int64              `db:"applicant_user_id" json:"applicant_user_id"`
@@ -110,6 +166,7 @@ type ListSubmittedApplicationsForOwnerRow struct {
 	SubmittedAt              pgtype.Timestamptz `db:"submitted_at" json:"submitted_at"`
 	CreatedAt                time.Time          `db:"created_at" json:"created_at"`
 	UpdatedAt                time.Time          `db:"updated_at" json:"updated_at"`
+	DecidedAt                pgtype.Timestamptz `db:"decided_at" json:"decided_at"`
 	ApplicantDisplayName     string             `db:"applicant_display_name" json:"applicant_display_name"`
 	ApplicantPrimaryRole     string             `db:"applicant_primary_role" json:"applicant_primary_role"`
 	ApplicantSkills          []string           `db:"applicant_skills" json:"applicant_skills"`
@@ -118,15 +175,15 @@ type ListSubmittedApplicationsForOwnerRow struct {
 	ApplicantEvidenceSummary string             `db:"applicant_evidence_summary" json:"applicant_evidence_summary"`
 }
 
-func (q *Queries) ListSubmittedApplicationsForOwner(ctx context.Context, arg ListSubmittedApplicationsForOwnerParams) ([]ListSubmittedApplicationsForOwnerRow, error) {
-	rows, err := q.db.Query(ctx, listSubmittedApplicationsForOwner, arg.OpeningID, arg.OwnerUserID)
+func (q *Queries) ListReviewableApplicationsForOwner(ctx context.Context, arg ListReviewableApplicationsForOwnerParams) ([]ListReviewableApplicationsForOwnerRow, error) {
+	rows, err := q.db.Query(ctx, listReviewableApplicationsForOwner, arg.OpeningID, arg.OwnerUserID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListSubmittedApplicationsForOwnerRow{}
+	items := []ListReviewableApplicationsForOwnerRow{}
 	for rows.Next() {
-		var i ListSubmittedApplicationsForOwnerRow
+		var i ListReviewableApplicationsForOwnerRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.OpeningID,
@@ -141,6 +198,7 @@ func (q *Queries) ListSubmittedApplicationsForOwner(ctx context.Context, arg Lis
 			&i.SubmittedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.DecidedAt,
 			&i.ApplicantDisplayName,
 			&i.ApplicantPrimaryRole,
 			&i.ApplicantSkills,
@@ -176,7 +234,7 @@ RETURNING
     application.work_sample_context, application.availability,
     application.availability_confirmed, application.proposed_contribution,
     application.status, application.submitted_at, application.created_at,
-    application.updated_at
+    application.updated_at, application.decided_at
 `
 
 type SubmitOwnApplicationParams struct {
@@ -201,6 +259,7 @@ func (q *Queries) SubmitOwnApplication(ctx context.Context, arg SubmitOwnApplica
 		&i.SubmittedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DecidedAt,
 	)
 	return i, err
 }
@@ -232,7 +291,7 @@ WHERE applications.status = 'draft'
 RETURNING
     id, opening_id, applicant_user_id, message, work_sample_url,
     work_sample_context, availability, availability_confirmed,
-    proposed_contribution, status, submitted_at, created_at, updated_at
+    proposed_contribution, status, submitted_at, created_at, updated_at, decided_at
 `
 
 type UpsertApplicationDraftParams struct {
@@ -274,6 +333,7 @@ func (q *Queries) UpsertApplicationDraft(ctx context.Context, arg UpsertApplicat
 		&i.SubmittedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DecidedAt,
 	)
 	return i, err
 }

@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useRef, useState } from 'react';
 import type { AuthenticatedUser } from '../data/auth';
 import {
   ApplicationAPIError,
+  decideApplication,
   listSubmittedApplications,
   type OwnerApplication,
 } from '../data/applications';
@@ -182,6 +183,9 @@ export function CreateOpeningPanel({
   );
   const [reviewApplications, setReviewApplications] = useState<OwnerApplication[]>([]);
   const [reviewStatus, setReviewStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [pendingDecision, setPendingDecision] = useState<{ applicationID: string; decision: 'accepted' | 'declined' } | null>(null);
+  const [decisionConfirmed, setDecisionConfirmed] = useState(false);
+  const [decidingApplicationID, setDecidingApplicationID] = useState<string | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLElement>(null);
   const stepHeadingRef = useRef<HTMLHeadingElement>(null);
@@ -370,6 +374,43 @@ export function CreateOpeningPanel({
     }
   };
 
+  const chooseDecision = (applicationID: string, decision: 'accepted' | 'declined') => {
+    setPendingDecision({ applicationID, decision });
+    setDecisionConfirmed(false);
+    setTransitionMessage('');
+  };
+
+  const confirmDecision = async () => {
+    if (!openingID || !pendingDecision || !decisionConfirmed) return;
+    setDecidingApplicationID(pendingDecision.applicationID);
+    setTransitionMessage('');
+    try {
+      const decided = await decideApplication(openingID, pendingDecision.applicationID, pendingDecision.decision);
+      setReviewApplications((current) => current.map((application) => (
+        application.id === decided.id
+          ? { ...application, status: decided.status, decidedAt: decided.decidedAt }
+          : application
+      )));
+      setTransitionMessage(
+        pendingDecision.decision === 'accepted'
+          ? 'Application accepted. The applicant can now see this decision.'
+          : 'Application declined. The applicant can now see this decision.',
+      );
+      setPendingDecision(null);
+      setDecisionConfirmed(false);
+    } catch (error) {
+      setTransitionMessage(
+        error instanceof ApplicationAPIError && error.status === 401
+          ? 'Your session expired. Log in again before deciding this application.'
+          : error instanceof ApplicationAPIError && error.code === 'application_decision_unavailable'
+            ? 'This application was already decided or is no longer available.'
+            : 'This application decision could not be saved. Please try again.',
+      );
+    } finally {
+      setDecidingApplicationID(null);
+    }
+  };
+
   const startAnotherDraft = () => {
     setDraft(emptyDraft);
     setStep(0);
@@ -466,6 +507,11 @@ export function CreateOpeningPanel({
                             Submitted {new Date(application.submittedAt).toLocaleDateString('en-GB', { dateStyle: 'medium', timeZone: 'UTC' })}
                           </time>
                         </header>
+                        {application.status !== 'submitted' && (
+                          <strong className={`owner-application-status ${application.status}`}>
+                            {application.status === 'accepted' ? 'Accepted' : 'Declined'}
+                          </strong>
+                        )}
                         <p>{application.input.message}</p>
                         <dl>
                           <div><dt>Contribution shown</dt><dd>{application.input.workSampleContext}</dd></div>
@@ -483,11 +529,33 @@ export function CreateOpeningPanel({
                             <a href={application.applicant.portfolioUrl} rel="noreferrer" target="_blank">Portfolio</a>
                           )}
                         </div>
+                        {application.status === 'submitted' && (
+                          <div className="owner-application-decision">
+                            <div>
+                              <button className="secondary-button" disabled={decidingApplicationID !== null} onClick={() => chooseDecision(application.id, 'accepted')} type="button">Accept application</button>
+                              <button className="text-button danger-button" disabled={decidingApplicationID !== null} onClick={() => chooseDecision(application.id, 'declined')} type="button">Decline application</button>
+                            </div>
+                            {pendingDecision?.applicationID === application.id && (
+                              <div className="owner-application-decision-confirmation">
+                                <label>
+                                  <input checked={decisionConfirmed} onChange={(event) => setDecisionConfirmed(event.target.checked)} type="checkbox" />
+                                  <span>I reviewed this application and understand this {pendingDecision.decision === 'accepted' ? 'acceptance' : 'decline'} cannot be reversed.</span>
+                                </label>
+                                <div>
+                                  <button className="primary-button" disabled={!decisionConfirmed || decidingApplicationID !== null} onClick={confirmDecision} type="button">
+                                    {decidingApplicationID === application.id ? 'Saving decision…' : `Confirm ${pendingDecision.decision === 'accepted' ? 'acceptance' : 'decline'}`}
+                                  </button>
+                                  <button className="text-button" disabled={decidingApplicationID !== null} onClick={() => setPendingDecision(null)} type="button">Cancel</button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </li>
                     ))}
                   </ol>
                 )}
-                <p className="owner-application-review-note">Decisions and messaging are not available yet. Reviewing an application does not notify the applicant.</p>
+                <p className="owner-application-review-note">Accept and decline decisions are irreversible. Messaging and next-step coordination are not available yet.</p>
               </section>
             )}
             {isAuthenticated && openingStatus === 'draft' && (

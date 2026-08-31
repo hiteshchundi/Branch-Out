@@ -218,8 +218,9 @@ preview. Signed-in members with a completed profile can save one private draft
 per published opening and submit it only after a separate confirmation. A
 submitted application becomes read-only. Members cannot apply to their own
 opening. Opening owners can privately review submitted applications and the
-applicant's completed-profile proof. Decisions, messaging, and withdrawal are
-not part of this milestone.
+applicant's completed-profile proof, then accept or decline after a separate
+confirmation. The decision is immutable and visible to the applicant. Messaging,
+next-step coordination, and withdrawal are not part of this milestone.
 
 ## Two-week trial agreements
 
@@ -275,8 +276,9 @@ and backend systems.
   and authenticated drafts in the member account.
 - Signed-out application previews stay in the current browser. Authenticated
   application drafts and submissions persist in the member account, and only
-  submitted applications appear in private owner review. Decisions, withdrawal,
-  and messaging are not implemented.
+  submitted or decided applications appear in private owner review. Owners can
+  make one irreversible accept/decline decision. Withdrawal, messaging, and
+  next-step coordination are not implemented.
 - Trial-agreement drafts stay in the current browser and are not sent or
   accepted by another person.
 - Outcome-review drafts and trust candidates stay local and are not confirmed or

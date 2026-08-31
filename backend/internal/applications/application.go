@@ -16,9 +16,10 @@ import (
 )
 
 var (
-	ErrNotFound       = errors.New("application not found")
-	ErrUnavailable    = errors.New("application unavailable")
-	ErrReviewNotFound = errors.New("application review opening not found")
+	ErrNotFound            = errors.New("application not found")
+	ErrUnavailable         = errors.New("application unavailable")
+	ErrReviewNotFound      = errors.New("application review opening not found")
+	ErrDecisionUnavailable = errors.New("application decision unavailable")
 )
 
 type FieldError struct {
@@ -43,6 +44,7 @@ type Application struct {
 	Input       Input      `json:"input"`
 	Status      string     `json:"status"`
 	SubmittedAt *time.Time `json:"submittedAt"`
+	DecidedAt   *time.Time `json:"decidedAt"`
 	CreatedAt   time.Time  `json:"createdAt"`
 	UpdatedAt   time.Time  `json:"updatedAt"`
 }
@@ -70,7 +72,8 @@ type Store interface {
 	GetOwn(context.Context, int64, string) (Application, error)
 	UpsertDraft(context.Context, Record) (Application, error)
 	Submit(context.Context, int64, string) (Application, error)
-	ListSubmittedForOwner(context.Context, int64, string) ([]OwnerApplication, error)
+	ListForOwner(context.Context, int64, string) ([]OwnerApplication, error)
+	Decide(context.Context, int64, string, string, string) (Application, error)
 }
 
 type ProfileLookup interface {
@@ -123,12 +126,22 @@ func (manager *Manager) Submit(ctx context.Context, userID int64, openingID stri
 	return manager.store.Submit(ctx, userID, openingID)
 }
 
-func (manager *Manager) ListSubmittedForOwner(ctx context.Context, userID int64, openingID string) ([]OwnerApplication, error) {
+func (manager *Manager) ListForOwner(ctx context.Context, userID int64, openingID string) ([]OwnerApplication, error) {
 	openingID = strings.TrimSpace(openingID)
 	if openingID == "" {
 		return nil, ErrReviewNotFound
 	}
-	return manager.store.ListSubmittedForOwner(ctx, userID, openingID)
+	return manager.store.ListForOwner(ctx, userID, openingID)
+}
+
+func (manager *Manager) Decide(ctx context.Context, userID int64, openingID, applicationID, decision string) (Application, error) {
+	openingID = strings.TrimSpace(openingID)
+	applicationID = strings.TrimSpace(applicationID)
+	decision = strings.TrimSpace(decision)
+	if openingID == "" || applicationID == "" || (decision != "accepted" && decision != "declined") {
+		return Application{}, ErrDecisionUnavailable
+	}
+	return manager.store.Decide(ctx, userID, openingID, applicationID, decision)
 }
 
 func normalizeInput(input Input) (Input, error) {

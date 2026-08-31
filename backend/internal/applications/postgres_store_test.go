@@ -86,12 +86,26 @@ func TestPostgresApplicationLifecycle(t *testing.T) {
 	if _, err := manager.Submit(ctx, applicant.ID, opening.ID); !errors.Is(err, ErrUnavailable) {
 		t.Fatalf("repeated Submit() error = %v, want ErrUnavailable", err)
 	}
-	reviewed, err := manager.ListSubmittedForOwner(ctx, owner.ID, opening.ID)
+	reviewed, err := manager.ListForOwner(ctx, owner.ID, opening.ID)
 	if err != nil || len(reviewed) != 1 || reviewed[0].ID != submitted.ID || reviewed[0].Applicant.DisplayName != "First Applicant" {
 		t.Fatalf("ListSubmittedForOwner() = %#v, %v", reviewed, err)
 	}
-	if _, err := manager.ListSubmittedForOwner(ctx, applicant.ID, opening.ID); !errors.Is(err, ErrReviewNotFound) {
+	if _, err := manager.ListForOwner(ctx, applicant.ID, opening.ID); !errors.Is(err, ErrReviewNotFound) {
 		t.Fatalf("non-owner review error = %v, want ErrReviewNotFound", err)
+	}
+	if _, err := manager.Decide(ctx, applicant.ID, opening.ID, submitted.ID, "accepted"); !errors.Is(err, ErrReviewNotFound) {
+		t.Fatalf("non-owner Decide() error = %v, want ErrReviewNotFound", err)
+	}
+	decided, err := manager.Decide(ctx, owner.ID, opening.ID, submitted.ID, "accepted")
+	if err != nil || decided.Status != "accepted" || decided.DecidedAt == nil {
+		t.Fatalf("Decide() = %#v, %v", decided, err)
+	}
+	if _, err := manager.Decide(ctx, owner.ID, opening.ID, submitted.ID, "declined"); !errors.Is(err, ErrDecisionUnavailable) {
+		t.Fatalf("repeated Decide() error = %v, want ErrDecisionUnavailable", err)
+	}
+	loaded, err = manager.GetOwn(ctx, applicant.ID, opening.ID)
+	if err != nil || loaded.Status != "accepted" || loaded.DecidedAt == nil {
+		t.Fatalf("decided GetOwn() = %#v, %v", loaded, err)
 	}
 
 	if _, err := manager.SaveDraft(ctx, secondApplicant.ID, opening.ID, validInput()); err != nil {
@@ -103,8 +117,8 @@ func TestPostgresApplicationLifecycle(t *testing.T) {
 	if _, err := manager.Submit(ctx, secondApplicant.ID, opening.ID); !errors.Is(err, ErrUnavailable) {
 		t.Fatalf("closed opening Submit() error = %v, want ErrUnavailable", err)
 	}
-	reviewed, err = manager.ListSubmittedForOwner(ctx, owner.ID, opening.ID)
-	if err != nil || len(reviewed) != 1 {
+	reviewed, err = manager.ListForOwner(ctx, owner.ID, opening.ID)
+	if err != nil || len(reviewed) != 1 || reviewed[0].Status != "accepted" {
 		t.Fatalf("closed opening review = %#v, %v", reviewed, err)
 	}
 }

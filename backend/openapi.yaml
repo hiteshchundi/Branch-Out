@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: Branch-Out API
-  version: 0.6.0
-  description: PostgreSQL-backed discovery, GitHub authentication, member profiles, owner-managed opening lifecycles, proof-led application submission, and private owner review for Branch-Out.
+  version: 0.7.0
+  description: PostgreSQL-backed discovery, GitHub authentication, member profiles, owner-managed opening lifecycles, proof-led applications, private owner review, and immutable application decisions for Branch-Out.
 servers:
   - url: http://localhost:8080
 paths:
@@ -458,7 +458,7 @@ paths:
     get:
       operationId: listSubmittedApplicationsForOwner
       summary: List submitted applications for an opening owner
-      description: Verifies ownership and returns submitted applications only. Applicant drafts are never included.
+      description: Verifies ownership and returns submitted or decided applications. Applicant drafts are never included.
       security:
         - sessionCookie: []
       parameters:
@@ -501,6 +501,72 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '500':
           description: Submitted applications could not be loaded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /v1/openings/{id}/applications/{applicationId}/decision:
+    post:
+      operationId: decideSubmittedApplication
+      summary: Accept or decline a submitted application
+      description: Requires opening ownership and a submitted application. The first accepted or declined decision is immutable.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: applicationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplicationDecisionInput'
+      responses:
+        '200':
+          description: The immutable owner decision was recorded.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Application'
+        '400':
+          description: The decision request is malformed or unsupported.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: No valid session is present.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: The opening does not exist or is not owned by the current member.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: The application is missing, not submitted, or already decided.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: The decision could not be recorded.
           content:
             application/json:
               schema:
@@ -865,9 +931,17 @@ components:
           type: string
           minLength: 20
           maxLength: 500
+    ApplicationDecisionInput:
+      type: object
+      additionalProperties: false
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [accepted, declined]
     Application:
       type: object
-      required: [id, openingId, input, status, submittedAt, createdAt, updatedAt]
+      required: [id, openingId, input, status, submittedAt, decidedAt, createdAt, updatedAt]
       properties:
         id:
           type: string
@@ -878,8 +952,13 @@ components:
           $ref: '#/components/schemas/ApplicationInput'
         status:
           type: string
-          enum: [draft, submitted]
+          enum: [draft, submitted, accepted, declined]
         submittedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        decidedAt:
           type:
             - string
             - 'null'

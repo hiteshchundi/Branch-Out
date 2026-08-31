@@ -2,7 +2,7 @@
 SELECT
     id, opening_id, applicant_user_id, message, work_sample_url,
     work_sample_context, availability, availability_confirmed,
-    proposed_contribution, status, submitted_at, created_at, updated_at
+    proposed_contribution, status, submitted_at, created_at, updated_at, decided_at
 FROM applications
 WHERE opening_id = sqlc.arg(opening_id)
   AND applicant_user_id = sqlc.arg(applicant_user_id);
@@ -34,7 +34,7 @@ WHERE applications.status = 'draft'
 RETURNING
     id, opening_id, applicant_user_id, message, work_sample_url,
     work_sample_context, availability, availability_confirmed,
-    proposed_contribution, status, submitted_at, created_at, updated_at;
+    proposed_contribution, status, submitted_at, created_at, updated_at, decided_at;
 
 -- name: SubmitOwnApplication :one
 UPDATE applications AS application SET
@@ -54,7 +54,7 @@ RETURNING
     application.work_sample_context, application.availability,
     application.availability_confirmed, application.proposed_contribution,
     application.status, application.submitted_at, application.created_at,
-    application.updated_at;
+    application.updated_at, application.decided_at;
 
 -- name: GetOwnedOpeningApplicationReviewScope :one
 SELECT id
@@ -62,14 +62,14 @@ FROM project_openings
 WHERE id = sqlc.arg(opening_id)
   AND owner_user_id = sqlc.arg(owner_user_id);
 
--- name: ListSubmittedApplicationsForOwner :many
+-- name: ListReviewableApplicationsForOwner :many
 SELECT
     application.id, application.opening_id, application.applicant_user_id,
     application.message, application.work_sample_url,
     application.work_sample_context, application.availability,
     application.availability_confirmed, application.proposed_contribution,
     application.status, application.submitted_at, application.created_at,
-    application.updated_at,
+    application.updated_at, application.decided_at,
     profiles.display_name AS applicant_display_name,
     profiles.primary_role AS applicant_primary_role,
     profiles.skills AS applicant_skills,
@@ -82,5 +82,25 @@ JOIN profiles ON profiles.user_id = application.applicant_user_id
 JOIN users ON users.id = application.applicant_user_id
 WHERE application.opening_id = sqlc.arg(opening_id)
   AND opening.owner_user_id = sqlc.arg(owner_user_id)
-  AND application.status = 'submitted'
+  AND application.status IN ('submitted', 'accepted', 'declined')
 ORDER BY application.submitted_at ASC, application.id ASC;
+
+-- name: DecideApplicationForOwner :one
+UPDATE applications AS application SET
+    status = sqlc.arg(decision),
+    decided_at = now(),
+    updated_at = now()
+FROM project_openings AS opening
+WHERE application.id = sqlc.arg(application_id)
+  AND application.opening_id = sqlc.arg(opening_id)
+  AND application.status = 'submitted'
+  AND opening.id = application.opening_id
+  AND opening.owner_user_id = sqlc.arg(owner_user_id)
+  AND sqlc.arg(decision)::text IN ('accepted', 'declined')
+RETURNING
+    application.id, application.opening_id, application.applicant_user_id,
+    application.message, application.work_sample_url,
+    application.work_sample_context, application.availability,
+    application.availability_confirmed, application.proposed_contribution,
+    application.status, application.submitted_at, application.created_at,
+    application.updated_at, application.decided_at;
