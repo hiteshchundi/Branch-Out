@@ -817,7 +817,7 @@ export function HomeExperience() {
         />
       )}
       {applicationProject && (
-        <ProofApplicationPanel project={applicationProject} onClose={closeApplication} />
+        <ProofApplicationPanel authenticatedUser={authenticatedUser} project={applicationProject} onClose={closeApplication} />
       )}
       {trialProject && (
         <TrialAgreementPanel onClose={closeTrialAgreement} project={trialProject} />

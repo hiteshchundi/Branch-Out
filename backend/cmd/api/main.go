@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/hiteshchundi/branch-out/backend/internal/applications"
 	"github.com/hiteshchundi/branch-out/backend/internal/auth"
 	"github.com/hiteshchundi/branch-out/backend/internal/config"
 	"github.com/hiteshchundi/branch-out/backend/internal/database"
@@ -46,7 +47,8 @@ func main() {
 	)
 	profiles := profile.NewService(profile.NewPostgresStore(database.New(pool)))
 	openingManager := openings.NewManager(repository, profiles)
-	api := httpapi.New(repository, openingManager, pool, authentication, profiles, httpapi.Options{
+	applicationManager := applications.NewManager(applications.NewPostgresStore(database.New(pool)), profiles)
+	api := httpapi.New(repository, openingManager, applicationManager, pool, authentication, profiles, httpapi.Options{
 		AllowedOrigin: cfg.AllowedOrigin, FrontendURL: cfg.FrontendURL, CookieSecure: cfg.CookieSecure,
 	}, logger)
 	server := &http.Server{

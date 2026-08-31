@@ -1,6 +1,6 @@
 # Branch-Out Handbook
 
-Updated: 30 August 2026
+Updated: 31 August 2026
 
 This handbook is the user guide for every feature currently available in the
 Branch-Out frontend. It is a living document and must be updated whenever a
@@ -342,21 +342,28 @@ resume-style mass applications.
 6. **Availability confirmation** — confirm that the stated time is realistic for
    the project's expected duration.
 
-### Save an application draft
+### Save an application
 
-Select **Save draft** at any time. The draft is saved only in the current browser
-and is restored when the application for that same project is reopened. Each
-project has a separate draft.
+Signed-out visitors can select **Save draft** at any time. That preview stays in
+the current browser and is restored for the same project.
 
-### Complete an application draft
+Signed-in members first complete every field, then select **Save private
+application**. A completed collaboration profile is required. Branch-Out
+validates the evidence and saves one private account draft for that published
+opening. Reopening the project restores the server-backed draft. An opening's
+owner cannot apply to their own opening.
 
-Select **Complete application draft**. Branch-Out validates every field and
-places an accessible error next to anything that needs attention.
+### Submit an application
 
-When validation succeeds, a summary confirms that the draft is ready and saved
-on the device. It also states clearly that the application has not been sent.
-Real submission will be added after account onboarding and the applications API
-exist.
+After saving a signed-in application, review its private summary, confirm that
+the evidence and availability are ready to share, and select **Submit
+application**. Submission is a separate, explicit action. The submitted
+application becomes read-only and cannot be replaced by another draft.
+
+Only applications for currently published openings can be saved or submitted.
+The API rejects closed or unavailable openings. Owner review, withdrawal, and
+applicant-owner messaging are not available yet, so the submitted view says so
+plainly.
 
 Close the application with its close button, the shaded area, or `Escape`.
 
@@ -653,11 +660,14 @@ configuration, and operating details live in `backend/README.md`.
 - Public discovery requires a running API and PostgreSQL; there is no sample-data
   fallback when they are unavailable.
 - GitHub login requires a configured OAuth app and a running API.
-- Authenticated profiles can be saved but are not yet public, searchable, or
-  attached to applications. Signed-out profile previews remain local only.
+- Authenticated profiles can be saved but are not yet public or searchable. A
+  completed profile is required for account-backed applications. Signed-out
+  profile previews remain local only.
 - Authenticated openings can be drafted, published, and closed. Reopening and
   moderation do not exist. Signed-out opening previews remain browser-local.
-- Application drafts cannot be sent or reviewed by an owner.
+- Authenticated applications can be saved and submitted, but cannot yet be
+  reviewed by an owner, withdrawn, or used for messaging. Signed-out application
+  previews remain browser-local.
 - Trial-agreement drafts cannot be sent, mutually accepted, or signed.
 - Outcome feedback and trust-signal candidates cannot be mutually confirmed,
   moderated, or published.

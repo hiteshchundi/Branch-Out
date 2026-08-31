@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: Branch-Out API
-  version: 0.4.0
-  description: PostgreSQL-backed project discovery, GitHub authentication, member profiles, and owner-managed opening lifecycles for Branch-Out.
+  version: 0.5.0
+  description: PostgreSQL-backed discovery, GitHub authentication, member profiles, owner-managed opening lifecycles, and proof-led application submission for Branch-Out.
 servers:
   - url: http://localhost:8080
 paths:
@@ -314,6 +314,142 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '500':
           description: The opening could not be closed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /v1/openings/{id}/application:
+    get:
+      operationId: getOwnApplication
+      summary: Get the authenticated member's application for an opening
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The member's private or submitted application.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Application'
+        '401':
+          description: No valid session is present.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: The member has no application for this opening.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: The application could not be loaded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    put:
+      operationId: saveOwnApplicationDraft
+      summary: Create or replace the authenticated member's private application draft
+      description: Requires a completed profile and a published opening owned by someone else. Submitted applications are immutable.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplicationInput'
+      responses:
+        '200':
+          description: The private application draft was saved.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Application'
+        '400':
+          description: The request or an application field is invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: No valid session is present.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: A profile is required, the opening is unavailable or owned by the applicant, or the application is already submitted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: The application draft could not be saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /v1/openings/{id}/application/submit:
+    post:
+      operationId: submitOwnApplication
+      summary: Submit the authenticated member's private application
+      description: Atomically changes a private draft to submitted. Submission is irreversible in this milestone.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The application was submitted and is now immutable.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Application'
+        '401':
+          description: No valid session is present.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: The application or opening is not available for submission.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: The application could not be submitted.
           content:
             application/json:
               schema:
@@ -644,6 +780,65 @@ components:
         confidentiality:
           type: string
           enum: [Public, Limited details, Confidential after agreement]
+    ApplicationInput:
+      type: object
+      additionalProperties: false
+      required:
+        - message
+        - workSampleUrl
+        - workSampleContext
+        - availability
+        - availabilityConfirmed
+        - proposedContribution
+      properties:
+        message:
+          type: string
+          minLength: 30
+          maxLength: 1000
+        workSampleUrl:
+          type: string
+          format: uri
+          maxLength: 2048
+        workSampleContext:
+          type: string
+          minLength: 20
+          maxLength: 500
+        availability:
+          type: string
+          minLength: 3
+          maxLength: 160
+        availabilityConfirmed:
+          type: boolean
+          const: true
+        proposedContribution:
+          type: string
+          minLength: 20
+          maxLength: 500
+    Application:
+      type: object
+      required: [id, openingId, input, status, submittedAt, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        openingId:
+          type: string
+        input:
+          $ref: '#/components/schemas/ApplicationInput'
+        status:
+          type: string
+          enum: [draft, submitted]
+        submittedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
     ErrorEnvelope:
       type: object
       required: [error]

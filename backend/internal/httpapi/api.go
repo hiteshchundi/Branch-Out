@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/hiteshchundi/branch-out/backend/internal/applications"
 	"github.com/hiteshchundi/branch-out/backend/internal/openings"
 	"github.com/hiteshchundi/branch-out/backend/internal/profile"
 )
@@ -16,6 +17,7 @@ import (
 type API struct {
 	repository     openings.Repository
 	openingManager OpeningManager
+	applications   ApplicationManager
 	readiness      ReadinessChecker
 	authentication Authenticator
 	profiles       ProfileManager
@@ -41,6 +43,12 @@ type OpeningManager interface {
 	CloseOpening(context.Context, int64, string) (openings.ManagedOpening, error)
 }
 
+type ApplicationManager interface {
+	GetOwn(context.Context, int64, string) (applications.Application, error)
+	SaveDraft(context.Context, int64, string, applications.Input) (applications.Application, error)
+	Submit(context.Context, int64, string) (applications.Application, error)
+}
+
 type listResponse struct {
 	Data []openings.Opening `json:"data"`
 	Meta struct {
@@ -62,8 +70,8 @@ type apiError struct {
 	Field   string `json:"field,omitempty"`
 }
 
-func New(repository openings.Repository, openingManager OpeningManager, readiness ReadinessChecker, authentication Authenticator, profiles ProfileManager, options Options, logger *slog.Logger) http.Handler {
-	api := &API{repository: repository, openingManager: openingManager, readiness: readiness, authentication: authentication, profiles: profiles, options: options, allowedOrigin: options.AllowedOrigin, logger: logger}
+func New(repository openings.Repository, openingManager OpeningManager, applicationManager ApplicationManager, readiness ReadinessChecker, authentication Authenticator, profiles ProfileManager, options Options, logger *slog.Logger) http.Handler {
+	api := &API{repository: repository, openingManager: openingManager, applications: applicationManager, readiness: readiness, authentication: authentication, profiles: profiles, options: options, allowedOrigin: options.AllowedOrigin, logger: logger}
 	routes := http.NewServeMux()
 	routes.HandleFunc("GET /healthz", api.health)
 	routes.HandleFunc("GET /readyz", api.ready)
@@ -73,6 +81,9 @@ func New(repository openings.Repository, openingManager OpeningManager, readines
 	routes.HandleFunc("PUT /v1/openings/{id}", api.updateOpeningDraft)
 	routes.HandleFunc("POST /v1/openings/{id}/publish", api.publishOpeningDraft)
 	routes.HandleFunc("POST /v1/openings/{id}/close", api.closeOpening)
+	routes.HandleFunc("GET /v1/openings/{id}/application", api.getOwnApplication)
+	routes.HandleFunc("PUT /v1/openings/{id}/application", api.saveApplicationDraft)
+	routes.HandleFunc("POST /v1/openings/{id}/application/submit", api.submitApplication)
 	routes.HandleFunc("GET /v1/auth/github/start", api.startGitHubAuth)
 	routes.HandleFunc("GET /v1/auth/github/callback", api.finishGitHubAuth)
 	routes.HandleFunc("GET /v1/session", api.currentSession)
@@ -86,6 +97,8 @@ func New(repository openings.Repository, openingManager OpeningManager, readines
 	routes.HandleFunc("OPTIONS /v1/openings/{id}", api.preflight)
 	routes.HandleFunc("OPTIONS /v1/openings/{id}/publish", api.preflight)
 	routes.HandleFunc("OPTIONS /v1/openings/{id}/close", api.preflight)
+	routes.HandleFunc("OPTIONS /v1/openings/{id}/application", api.preflight)
+	routes.HandleFunc("OPTIONS /v1/openings/{id}/application/submit", api.preflight)
 	routes.HandleFunc("/", api.notFound)
 
 	return api.recoverPanics(api.logRequests(api.cors(routes)))

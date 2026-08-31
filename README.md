@@ -211,8 +211,11 @@ draft tailored to that opening. It requires:
 - One small proposed first contribution
 
 Applications validate weak or missing evidence, reject unsupported URL schemes,
-save separately for each project on the current device, and clearly state that a
-completed frontend draft has not been sent.
+and save separately for each project. Signed-out visitors keep a device-local
+preview. Signed-in members with a completed profile can save one private draft
+per published opening and submit it only after a separate confirmation. A
+submitted application becomes read-only. Members cannot apply to their own
+opening, and owner review is not part of this milestone.
 
 ## Two-week trial agreements
 
@@ -260,14 +263,15 @@ and backend systems.
   the backend environment before sign-in is available.
 - Authenticated profile onboarding loads and saves through the member account;
   signed-out onboarding remains a device-local preview.
-- Saved account profiles are not yet public, searchable, or attached to project
-  applications.
+- Saved account profiles are not yet public or searchable. A completed profile
+  is required before an authenticated member can save an application.
 - The early-access form confirms frontend input only and does not claim to store
   an email address.
 - The project-opening creator stores signed-out previews in the current browser
   and authenticated drafts in the member account.
-- Application drafts are stored separately for each project in the current
-  browser and are not submitted to another person.
+- Signed-out application previews stay in the current browser. Authenticated
+  application drafts and submissions persist in the member account, but owner
+  review, withdrawal, and messaging are not implemented.
 - Trial-agreement drafts stay in the current browser and are not sent or
   accepted by another person.
 - Outcome-review drafts and trust candidates stay local and are not confirmed or

@@ -1,17 +1,18 @@
 'use client';
 
-import { FormEvent, useRef, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
+import type { AuthenticatedUser } from '../data/auth';
+import {
+  ApplicationAPIError,
+  loadOwnApplication,
+  saveApplicationDraft,
+  submitApplication,
+  type ApplicationInput,
+} from '../data/applications';
 import type { ProjectOpening } from '../data/projects';
 import { useAccessibleDialog } from './use-accessible-dialog';
 
-export type ApplicationDraft = {
-  message: string;
-  workSampleUrl: string;
-  workSampleContext: string;
-  availability: string;
-  availabilityConfirmed: boolean;
-  proposedContribution: string;
-};
+export type ApplicationDraft = ApplicationInput;
 
 type DraftField = keyof ApplicationDraft;
 type ApplicationErrors = Partial<Record<DraftField, string>>;
@@ -73,19 +74,58 @@ function FieldError({ field, errors }: { field: DraftField; errors: ApplicationE
 }
 
 export function ProofApplicationPanel({
+  authenticatedUser = null,
   project,
   onClose,
 }: {
+  authenticatedUser?: AuthenticatedUser | null;
   project: ProjectOpening;
   onClose: () => void;
 }) {
-  const [draft, setDraft] = useState<ApplicationDraft>(() => loadSavedDraft(project.id));
+  const isAuthenticated = authenticatedUser !== null;
+  const [draft, setDraft] = useState<ApplicationDraft>(() => isAuthenticated ? emptyDraft : loadSavedDraft(project.id));
   const [errors, setErrors] = useState<ApplicationErrors>({});
   const [saveMessage, setSaveMessage] = useState('');
   const [isComplete, setIsComplete] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [applicationStatus, setApplicationStatus] = useState<'draft' | 'submitted' | null>(null);
+  const [submitConfirmed, setSubmitConfirmed] = useState(false);
+  const [loadStatus, setLoadStatus] = useState<'local' | 'loading' | 'ready' | 'error'>(
+    isAuthenticated ? 'loading' : 'local',
+  );
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLElement>(null);
   useAccessibleDialog({ dialogRef, initialFocusRef: closeButtonRef, onClose });
+
+  useEffect(() => {
+    if (!authenticatedUser) return;
+    const controller = new AbortController();
+    let active = true;
+    loadOwnApplication(project.id, controller.signal)
+      .then((application) => {
+        if (!active) return;
+        if (application) {
+          setDraft(application.input);
+          setApplicationStatus(application.status);
+          if (application.status === 'submitted') setIsComplete(true);
+        }
+        setLoadStatus('ready');
+      })
+      .catch((error: unknown) => {
+        if (!active || (error instanceof DOMException && error.name === 'AbortError')) return;
+        setLoadStatus('error');
+        setSaveMessage(
+          error instanceof ApplicationAPIError && error.status === 401
+            ? 'Your session expired. Log in again before managing this application.'
+            : 'Your account application could not be loaded. Close and reopen this panel to retry.',
+        );
+      });
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [authenticatedUser, project.id]);
 
   const updateDraft = <Field extends DraftField>(field: Field, value: ApplicationDraft[Field]) => {
     setDraft((current) => ({ ...current, [field]: value }));
@@ -93,7 +133,7 @@ export function ProofApplicationPanel({
     setSaveMessage('');
   };
 
-  const persistDraft = () => {
+  const persistLocalDraft = () => {
     try {
       window.localStorage.setItem(applicationDraftStorageKey(project.id), JSON.stringify(draft));
       setSaveMessage('Application draft saved on this device.');
@@ -104,12 +144,76 @@ export function ProofApplicationPanel({
     }
   };
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const saveAccountDraft = async (complete: boolean) => {
+    const nextErrors = validateApplicationDraft(draft);
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) {
+      setSaveMessage('Complete every application field before saving it to your account.');
+      return false;
+    }
+    setIsSaving(true);
+    setSaveMessage('');
+    try {
+      const saved = await saveApplicationDraft(project.id, draft);
+      setDraft(saved.input);
+      setApplicationStatus(saved.status);
+      if (complete) setIsComplete(true);
+      else setSaveMessage('Private application draft saved to your account. It has not been submitted.');
+      return true;
+    } catch (error) {
+      if (error instanceof ApplicationAPIError && error.field && error.field in draft) {
+        setErrors((current) => ({ ...current, [error.field as DraftField]: 'Review this field and try again.' }));
+      }
+      setSaveMessage(
+        error instanceof ApplicationAPIError && error.status === 401
+          ? 'Your session expired. Log in again before saving this application.'
+          : error instanceof ApplicationAPIError && error.code === 'profile_required'
+            ? 'Complete your collaboration profile before saving an application.'
+            : error instanceof ApplicationAPIError && error.code === 'application_unavailable'
+              ? 'This opening is unavailable, belongs to you, or already has a submitted application.'
+              : 'Your application draft could not be saved. Review the fields and try again.',
+      );
+      return false;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const saveDraft = async () => {
+    if (isAuthenticated) await saveAccountDraft(false);
+    else persistLocalDraft();
+  };
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const nextErrors = validateApplicationDraft(draft);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
-    if (persistDraft()) setIsComplete(true);
+    if (isAuthenticated) await saveAccountDraft(true);
+    else if (persistLocalDraft()) setIsComplete(true);
+  };
+
+  const handleApplicationSubmission = async () => {
+    if (!isAuthenticated || applicationStatus !== 'draft' || !submitConfirmed) return;
+    setIsSubmitting(true);
+    setSaveMessage('');
+    try {
+      const submitted = await submitApplication(project.id);
+      setDraft(submitted.input);
+      setApplicationStatus(submitted.status);
+      setSubmitConfirmed(false);
+      setSaveMessage('Your application has been submitted and can no longer be edited.');
+    } catch (error) {
+      setSaveMessage(
+        error instanceof ApplicationAPIError && error.status === 401
+          ? 'Your session expired. Log in again before submitting this application.'
+          : error instanceof ApplicationAPIError && error.code === 'application_unavailable'
+            ? 'This application cannot be submitted. The opening may have closed or the application may already be submitted.'
+            : 'Your application could not be submitted. Please try again.',
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const describedBy = (field: DraftField) => errors[field] ? `application-${field}-error` : undefined;
@@ -140,20 +244,39 @@ export function ProofApplicationPanel({
           </dl>
         </div>
 
-        {isComplete ? (
-          <div className="application-complete" role="status">
-            <span aria-hidden="true" className="complete-mark">✓</span>
-            <span className="eyebrow">Application ready</span>
-            <h3>Your proof-led draft is complete.</h3>
-            <p>
-              It is saved on this device and has not been sent. Submission will be
-              enabled after account onboarding and the applications API are connected.
-            </p>
+        {loadStatus === 'loading' ? (
+          <div className="application-loading" role="status">Loading your application…</div>
+        ) : isComplete ? (
+          <div className="application-complete">
+            <div className="application-complete-announcement" role="status">
+              <span aria-hidden="true" className="complete-mark">✓</span>
+              <span className="eyebrow">{applicationStatus === 'submitted' ? 'Application submitted' : 'Application ready'}</span>
+              <h3>{applicationStatus === 'submitted' ? 'Your application is submitted.' : 'Your proof-led draft is complete.'}</h3>
+              <p>
+                {applicationStatus === 'submitted'
+                  ? 'It is stored in your Branch-Out account and can no longer be edited. Owner review is not yet available.'
+                  : isAuthenticated
+                    ? 'It is saved privately to your Branch-Out account and has not been submitted.'
+                    : 'It is saved on this device and has not been sent.'}
+              </p>
+            </div>
             <div className="application-summary">
               <span>Relevant sample</span><strong>{draft.workSampleUrl}</strong>
               <span>Confirmed availability</span><strong>{draft.availability}</strong>
               <span>Proposed contribution</span><strong>{draft.proposedContribution}</strong>
             </div>
+            {isAuthenticated && applicationStatus === 'draft' && (
+              <div className="application-submit-confirmation">
+                <label>
+                  <input checked={submitConfirmed} onChange={(event) => setSubmitConfirmed(event.target.checked)} type="checkbox" />
+                  <span>I reviewed this application and understand it cannot be edited after submission.</span>
+                </label>
+                <button className="primary-button" disabled={!submitConfirmed || isSubmitting} onClick={handleApplicationSubmission} type="button">
+                  {isSubmitting ? 'Submitting…' : 'Submit application'}
+                </button>
+              </div>
+            )}
+            {saveMessage && <p aria-live="polite" className="save-message">{saveMessage}</p>}
             <button className="primary-button" onClick={onClose} type="button">Return to opening</button>
           </div>
         ) : (
@@ -200,15 +323,19 @@ export function ProofApplicationPanel({
                 <li><span>02</span><div><strong>Show your part</strong><p>Link one sample and explain what you delivered.</p></div></li>
                 <li><span>03</span><div><strong>Start small</strong><p>Suggest a contribution that reduces risk for both people.</p></div></li>
               </ol>
-              <p className="application-privacy-note">Your draft stays in this browser. Branch-Out does not send it anywhere yet.</p>
+              <p className="application-privacy-note">
+                {isAuthenticated
+                  ? 'Saving keeps this draft private. Submission is a separate, explicit step.'
+                  : 'Your draft stays in this browser. Branch-Out does not send it anywhere.'}
+              </p>
             </aside>
 
             <footer className="application-actions">
               <div>
-                <button className="secondary-button" onClick={persistDraft} type="button">Save draft</button>
+                <button className="secondary-button" disabled={isSaving || loadStatus === 'error'} onClick={saveDraft} type="button">{isSaving ? 'Saving draft…' : 'Save draft'}</button>
                 {saveMessage && <span aria-live="polite" className="save-message">{saveMessage}</span>}
               </div>
-              <button className="primary-button" type="submit">Complete application draft</button>
+              <button className="primary-button" disabled={isSaving || loadStatus === 'error'} type="submit">{isSaving ? 'Saving draft…' : isAuthenticated ? 'Save private application' : 'Complete application draft'}</button>
             </footer>
           </form>
         )}

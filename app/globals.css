@@ -2075,9 +2075,45 @@ main:focus {
   margin-bottom: 12px;
 }
 
-.application-complete > p {
+.application-complete-announcement > p {
   color: var(--muted);
   line-height: 1.65;
+}
+
+.application-loading {
+  color: var(--muted);
+  margin: 54px auto 10px;
+  min-height: 220px;
+  text-align: center;
+}
+
+.application-submit-confirmation {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: grid;
+  gap: 16px;
+  margin-bottom: 22px;
+  padding: 18px;
+  text-align: left;
+}
+
+.application-submit-confirmation label {
+  align-items: flex-start;
+  color: var(--muted);
+  display: flex;
+  font-size: 0.82rem;
+  gap: 10px;
+  line-height: 1.55;
+}
+
+.application-submit-confirmation input {
+  flex: 0 0 auto;
+  margin-top: 3px;
+}
+
+.application-submit-confirmation button {
+  justify-self: start;
 }
 
 .application-summary {

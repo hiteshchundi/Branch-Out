@@ -65,6 +65,9 @@ checks PostgreSQL on every request and returns HTTP 503 with
 - `PUT /v1/openings/{id}` — replace a private draft owned by that member
 - `POST /v1/openings/{id}/publish` — publish an owned draft
 - `POST /v1/openings/{id}/close` — close an owned published opening
+- `GET /v1/openings/{id}/application` — return the member's private application
+- `PUT /v1/openings/{id}/application` — save the member's private draft
+- `POST /v1/openings/{id}/application/submit` — submit that application
 
 Discovery accepts optional filters. Structured values use the labels already
 shown by the frontend.
@@ -98,6 +101,14 @@ Both transitions record lifecycle timestamps and use the same HTTP 404 response
 for a missing opening, another member's opening, or an invalid current state.
 Closed openings leave discovery immediately. Reopening and moderation are
 intentionally outside this milestone.
+
+Application routes require an authenticated session and completed collaboration
+profile. A member can keep one private application per published opening and
+cannot apply to an opening they own. Saving uses one statement to verify the
+opening is published, reject the owner, and create or replace only a `draft`
+application. Submission atomically moves that draft to `submitted` and records
+its submission time. Submitted applications are immutable. Owner review,
+withdrawal, and messaging are intentionally outside this milestone.
 
 The complete contract is in [`openapi.yaml`](openapi.yaml).
 
@@ -162,11 +173,14 @@ generate and migrate with the same tool versions. Generated files under
 The tests cover liveness, readiness, credentialed CORS behavior, the OAuth and
 session lifecycle, PKCE exchange behavior, response shape, combined discovery
 filtering, opening-draft validation and authorization, invalid filters,
-unsupported methods, and unknown routes. PostgreSQL integration tests cover
+application validation and lifecycle authorization, unsupported methods, and
+unknown routes. PostgreSQL integration tests cover
 single-use OAuth attempts, user upserts, session revocation, profile creation
 and replacement, authoritative GitHub identity, owner-only draft updates, draft
 isolation from discovery, full-catalogue retrieval, text search, combined
 structured filters, conflicting filters, ordering, and cancellation.
+Application integration coverage includes private draft replacement, self-apply
+rejection, published-opening enforcement, submission, and immutability.
 
 ## Package boundaries
 
@@ -174,6 +188,8 @@ structured filters, conflicting filters, ordering, and cancellation.
 - `internal/config` owns environment parsing and safe defaults.
 - `internal/database` contains SQLC-generated pgx query code.
 - `internal/auth` owns GitHub OAuth, users, and durable sessions.
+- `internal/applications` owns proof-led application validation, persistence,
+  and the draft-to-submitted lifecycle.
 - `internal/openings` owns project-opening types, validation, ownership,
   filtering, and the repository contract, including memory and PostgreSQL
   implementations.
@@ -189,3 +205,6 @@ opening while retaining a device-local preview for signed-out visitors. It
 exposes publishing and closing behind separate, explicit confirmations. Public
 discovery also reads this API directly, including text and structured filters,
 and never substitutes frontend sample data when the API is unavailable.
+Authenticated members with completed profiles can also save one private
+application per published opening and submit it through a separate confirmation;
+signed-out application previews remain device-local.

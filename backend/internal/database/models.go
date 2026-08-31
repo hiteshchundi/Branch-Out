@@ -10,6 +10,22 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type Application struct {
+	ID                    string             `db:"id" json:"id"`
+	OpeningID             string             `db:"opening_id" json:"opening_id"`
+	ApplicantUserID       int64              `db:"applicant_user_id" json:"applicant_user_id"`
+	Message               string             `db:"message" json:"message"`
+	WorkSampleUrl         string             `db:"work_sample_url" json:"work_sample_url"`
+	WorkSampleContext     string             `db:"work_sample_context" json:"work_sample_context"`
+	Availability          string             `db:"availability" json:"availability"`
+	AvailabilityConfirmed bool               `db:"availability_confirmed" json:"availability_confirmed"`
+	ProposedContribution  string             `db:"proposed_contribution" json:"proposed_contribution"`
+	Status                string             `db:"status" json:"status"`
+	SubmittedAt           pgtype.Timestamptz `db:"submitted_at" json:"submitted_at"`
+	CreatedAt             time.Time          `db:"created_at" json:"created_at"`
+	UpdatedAt             time.Time          `db:"updated_at" json:"updated_at"`
+}
+
 type OauthAttempt struct {
 	StateHash    []byte    `db:"state_hash" json:"state_hash"`
 	CodeVerifier string    `db:"code_verifier" json:"code_verifier"`
