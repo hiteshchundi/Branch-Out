@@ -186,4 +186,6 @@ sessions. Authenticated members can persist a collaboration profile, and the
 frontend uses authentication, profile, and owner-opening routes. The
 project-opening creator manages the authenticated member's most recently updated
 opening while retaining a device-local preview for signed-out visitors. It
-exposes publishing and closing behind separate, explicit confirmations.
+exposes publishing and closing behind separate, explicit confirmations. Public
+discovery also reads this API directly, including text and structured filters,
+and never substitutes frontend sample data when the API is unavailable.

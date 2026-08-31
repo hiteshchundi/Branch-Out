@@ -864,6 +864,51 @@ main:focus {
   font-weight: 800;
 }
 
+.discovery-state {
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: 16px;
+  padding: 70px 24px;
+  text-align: center;
+}
+
+.discovery-state strong {
+  display: block;
+  font-size: 1.1rem;
+  margin-bottom: 8px;
+}
+
+.discovery-state p,
+.discovery-notice {
+  color: var(--muted);
+}
+
+.discovery-state button,
+.discovery-notice button {
+  background: transparent;
+  border: 0;
+  color: var(--accent);
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.discovery-error {
+  border-color: color-mix(in srgb, #b43b3b 55%, var(--border));
+}
+
+.discovery-notice {
+  align-items: center;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  display: flex;
+  font-size: 0.8rem;
+  gap: 16px;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  padding: 12px 14px;
+}
+
 /* Early access and footer */
 .early-access {
   align-items: center;

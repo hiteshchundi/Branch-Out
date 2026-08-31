@@ -177,3 +177,120 @@ export function filterProjects(openings: ProjectOpening[], filters: ProjectFilte
     return matchesText && matchesRole && matchesCompensation && matchesCommitment;
   });
 }
+
+type ProjectListEnvelope = {
+  data?: unknown;
+  meta?: { count?: unknown };
+};
+
+type ProjectErrorEnvelope = {
+  error?: { code?: unknown; message?: unknown; field?: unknown };
+};
+
+export class ProjectDiscoveryAPIError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly code: string,
+    public readonly field?: keyof ProjectFilters,
+  ) {
+    super(code);
+  }
+}
+
+function isBoundedString(value: unknown, maximum = 500): value is string {
+  return typeof value === 'string' && value.trim().length > 0 && value.length <= maximum;
+}
+
+function parseProjectOpening(value: unknown): ProjectOpening {
+  if (!value || typeof value !== 'object') throw new Error('The API returned an invalid project opening.');
+  const opening = value as Record<string, unknown>;
+  const requiredStrings = [
+    'id',
+    'title',
+    'summary',
+    'commitment',
+    'duration',
+    'timezone',
+    'freshness',
+    'stage',
+    'desiredOutcome',
+    'firstMilestone',
+    'ownerContribution',
+    'ownerName',
+    'ownerSignal',
+    'confidentiality',
+  ];
+  const skills = opening.skills;
+  if (
+    requiredStrings.some((field) => !isBoundedString(opening[field]))
+    || !projectRoles.includes(opening.role as ProjectRole)
+    || !compensationTypes.includes(opening.compensation as CompensationType)
+    || !commitmentBands.includes(opening.commitmentBand as CommitmentBand)
+    || !Array.isArray(skills)
+    || skills.length < 1
+    || skills.length > 12
+    || skills.some((skill) => !isBoundedString(skill, 40))
+    || new Set(skills.map((skill) => (skill as string).trim().toLocaleLowerCase())).size !== skills.length
+  ) {
+    throw new Error('The API returned an invalid project opening.');
+  }
+
+  return {
+    id: (opening.id as string).trim(),
+    title: (opening.title as string).trim(),
+    summary: (opening.summary as string).trim(),
+    skills: skills.map((skill) => (skill as string).trim()),
+    role: opening.role as ProjectRole,
+    compensation: opening.compensation as CompensationType,
+    commitment: (opening.commitment as string).trim(),
+    commitmentBand: opening.commitmentBand as CommitmentBand,
+    duration: (opening.duration as string).trim(),
+    timezone: (opening.timezone as string).trim(),
+    freshness: (opening.freshness as string).trim(),
+    stage: (opening.stage as string).trim(),
+    desiredOutcome: (opening.desiredOutcome as string).trim(),
+    firstMilestone: (opening.firstMilestone as string).trim(),
+    ownerContribution: (opening.ownerContribution as string).trim(),
+    ownerName: (opening.ownerName as string).trim(),
+    ownerSignal: (opening.ownerSignal as string).trim(),
+    confidentiality: (opening.confidentiality as string).trim(),
+  };
+}
+
+async function parseProjectError(response: Response) {
+  let body: ProjectErrorEnvelope = {};
+  try {
+    body = await response.json() as ProjectErrorEnvelope;
+  } catch {
+    // Preserve the HTTP status when a proxy returns an unstructured error.
+  }
+  return new ProjectDiscoveryAPIError(
+    response.status,
+    typeof body.error?.code === 'string' ? body.error.code : 'project_discovery_failed',
+    typeof body.error?.field === 'string' ? body.error.field as keyof ProjectFilters : undefined,
+  );
+}
+
+/** Loads the published catalogue using the same filters shown by discovery. */
+export async function listProjectOpenings(filters: ProjectFilters, signal?: AbortSignal) {
+  const parameters = new URLSearchParams();
+  const query = filters.query.trim();
+  if (query) parameters.set('query', query);
+  if (filters.role !== 'All roles') parameters.set('role', filters.role);
+  if (filters.compensation !== 'All compensation') parameters.set('compensation', filters.compensation);
+  if (filters.commitment !== 'Any commitment') parameters.set('commitment', filters.commitment);
+  const queryString = parameters.toString();
+  const response = await fetch(`${getAPIBaseURL()}/v1/openings${queryString ? `?${queryString}` : ''}`, {
+    credentials: 'include',
+    headers: { Accept: 'application/json' },
+    signal,
+  });
+  if (!response.ok) throw await parseProjectError(response);
+
+  const body = await response.json() as ProjectListEnvelope;
+  if (!Array.isArray(body.data) || typeof body.meta?.count !== 'number' || body.meta.count !== body.data.length) {
+    throw new Error('The API returned invalid project openings.');
+  }
+  return body.data.map(parseProjectOpening);
+}
+import { getAPIBaseURL } from './auth';

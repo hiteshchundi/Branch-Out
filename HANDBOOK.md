@@ -16,9 +16,9 @@ claims with three understandable trust signals:
 2. **Work Demonstrated** — previous work and the person's contribution are clear.
 3. **Collaboration Proven** — a teammate confirmed behavior observed in shared work.
 
-The current frontend is a local product preview. It uses representative project
-data and device-local drafts while its existing backend services are connected
-to the interface one feature at a time.
+The current frontend is a local product preview. Published discovery data comes
+from the Branch-Out API and PostgreSQL; unfinished signed-out workflows remain
+device-local drafts while backend services are connected one feature at a time.
 
 ## Quick start
 
@@ -210,6 +210,12 @@ badge is presented as absolute proof of expertise.
 
 **How to use it:** Watch the count update as search text or filters change. It is
 also announced to assistive technologies.
+
+The catalogue initially announces that published openings are loading. Search
+text and structured filters are sent to the API, with a short delay while typing
+to avoid unnecessary requests. If the first request fails, Branch-Out shows a
+clear retry action and does not substitute sample cards. If a later refresh
+fails, the last successful results remain visible and are labelled as such.
 
 ### Role filter
 
@@ -613,6 +619,11 @@ development data. The API verifies PostgreSQL during startup; its readiness rout
 returns HTTP 503 when the database cannot be reached. The in-memory repository
 remains only as a fast test double.
 
+The frontend calls this public discovery route directly. Header search and the
+three structured filters become API query parameters, responses are validated
+before rendering, and publishing or closing an owned opening triggers a catalogue
+refresh.
+
 The API also supports GitHub OAuth and durable, revocable application sessions,
 and the frontend login panel now uses those routes.
 It stores users, one-time OAuth attempts, and hashed session tokens in
@@ -638,8 +649,9 @@ configuration, and operating details live in `backend/README.md`.
 
 ## Current limitations
 
-- Project and owner information is representative data duplicated in the
-  frontend and PostgreSQL until frontend integration lands.
+- The development database begins with representative project and owner data.
+- Public discovery requires a running API and PostgreSQL; there is no sample-data
+  fallback when they are unavailable.
 - GitHub login requires a configured OAuth app and a running API.
 - Authenticated profiles can be saved but are not yet public, searchable, or
   attached to applications. Signed-out profile previews remain local only.
@@ -651,8 +663,7 @@ configuration, and operating details live in `backend/README.md`.
   moderated, or published.
 - Saved openings do not synchronize between browsers or devices.
 - Early-access email addresses are not transmitted or stored.
-- PostgreSQL-backed discovery exists, but the frontend discovery catalogue is
-  still local and notification and moderation flows do not exist yet.
+- Notification and moderation flows do not exist yet.
 
 ## Handbook maintenance rule
 

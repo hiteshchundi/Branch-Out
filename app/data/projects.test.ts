@@ -1,5 +1,13 @@
-import { describe, expect, it } from 'vitest';
-import { defaultProjectFilters, filterProjects, projects } from './projects';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  defaultProjectFilters,
+  filterProjects,
+  listProjectOpenings,
+  ProjectDiscoveryAPIError,
+  projects,
+} from './projects';
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe('filterProjects', () => {
   it('returns every opening when all filters are at their defaults', () => {
@@ -38,5 +46,63 @@ describe('filterProjects', () => {
         role: 'Design',
       }),
     ).toEqual([]);
+  });
+});
+
+describe('project discovery API client', () => {
+  it('loads and validates the published catalogue', async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      data: projects.slice(0, 2),
+      meta: { count: 2 },
+    }), { status: 200 }));
+    vi.stubGlobal('fetch', fetcher);
+
+    await expect(listProjectOpenings(defaultProjectFilters)).resolves.toEqual(projects.slice(0, 2));
+    expect(fetcher).toHaveBeenCalledWith(
+      'http://localhost:8080/v1/openings',
+      expect.objectContaining({ credentials: 'include', headers: { Accept: 'application/json' } }),
+    );
+  });
+
+  it('sends only active filters to the backend', async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      data: [projects[0]],
+      meta: { count: 1 },
+    }), { status: 200 }));
+    vi.stubGlobal('fetch', fetcher);
+
+    await listProjectOpenings({
+      query: ' React climate ',
+      role: 'Engineering',
+      compensation: 'Fixed bounty',
+      commitment: '6–8 hrs/week',
+    });
+    expect(fetcher.mock.calls[0]?.[0]).toBe(
+      'http://localhost:8080/v1/openings?query=React+climate&role=Engineering&compensation=Fixed+bounty&commitment=6%E2%80%938+hrs%2Fweek',
+    );
+  });
+
+  it('preserves structured discovery errors', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      error: { code: 'invalid_filter', message: 'invalid', field: 'role' },
+    }), { status: 400 })));
+
+    await expect(listProjectOpenings(defaultProjectFilters)).rejects.toEqual(
+      new ProjectDiscoveryAPIError(400, 'invalid_filter', 'role'),
+    );
+  });
+
+  it('rejects malformed catalogues and inconsistent counts', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      data: [{ ...projects[0], role: 'Unknown' }],
+      meta: { count: 1 },
+    }), { status: 200 })));
+    await expect(listProjectOpenings(defaultProjectFilters)).rejects.toThrow(/invalid project opening/i);
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      data: projects.slice(0, 1),
+      meta: { count: 2 },
+    }), { status: 200 })));
+    await expect(listProjectOpenings(defaultProjectFilters)).rejects.toThrow(/invalid project openings/i);
   });
 });

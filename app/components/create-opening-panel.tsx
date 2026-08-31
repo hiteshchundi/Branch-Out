@@ -153,9 +153,11 @@ function FieldError({ field, errors }: { field: DraftField; errors: ValidationEr
 export function CreateOpeningPanel({
   authenticatedUser = null,
   onClose,
+  onOpeningChanged,
 }: {
   authenticatedUser?: AuthenticatedUser | null;
   onClose: () => void;
+  onOpeningChanged?: () => void;
 }) {
   const isAuthenticated = authenticatedUser !== null;
   const [draft, setDraft] = useState<OpeningDraft>(() => isAuthenticated ? emptyDraft : loadSavedDraft());
@@ -307,6 +309,7 @@ export function CreateOpeningPanel({
       setDraft(fromAPIInput(published.input));
       setPublishConfirmed(false);
       setTransitionMessage('Your opening is now visible in public discovery.');
+      onOpeningChanged?.();
     } catch (error) {
       setTransitionMessage(transitionErrorMessage(error, 'published'));
     } finally {
@@ -324,6 +327,7 @@ export function CreateOpeningPanel({
       setDraft(fromAPIInput(closed.input));
       setCloseConfirmed(false);
       setTransitionMessage('The opening has been removed from public discovery.');
+      onOpeningChanged?.();
     } catch (error) {
       setTransitionMessage(transitionErrorMessage(error, 'closed'));
     } finally {

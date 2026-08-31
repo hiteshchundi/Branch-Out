@@ -12,11 +12,10 @@ import {
   commitmentBands,
   compensationTypes,
   defaultProjectFilters,
-  filterProjects,
+  listProjectOpenings,
   type ProjectFilters,
   type ProjectOpening,
   projectRoles,
-  projects,
 } from '../data/projects';
 import {
   parseSavedProjectIds,
@@ -238,6 +237,10 @@ export function HomeExperience() {
   const [isSavedComparisonOpen, setIsSavedComparisonOpen] = useState(false);
   const [showSavedOnly, setShowSavedOnly] = useState(false);
   const [savedProjectsMessage, setSavedProjectsMessage] = useState('');
+  const [catalogue, setCatalogue] = useState<ProjectOpening[]>([]);
+  const [discoveryStatus, setDiscoveryStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [hasLoadedDiscovery, setHasLoadedDiscovery] = useState(false);
+  const [discoveryRetry, setDiscoveryRetry] = useState(0);
   const [email, setEmail] = useState('');
   const [signupMessage, setSignupMessage] = useState('');
   const [sessionStatus, setSessionStatus] = useState<'loading' | 'anonymous' | 'authenticated' | 'unavailable'>('loading');
@@ -254,19 +257,19 @@ export function HomeExperience() {
     () => '',
   );
   const savedProjectIds = useMemo(
-    () => parseSavedProjectIds(savedProjectsSnapshot, projects),
-    [savedProjectsSnapshot],
+    () => parseSavedProjectIds(savedProjectsSnapshot, catalogue),
+    [catalogue, savedProjectsSnapshot],
   );
   const savedProjects = useMemo(
-    () => projects.filter((project) => savedProjectIds.includes(project.id)),
-    [savedProjectIds],
+    () => catalogue.filter((project) => savedProjectIds.includes(project.id)),
+    [catalogue, savedProjectIds],
   );
-  const visibleProjects = useMemo(() => {
-    const filteredProjects = filterProjects(projects, filters);
-    return showSavedOnly
-      ? filteredProjects.filter((project) => savedProjectIds.includes(project.id))
-      : filteredProjects;
-  }, [filters, savedProjectIds, showSavedOnly]);
+  const visibleProjects = useMemo(
+    () => showSavedOnly
+      ? catalogue.filter((project) => savedProjectIds.includes(project.id))
+      : catalogue,
+    [catalogue, savedProjectIds, showSavedOnly],
+  );
   const activeFilterCount = Number(filters.role !== 'All roles')
     + Number(filters.compensation !== 'All compensation')
     + Number(filters.commitment !== 'Any commitment');
@@ -306,8 +309,38 @@ export function HomeExperience() {
     };
   }, []);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
+    const timer = window.setTimeout(() => {
+      listProjectOpenings(filters, controller.signal)
+        .then((openings) => {
+          if (!active) return;
+          setCatalogue(openings);
+          setHasLoadedDiscovery(true);
+          setDiscoveryStatus('ready');
+        })
+        .catch((error: unknown) => {
+          if (!active || (error instanceof DOMException && error.name === 'AbortError')) return;
+          setDiscoveryStatus('error');
+        });
+    }, filters.query.trim() ? 250 : 0);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [discoveryRetry, filters]);
+
   const updateFilter = <Key extends keyof ProjectFilters>(key: Key, value: ProjectFilters[Key]) => {
+    setDiscoveryStatus('loading');
     setFilters((current) => ({ ...current, [key]: value }));
+  };
+
+  const retryDiscovery = () => {
+    setDiscoveryStatus('loading');
+    setDiscoveryRetry((current) => current + 1);
   };
 
   const toggleSavedProject = (project: ProjectOpening) => {
@@ -330,6 +363,7 @@ export function HomeExperience() {
   };
 
   const resetDiscovery = () => {
+    setDiscoveryStatus('loading');
     setFilters(defaultProjectFilters);
     setShowSavedOnly(false);
   };
@@ -544,7 +578,13 @@ export function HomeExperience() {
               <h2 id="openings-title">Openings worth a closer look</h2>
             </div>
             <span className="result-count" aria-live="polite">
-              {visibleProjects.length} {visibleProjects.length === 1 ? 'opening' : 'openings'}
+              {discoveryStatus === 'loading' && !hasLoadedDiscovery
+                ? 'Loading openings…'
+                : discoveryStatus === 'error' && !hasLoadedDiscovery
+                  ? 'Openings unavailable'
+                : discoveryStatus === 'loading'
+                  ? 'Refreshing openings…'
+                  : `${visibleProjects.length} ${visibleProjects.length === 1 ? 'opening' : 'openings'}`}
             </span>
           </div>
 
@@ -623,7 +663,25 @@ export function HomeExperience() {
             </small>
           </div>
 
-          {visibleProjects.length > 0 ? (
+          {discoveryStatus === 'error' && hasLoadedDiscovery && (
+            <div className="discovery-notice" role="status">
+              <span>Live openings could not be refreshed. Showing the last successful results.</span>
+              <button onClick={retryDiscovery} type="button">Retry</button>
+            </div>
+          )}
+
+          {discoveryStatus === 'loading' && !hasLoadedDiscovery ? (
+            <div className="discovery-state" role="status">
+              <strong>Loading published openings…</strong>
+              <p>Branch-Out is retrieving the latest opportunities.</p>
+            </div>
+          ) : discoveryStatus === 'error' && !hasLoadedDiscovery ? (
+            <div className="discovery-state discovery-error" role="alert">
+              <strong>Published openings could not be loaded</strong>
+              <p>Check that the Branch-Out API is running, then try again.</p>
+              <button onClick={retryDiscovery} type="button">Retry loading openings</button>
+            </div>
+          ) : visibleProjects.length > 0 ? (
             <div className="project-grid">
               {visibleProjects.map((project) => (
                 <article className="project-card" key={project.id}>
@@ -669,11 +727,23 @@ export function HomeExperience() {
             </div>
           ) : (
             <div className="empty-state" role="status">
-              <strong>No openings match the current filters</strong>
-              <p>Try a broader skill, role, compensation type, or weekly commitment.</p>
-              <button onClick={resetDiscovery} type="button">
-                {showSavedOnly && savedProjectIds.length === 0 ? 'Browse all openings' : 'Reset all filters'}
-              </button>
+              <strong>
+                {showSavedOnly
+                  ? 'No saved openings match the current filters'
+                  : activeFilterCount > 0 || filters.query
+                    ? 'No openings match the current filters'
+                    : 'No published openings yet'}
+              </strong>
+              <p>
+                {showSavedOnly || activeFilterCount > 0 || filters.query
+                  ? 'Try a broader skill, role, compensation type, or weekly commitment.'
+                  : 'New opportunities will appear here after an owner publishes them.'}
+              </p>
+              {(showSavedOnly || activeFilterCount > 0 || filters.query) && (
+                <button onClick={resetDiscovery} type="button">
+                  {showSavedOnly && savedProjectIds.length === 0 ? 'Browse all openings' : 'Reset all filters'}
+                </button>
+              )}
             </div>
           )}
         </section>
@@ -732,6 +802,7 @@ export function HomeExperience() {
           authenticatedUser={authenticatedUser}
           key={authenticatedUser?.id ?? 'anonymous'}
           onClose={closeCreateOpening}
+          onOpeningChanged={retryDiscovery}
         />
       )}
       {selectedProject && (

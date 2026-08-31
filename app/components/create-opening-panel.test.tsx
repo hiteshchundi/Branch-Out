@@ -134,12 +134,13 @@ describe('CreateOpeningPanel', () => {
   });
 
   it('requires explicit confirmation before publishing a private draft', async () => {
+    const onOpeningChanged = vi.fn();
     const fetcher = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [managedDraft()] }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: managedDraft() }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: managedDraft(completeDraft.projectName, 'published') }), { status: 200 }));
     vi.stubGlobal('fetch', fetcher);
-    render(<CreateOpeningPanel authenticatedUser={authenticatedUser} onClose={vi.fn()} />);
+    render(<CreateOpeningPanel authenticatedUser={authenticatedUser} onClose={vi.fn()} onOpeningChanged={onOpeningChanged} />);
     await screen.findByLabelText(/project name/i);
 
     fireEvent.click(screen.getByRole('button', { name: /continue/i }));
@@ -157,15 +158,17 @@ describe('CreateOpeningPanel', () => {
       `http://localhost:8080/v1/openings/${managedDraft().id}/publish`,
       expect.objectContaining({ method: 'POST', credentials: 'include' }),
     );
+    expect(onOpeningChanged).toHaveBeenCalledOnce();
   });
 
   it('loads a published opening and requires separate confirmation to close it', async () => {
+    const onOpeningChanged = vi.fn();
     const published = managedDraft(completeDraft.projectName, 'published');
     const fetcher = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [published] }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: { ...published, publicationStatus: 'closed' } }), { status: 200 }));
     vi.stubGlobal('fetch', fetcher);
-    render(<CreateOpeningPanel authenticatedUser={authenticatedUser} onClose={vi.fn()} />);
+    render(<CreateOpeningPanel authenticatedUser={authenticatedUser} onClose={vi.fn()} onOpeningChanged={onOpeningChanged} />);
 
     expect(await screen.findByText('Published opening')).toBeInTheDocument();
     const closeButton = screen.getByRole('button', { name: /close opening/i });
@@ -175,6 +178,7 @@ describe('CreateOpeningPanel', () => {
 
     expect(await screen.findByText('Opening closed')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /start another draft/i })).toBeInTheDocument();
+    expect(onOpeningChanged).toHaveBeenCalledOnce();
   });
 
   it('starts a fresh draft after loading a closed opening', async () => {

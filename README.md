@@ -154,8 +154,11 @@ Neither path publishes or verifies the profile.
 ## Project discovery
 
 Openings can be narrowed by role, compensation, weekly commitment, or any
-combination of those filters with the header search. Each opening has an
-accessible detail panel containing:
+combination of those filters with the header search. The frontend sends these
+choices to the Go API and renders only its validated, published results from
+PostgreSQL. Initial loading, empty results, and API failures are explicit; a
+failed refresh retains the last successful catalogue and offers a retry. Each
+opening has an accessible detail panel containing:
 
 - Project stage and desired outcome
 - Owner contribution and visible trust signal
@@ -249,11 +252,10 @@ and backend systems.
 
 ## Current boundaries
 
-- The Go API exposes representative project openings, but the frontend still
-  reads its matching local catalogue until the integration milestone.
-- The API can create, list, edit, publish, and close openings for their
-  authenticated owner. The publish and close controls are not connected to the
-  frontend yet.
+- Project discovery requires the Go API and PostgreSQL. The frontend does not
+  substitute sample cards when live discovery is unavailable.
+- Authenticated owners can create, edit, publish, and close openings through the
+  visible creator. Reopening and moderation are not implemented.
 - GitHub login and logout are connected, but the OAuth app must be configured in
   the backend environment before sign-in is available.
 - Authenticated profile onboarding loads and saves through the member account;
@@ -263,8 +265,7 @@ and backend systems.
 - The early-access form confirms frontend input only and does not claim to store
   an email address.
 - The project-opening creator stores signed-out previews in the current browser
-  and authenticated drafts in the member account. Publishing and closing require
-  the API until the next frontend integration phase.
+  and authenticated drafts in the member account.
 - Application drafts are stored separately for each project in the current
   browser and are not submitted to another person.
 - Trial-agreement drafts stay in the current browser and are not sent or
