@@ -220,7 +220,9 @@ submitted application becomes read-only. Members cannot apply to their own
 opening. Opening owners can privately review submitted applications and the
 applicant's completed-profile proof, then accept or decline after a separate
 confirmation. The decision is immutable and visible to the applicant. Messaging,
-next-step coordination, and withdrawal are not part of this milestone.
+and next-step coordination are not part of this milestone. Before a decision,
+the applicant can permanently withdraw the submission; the owner sees the
+withdrawn state and can no longer decide it.
 
 ## Two-week trial agreements
 
@@ -277,7 +279,8 @@ and backend systems.
 - Signed-out application previews stay in the current browser. Authenticated
   application drafts and submissions persist in the member account, and only
   submitted or decided applications appear in private owner review. Owners can
-  make one irreversible accept/decline decision. Withdrawal, messaging, and
+  make one irreversible accept/decline decision. Applicants can irreversibly
+  withdraw a submission before that decision. Reapplication, messaging, and
   next-step coordination are not implemented.
 - Trial-agreement drafts stay in the current browser and are not sent or
   accepted by another person.

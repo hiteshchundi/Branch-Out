@@ -192,6 +192,7 @@ describe('CreateOpeningPanel', () => {
       status: 'submitted',
       submittedAt: '2026-08-31T08:00:00Z',
       decidedAt: null,
+      withdrawnAt: null,
       input: {
         message: 'I have built accessible climate dashboards for planning teams.',
         workSampleUrl: 'https://github.com/asha/climate',

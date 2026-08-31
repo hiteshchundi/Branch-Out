@@ -20,6 +20,7 @@ func TestApplicationRoutesRequireAuthentication(t *testing.T) {
 		{http.MethodGet, "/v1/openings/opening-id/application"},
 		{http.MethodPut, "/v1/openings/opening-id/application"},
 		{http.MethodPost, "/v1/openings/opening-id/application/submit"},
+		{http.MethodPost, "/v1/openings/opening-id/application/withdraw"},
 		{http.MethodGet, "/v1/openings/opening-id/applications"},
 		{http.MethodPost, "/v1/openings/opening-id/applications/application-id/decision"},
 	} {
@@ -51,6 +52,17 @@ func TestOpeningOwnerDecidesSubmittedApplication(t *testing.T) {
 		if invalid.Code != http.StatusBadRequest {
 			t.Fatalf("invalid decision %s = %d", body, invalid.Code)
 		}
+	}
+}
+
+func TestApplicantWithdrawsOwnSubmittedApplication(t *testing.T) {
+	calls := &applicationManagerCalls{}
+	manager := fakeApplicationManager{calls: calls, result: applications.Application{ID: "application-id", Status: "withdrawn"}}
+	api := applicationTestAPI(manager, fakeAuthenticator{user: auth.User{ID: 7}})
+	response := httptest.NewRecorder()
+	api.ServeHTTP(response, authenticatedApplicationRequest(http.MethodPost, "/v1/openings/opening-id/application/withdraw", nil))
+	if response.Code != http.StatusOK || calls.operation != "withdraw" || calls.userID != 7 || calls.openingID != "opening-id" {
+		t.Fatalf("response = %d, calls %#v: %s", response.Code, calls, response.Body.String())
 	}
 }
 
@@ -122,6 +134,7 @@ func TestApplicationRejectsInvalidRequestAndMapsDomainErrors(t *testing.T) {
 		{applications.ErrUnavailable, http.StatusConflict, "application_unavailable"},
 		{applications.ErrReviewNotFound, http.StatusNotFound, "opening_not_found"},
 		{applications.ErrDecisionUnavailable, http.StatusConflict, "application_decision_unavailable"},
+		{applications.ErrWithdrawalUnavailable, http.StatusConflict, "application_withdrawal_unavailable"},
 	}
 	for _, test := range tests {
 		api := applicationTestAPI(fakeApplicationManager{err: test.err}, fakeAuthenticator{user: auth.User{ID: 7}})
@@ -210,6 +223,13 @@ func (fake fakeApplicationManager) Decide(_ context.Context, userID int64, openi
 	if fake.calls != nil {
 		fake.calls.userID, fake.calls.openingID, fake.calls.applicationID = userID, openingID, applicationID
 		fake.calls.decision, fake.calls.operation = decision, "decide"
+	}
+	return fake.result, fake.err
+}
+
+func (fake fakeApplicationManager) Withdraw(_ context.Context, userID int64, openingID string) (applications.Application, error) {
+	if fake.calls != nil {
+		fake.calls.userID, fake.calls.openingID, fake.calls.operation = userID, openingID, "withdraw"
 	}
 	return fake.result, fake.err
 }

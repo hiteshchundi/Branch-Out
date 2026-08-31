@@ -6,6 +6,7 @@ import {
   loadOwnApplication,
   saveApplicationDraft,
   submitApplication,
+  withdrawApplication,
   type ApplicationInput,
 } from './applications';
 
@@ -63,6 +64,7 @@ describe('application API client', () => {
       status: 'submitted',
       submittedAt: '2026-08-31T08:00:00Z',
       decidedAt: null,
+      withdrawnAt: null,
       applicant: {
         displayName: 'Asha Rao', primaryRole: 'Software developer', skills: ['Go', 'React'],
         githubUrl: 'https://github.com/asha', portfolioUrl: null,
@@ -89,6 +91,18 @@ describe('application API client', () => {
     expect(fetcher).toHaveBeenCalledWith(
       `http://localhost:8080/v1/openings/${application.openingId}/applications/${application.id}/decision`,
       expect.objectContaining({ method: 'POST', body: JSON.stringify({ decision: 'accepted' }) }),
+    );
+  });
+
+  it('withdraws the applicant submission through its own endpoint', async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      data: { ...application, status: 'withdrawn', withdrawnAt: '2026-08-31T10:00:00Z' },
+    }), { status: 200 }));
+    vi.stubGlobal('fetch', fetcher);
+    await expect(withdrawApplication(application.openingId)).resolves.toMatchObject({ status: 'withdrawn' });
+    expect(fetcher).toHaveBeenCalledWith(
+      `http://localhost:8080/v1/openings/${application.openingId}/application/withdraw`,
+      expect.objectContaining({ method: 'POST', credentials: 'include' }),
     );
   });
 

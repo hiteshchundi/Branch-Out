@@ -363,17 +363,27 @@ application becomes read-only and cannot be replaced by another draft.
 Only applications for currently published openings can be saved or submitted.
 The API rejects closed or unavailable openings. After submission, the opening
 owner can review the application privately. Withdrawal and applicant-owner
-messaging are not available yet. When the owner accepts or declines, the
+messaging are separate: withdrawal is available before a decision, while
+messaging is not available yet. When the owner accepts or declines, the
 applicant's read-only application shows that result.
+
+### Withdraw a submitted application
+
+Before the owner decides, the applicant can confirm the permanent-action warning
+and select **Withdraw application**. Withdrawal is irreversible, prevents an
+owner decision, and does not allow another application for the same opening. The
+applicant and owner both see the withdrawn state. Drafts and already-decided
+applications cannot be withdrawn.
 
 ### Review submitted applications
 
 Authenticated opening owners select **Post a project** to load their most recent
 opening. A published or closed opening includes a **Submitted applications**
-section. It shows submitted and already-decided applications, ordered by the
+section. It shows submitted, decided, and withdrawn applications, ordered by the
 original submission time, with the applicant's note, work sample, stated
 contribution, availability, proposed first step, skills, profile evidence,
-GitHub profile, and optional portfolio.
+GitHub profile, and optional portfolio. A withdrawn application is labeled and
+has no decision controls.
 
 Applicant drafts remain private and never appear in owner review. Select
 **Accept application** or **Decline application**, review the irreversible-action
@@ -687,8 +697,9 @@ configuration, and operating details live in `backend/README.md`.
   moderation do not exist. Signed-out opening previews remain browser-local.
 - Authenticated applications can be saved, submitted, and privately reviewed by
   the opening owner. Owners can make one irreversible accept/decline decision,
-  which the applicant can see. Withdrawal, messaging, and next-step coordination
-  are not available. Signed-out application previews remain browser-local.
+  which the applicant can see. Applicants can permanently withdraw before that
+  decision. Reapplication, messaging, and next-step coordination are not
+  available. Signed-out application previews remain browser-local.
 - Trial-agreement drafts cannot be sent, mutually accepted, or signed.
 - Outcome feedback and trust-signal candidates cannot be mutually confirmed,
   moderated, or published.

@@ -49,6 +49,7 @@ type ApplicationManager interface {
 	Submit(context.Context, int64, string) (applications.Application, error)
 	ListForOwner(context.Context, int64, string) ([]applications.OwnerApplication, error)
 	Decide(context.Context, int64, string, string, string) (applications.Application, error)
+	Withdraw(context.Context, int64, string) (applications.Application, error)
 }
 
 type listResponse struct {
@@ -86,6 +87,7 @@ func New(repository openings.Repository, openingManager OpeningManager, applicat
 	routes.HandleFunc("GET /v1/openings/{id}/application", api.getOwnApplication)
 	routes.HandleFunc("PUT /v1/openings/{id}/application", api.saveApplicationDraft)
 	routes.HandleFunc("POST /v1/openings/{id}/application/submit", api.submitApplication)
+	routes.HandleFunc("POST /v1/openings/{id}/application/withdraw", api.withdrawApplication)
 	routes.HandleFunc("GET /v1/openings/{id}/applications", api.listSubmittedApplications)
 	routes.HandleFunc("POST /v1/openings/{id}/applications/{applicationId}/decision", api.decideApplication)
 	routes.HandleFunc("GET /v1/auth/github/start", api.startGitHubAuth)
@@ -103,6 +105,7 @@ func New(repository openings.Repository, openingManager OpeningManager, applicat
 	routes.HandleFunc("OPTIONS /v1/openings/{id}/close", api.preflight)
 	routes.HandleFunc("OPTIONS /v1/openings/{id}/application", api.preflight)
 	routes.HandleFunc("OPTIONS /v1/openings/{id}/application/submit", api.preflight)
+	routes.HandleFunc("OPTIONS /v1/openings/{id}/application/withdraw", api.preflight)
 	routes.HandleFunc("OPTIONS /v1/openings/{id}/applications", api.preflight)
 	routes.HandleFunc("OPTIONS /v1/openings/{id}/applications/{applicationId}/decision", api.preflight)
 	routes.HandleFunc("/", api.notFound)

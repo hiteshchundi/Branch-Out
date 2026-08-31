@@ -16,10 +16,11 @@ import (
 )
 
 var (
-	ErrNotFound            = errors.New("application not found")
-	ErrUnavailable         = errors.New("application unavailable")
-	ErrReviewNotFound      = errors.New("application review opening not found")
-	ErrDecisionUnavailable = errors.New("application decision unavailable")
+	ErrNotFound              = errors.New("application not found")
+	ErrUnavailable           = errors.New("application unavailable")
+	ErrReviewNotFound        = errors.New("application review opening not found")
+	ErrDecisionUnavailable   = errors.New("application decision unavailable")
+	ErrWithdrawalUnavailable = errors.New("application withdrawal unavailable")
 )
 
 type FieldError struct {
@@ -45,6 +46,7 @@ type Application struct {
 	Status      string     `json:"status"`
 	SubmittedAt *time.Time `json:"submittedAt"`
 	DecidedAt   *time.Time `json:"decidedAt"`
+	WithdrawnAt *time.Time `json:"withdrawnAt"`
 	CreatedAt   time.Time  `json:"createdAt"`
 	UpdatedAt   time.Time  `json:"updatedAt"`
 }
@@ -74,6 +76,7 @@ type Store interface {
 	Submit(context.Context, int64, string) (Application, error)
 	ListForOwner(context.Context, int64, string) ([]OwnerApplication, error)
 	Decide(context.Context, int64, string, string, string) (Application, error)
+	Withdraw(context.Context, int64, string) (Application, error)
 }
 
 type ProfileLookup interface {
@@ -142,6 +145,14 @@ func (manager *Manager) Decide(ctx context.Context, userID int64, openingID, app
 		return Application{}, ErrDecisionUnavailable
 	}
 	return manager.store.Decide(ctx, userID, openingID, applicationID, decision)
+}
+
+func (manager *Manager) Withdraw(ctx context.Context, userID int64, openingID string) (Application, error) {
+	openingID = strings.TrimSpace(openingID)
+	if openingID == "" {
+		return Application{}, ErrWithdrawalUnavailable
+	}
+	return manager.store.Withdraw(ctx, userID, openingID)
 }
 
 func normalizeInput(input Input) (Input, error) {

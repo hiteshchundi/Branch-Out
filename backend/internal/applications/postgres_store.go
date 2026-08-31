@@ -82,7 +82,8 @@ func (store *PostgresStore) ListForOwner(ctx context.Context, userID int64, open
 			WorkSampleContext: row.WorkSampleContext, Availability: row.Availability,
 			AvailabilityConfirmed: row.AvailabilityConfirmed,
 			ProposedContribution:  row.ProposedContribution, Status: row.Status,
-			SubmittedAt: row.SubmittedAt, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, DecidedAt: row.DecidedAt,
+			SubmittedAt: row.SubmittedAt, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
+			DecidedAt: row.DecidedAt, WithdrawnAt: row.WithdrawnAt,
 		})
 		results = append(results, OwnerApplication{Application: application, Applicant: ApplicantProof{
 			DisplayName: row.ApplicantDisplayName, PrimaryRole: row.ApplicantPrimaryRole,
@@ -113,6 +114,19 @@ func (store *PostgresStore) Decide(ctx context.Context, userID int64, openingID,
 	return fromDatabase(row), nil
 }
 
+func (store *PostgresStore) Withdraw(ctx context.Context, userID int64, openingID string) (Application, error) {
+	row, err := store.queries.WithdrawOwnApplication(ctx, database.WithdrawOwnApplicationParams{
+		OpeningID: openingID, ApplicantUserID: userID,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Application{}, ErrWithdrawalUnavailable
+	}
+	if err != nil {
+		return Application{}, err
+	}
+	return fromDatabase(row), nil
+}
+
 func fromDatabase(row database.Application) Application {
 	var submittedAt *time.Time
 	if row.SubmittedAt.Valid {
@@ -124,6 +138,11 @@ func fromDatabase(row database.Application) Application {
 		value := row.DecidedAt.Time
 		decidedAt = &value
 	}
+	var withdrawnAt *time.Time
+	if row.WithdrawnAt.Valid {
+		value := row.WithdrawnAt.Time
+		withdrawnAt = &value
+	}
 	return Application{
 		ID: row.ID, OpeningID: row.OpeningID,
 		Input: Input{
@@ -132,7 +151,7 @@ func fromDatabase(row database.Application) Application {
 			AvailabilityConfirmed: row.AvailabilityConfirmed,
 			ProposedContribution:  row.ProposedContribution,
 		},
-		Status: row.Status, SubmittedAt: submittedAt, DecidedAt: decidedAt,
+		Status: row.Status, SubmittedAt: submittedAt, DecidedAt: decidedAt, WithdrawnAt: withdrawnAt,
 		CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
 	}
 }

@@ -28,7 +28,7 @@ const authenticatedUser: AuthenticatedUser = {
   profileUrl: 'https://github.com/branch-builder',
 };
 
-function managedApplication(status: 'draft' | 'submitted' | 'accepted' | 'declined' = 'draft') {
+function managedApplication(status: 'draft' | 'submitted' | 'accepted' | 'declined' | 'withdrawn' = 'draft') {
   return {
     id: '61616161-6161-4161-a161-616161616161',
     openingId: project.id,
@@ -152,6 +152,24 @@ describe('ProofApplicationPanel', () => {
     expect(screen.getByRole('status')).toHaveTextContent(/owner accepted/i);
     expect(screen.getByRole('status')).toHaveTextContent(/messaging are not available/i);
     expect(screen.queryByLabelText(/short note/i)).not.toBeInTheDocument();
+  });
+
+  it('requires explicit confirmation before withdrawing a submitted application', async () => {
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: managedApplication('submitted') }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        data: { ...managedApplication('withdrawn'), withdrawnAt: '2026-08-31T10:00:00Z' },
+      }), { status: 200 }));
+    vi.stubGlobal('fetch', fetcher);
+    render(<ProofApplicationPanel authenticatedUser={authenticatedUser} project={project} onClose={vi.fn()} />);
+
+    expect(await screen.findByText('Application submitted')).toBeInTheDocument();
+    const withdrawButton = screen.getByRole('button', { name: /withdraw application/i });
+    expect(withdrawButton).toBeDisabled();
+    fireEvent.click(screen.getByLabelText(/withdrawal is permanent/i));
+    fireEvent.click(withdrawButton);
+    expect(await screen.findByText('Application withdrawn')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /withdraw application/i })).not.toBeInTheDocument();
   });
 
   it('explains when a profile is required for an account application', async () => {

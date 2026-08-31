@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: Branch-Out API
-  version: 0.7.0
-  description: PostgreSQL-backed discovery, GitHub authentication, member profiles, owner-managed opening lifecycles, proof-led applications, private owner review, and immutable application decisions for Branch-Out.
+  version: 0.8.0
+  description: PostgreSQL-backed discovery, GitHub authentication, member profiles, owner-managed opening lifecycles, proof-led applications, private owner review, immutable decisions, and pre-decision applicant withdrawal for Branch-Out.
 servers:
   - url: http://localhost:8080
 paths:
@@ -454,11 +454,53 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /v1/openings/{id}/application/withdraw:
+    post:
+      operationId: withdrawOwnApplication
+      summary: Withdraw the authenticated member's submitted application
+      description: Irreversibly changes the member's own submitted application to withdrawn before an owner decision.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The application was withdrawn and can no longer be decided.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Application'
+        '401':
+          description: No valid session is present.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: The application is missing, not submitted, already withdrawn, or already decided.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: The application could not be withdrawn.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /v1/openings/{id}/applications:
     get:
       operationId: listSubmittedApplicationsForOwner
       summary: List submitted applications for an opening owner
-      description: Verifies ownership and returns submitted or decided applications. Applicant drafts are never included.
+      description: Verifies ownership and returns submitted, decided, or withdrawn applications. Applicant drafts are never included.
       security:
         - sessionCookie: []
       parameters:
@@ -941,7 +983,7 @@ components:
           enum: [accepted, declined]
     Application:
       type: object
-      required: [id, openingId, input, status, submittedAt, decidedAt, createdAt, updatedAt]
+      required: [id, openingId, input, status, submittedAt, decidedAt, withdrawnAt, createdAt, updatedAt]
       properties:
         id:
           type: string
@@ -952,13 +994,18 @@ components:
           $ref: '#/components/schemas/ApplicationInput'
         status:
           type: string
-          enum: [draft, submitted, accepted, declined]
+          enum: [draft, submitted, accepted, declined, withdrawn]
         submittedAt:
           type:
             - string
             - 'null'
           format: date-time
         decidedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        withdrawnAt:
           type:
             - string
             - 'null'

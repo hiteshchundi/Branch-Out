@@ -25,6 +25,7 @@ type Application struct {
 	CreatedAt             time.Time          `db:"created_at" json:"created_at"`
 	UpdatedAt             time.Time          `db:"updated_at" json:"updated_at"`
 	DecidedAt             pgtype.Timestamptz `db:"decided_at" json:"decided_at"`
+	WithdrawnAt           pgtype.Timestamptz `db:"withdrawn_at" json:"withdrawn_at"`
 }
 
 type OauthAttempt struct {

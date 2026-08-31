@@ -509,7 +509,7 @@ export function CreateOpeningPanel({
                         </header>
                         {application.status !== 'submitted' && (
                           <strong className={`owner-application-status ${application.status}`}>
-                            {application.status === 'accepted' ? 'Accepted' : 'Declined'}
+                            {application.status === 'accepted' ? 'Accepted' : application.status === 'declined' ? 'Declined' : 'Withdrawn'}
                           </strong>
                         )}
                         <p>{application.input.message}</p>

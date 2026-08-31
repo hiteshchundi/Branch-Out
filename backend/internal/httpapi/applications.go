@@ -111,6 +111,19 @@ func (api *API) submitApplication(writer http.ResponseWriter, request *http.Requ
 	writeJSON(writer, http.StatusOK, applicationResponse{Data: result})
 }
 
+func (api *API) withdrawApplication(writer http.ResponseWriter, request *http.Request) {
+	writer.Header().Set("Cache-Control", "no-store")
+	user, ok := api.requireUser(writer, request)
+	if !ok {
+		return
+	}
+	result, err := api.applications.Withdraw(request.Context(), user.ID, request.PathValue("id"))
+	if api.writeApplicationError(writer, err) {
+		return
+	}
+	writeJSON(writer, http.StatusOK, applicationResponse{Data: result})
+}
+
 func decodeApplicationInput(writer http.ResponseWriter, request *http.Request) (applications.Input, bool) {
 	var input applications.Input
 	decoder := json.NewDecoder(http.MaxBytesReader(writer, request.Body, maximumApplicationBody))
@@ -144,6 +157,8 @@ func (api *API) writeApplicationError(writer http.ResponseWriter, err error) boo
 		writeError(writer, http.StatusNotFound, apiError{Code: "opening_not_found", Message: "This opening was not found."})
 	case errors.Is(err, applications.ErrDecisionUnavailable):
 		writeError(writer, http.StatusConflict, apiError{Code: "application_decision_unavailable", Message: "This application cannot be decided."})
+	case errors.Is(err, applications.ErrWithdrawalUnavailable):
+		writeError(writer, http.StatusConflict, apiError{Code: "application_withdrawal_unavailable", Message: "This application cannot be withdrawn."})
 	default:
 		api.logger.Error("manage application failed", "error", err)
 		writeError(writer, http.StatusInternalServerError, apiError{Code: "internal_error", Message: "The application request could not be completed."})

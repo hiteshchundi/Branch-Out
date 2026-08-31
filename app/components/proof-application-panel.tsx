@@ -7,6 +7,7 @@ import {
   loadOwnApplication,
   saveApplicationDraft,
   submitApplication,
+  withdrawApplication,
   type ApplicationInput,
   type ManagedApplication,
 } from '../data/applications';
@@ -92,6 +93,8 @@ export function ProofApplicationPanel({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [applicationStatus, setApplicationStatus] = useState<ManagedApplication['status'] | null>(null);
   const [submitConfirmed, setSubmitConfirmed] = useState(false);
+  const [withdrawConfirmed, setWithdrawConfirmed] = useState(false);
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [loadStatus, setLoadStatus] = useState<'local' | 'loading' | 'ready' | 'error'>(
     isAuthenticated ? 'loading' : 'local',
   );
@@ -217,6 +220,28 @@ export function ProofApplicationPanel({
     }
   };
 
+  const handleWithdrawal = async () => {
+    if (!isAuthenticated || applicationStatus !== 'submitted' || !withdrawConfirmed) return;
+    setIsWithdrawing(true);
+    setSaveMessage('');
+    try {
+      const withdrawn = await withdrawApplication(project.id);
+      setApplicationStatus(withdrawn.status);
+      setWithdrawConfirmed(false);
+      setSaveMessage('Your application was withdrawn and can no longer be decided.');
+    } catch (error) {
+      setSaveMessage(
+        error instanceof ApplicationAPIError && error.status === 401
+          ? 'Your session expired. Log in again before withdrawing this application.'
+          : error instanceof ApplicationAPIError && error.code === 'application_withdrawal_unavailable'
+            ? 'This application was already decided, withdrawn, or is no longer available.'
+            : 'Your application could not be withdrawn. Please try again.',
+      );
+    } finally {
+      setIsWithdrawing(false);
+    }
+  };
+
   const describedBy = (field: DraftField) => errors[field] ? `application-${field}-error` : undefined;
 
   return (
@@ -252,17 +277,19 @@ export function ProofApplicationPanel({
             <div className="application-complete-announcement" role="status">
               <span aria-hidden="true" className="complete-mark">✓</span>
               <span className="eyebrow">
-                {applicationStatus === 'accepted' ? 'Application accepted' : applicationStatus === 'declined' ? 'Application declined' : applicationStatus === 'submitted' ? 'Application submitted' : 'Application ready'}
+                {applicationStatus === 'accepted' ? 'Application accepted' : applicationStatus === 'declined' ? 'Application declined' : applicationStatus === 'withdrawn' ? 'Application withdrawn' : applicationStatus === 'submitted' ? 'Application submitted' : 'Application ready'}
               </span>
               <h3>
-                {applicationStatus === 'accepted' ? 'The opening owner accepted your application.' : applicationStatus === 'declined' ? 'The opening owner declined your application.' : applicationStatus === 'submitted' ? 'Your application is submitted.' : 'Your proof-led draft is complete.'}
+                {applicationStatus === 'accepted' ? 'The opening owner accepted your application.' : applicationStatus === 'declined' ? 'The opening owner declined your application.' : applicationStatus === 'withdrawn' ? 'You withdrew this application.' : applicationStatus === 'submitted' ? 'Your application is submitted.' : 'Your proof-led draft is complete.'}
               </h3>
               <p>
                 {applicationStatus === 'accepted'
                   ? 'This decision is stored in your Branch-Out account. Next-step coordination and messaging are not available yet.'
                   : applicationStatus === 'declined'
                     ? 'This decision is stored in your Branch-Out account. The application remains read-only and private to you and the opening owner.'
-                    : applicationStatus === 'submitted'
+                    : applicationStatus === 'withdrawn'
+                      ? 'The withdrawal is stored in your Branch-Out account. The opening owner can see it, and the application cannot be submitted again.'
+                      : applicationStatus === 'submitted'
                       ? 'It is stored in your Branch-Out account and can no longer be edited. The opening owner can review and decide it privately.'
                   : isAuthenticated
                     ? 'It is saved privately to your Branch-Out account and has not been submitted.'
@@ -282,6 +309,17 @@ export function ProofApplicationPanel({
                 </label>
                 <button className="primary-button" disabled={!submitConfirmed || isSubmitting} onClick={handleApplicationSubmission} type="button">
                   {isSubmitting ? 'Submitting…' : 'Submit application'}
+                </button>
+              </div>
+            )}
+            {isAuthenticated && applicationStatus === 'submitted' && (
+              <div className="application-submit-confirmation application-withdraw-confirmation">
+                <label>
+                  <input checked={withdrawConfirmed} onChange={(event) => setWithdrawConfirmed(event.target.checked)} type="checkbox" />
+                  <span>I understand withdrawal is permanent and I cannot submit another application for this opening.</span>
+                </label>
+                <button className="secondary-button danger-button" disabled={!withdrawConfirmed || isWithdrawing} onClick={handleWithdrawal} type="button">
+                  {isWithdrawing ? 'Withdrawing…' : 'Withdraw application'}
                 </button>
               </div>
             )}

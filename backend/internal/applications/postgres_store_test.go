@@ -37,10 +37,11 @@ func TestPostgresApplicationLifecycle(t *testing.T) {
 	owner := createApplicationTestUser(t, ctx, authStore, profileService, identifier, "Opening Owner")
 	applicant := createApplicationTestUser(t, ctx, authStore, profileService, identifier+1, "First Applicant")
 	secondApplicant := createApplicationTestUser(t, ctx, authStore, profileService, identifier+2, "Second Applicant")
+	thirdApplicant := createApplicationTestUser(t, ctx, authStore, profileService, identifier+3, "Third Applicant")
 	t.Cleanup(func() {
-		_, _ = pool.Exec(context.Background(), "DELETE FROM applications WHERE applicant_user_id = ANY($1)", []int64{applicant.ID, secondApplicant.ID})
+		_, _ = pool.Exec(context.Background(), "DELETE FROM applications WHERE applicant_user_id = ANY($1)", []int64{applicant.ID, secondApplicant.ID, thirdApplicant.ID})
 		_, _ = pool.Exec(context.Background(), "DELETE FROM project_openings WHERE owner_user_id = $1", owner.ID)
-		_, _ = pool.Exec(context.Background(), "DELETE FROM users WHERE id = ANY($1)", []int64{owner.ID, applicant.ID, secondApplicant.ID})
+		_, _ = pool.Exec(context.Background(), "DELETE FROM users WHERE id = ANY($1)", []int64{owner.ID, applicant.ID, secondApplicant.ID, thirdApplicant.ID})
 	})
 
 	openingInput := openings.DraftInput{
@@ -111,14 +112,31 @@ func TestPostgresApplicationLifecycle(t *testing.T) {
 	if _, err := manager.SaveDraft(ctx, secondApplicant.ID, opening.ID, validInput()); err != nil {
 		t.Fatalf("second applicant SaveDraft() error = %v", err)
 	}
+	secondSubmitted, err := manager.Submit(ctx, secondApplicant.ID, opening.ID)
+	if err != nil {
+		t.Fatalf("second applicant Submit() error = %v", err)
+	}
+	withdrawn, err := manager.Withdraw(ctx, secondApplicant.ID, opening.ID)
+	if err != nil || withdrawn.Status != "withdrawn" || withdrawn.WithdrawnAt == nil {
+		t.Fatalf("Withdraw() = %#v, %v", withdrawn, err)
+	}
+	if _, err := manager.Withdraw(ctx, secondApplicant.ID, opening.ID); !errors.Is(err, ErrWithdrawalUnavailable) {
+		t.Fatalf("repeated Withdraw() error = %v, want ErrWithdrawalUnavailable", err)
+	}
+	if _, err := manager.Decide(ctx, owner.ID, opening.ID, secondSubmitted.ID, "accepted"); !errors.Is(err, ErrDecisionUnavailable) {
+		t.Fatalf("withdrawn Decide() error = %v, want ErrDecisionUnavailable", err)
+	}
+	if _, err := manager.SaveDraft(ctx, thirdApplicant.ID, opening.ID, validInput()); err != nil {
+		t.Fatalf("third applicant SaveDraft() error = %v", err)
+	}
 	if _, err := openingManager.CloseOpening(ctx, owner.ID, opening.ID); err != nil {
 		t.Fatalf("CloseOpening() error = %v", err)
 	}
-	if _, err := manager.Submit(ctx, secondApplicant.ID, opening.ID); !errors.Is(err, ErrUnavailable) {
+	if _, err := manager.Submit(ctx, thirdApplicant.ID, opening.ID); !errors.Is(err, ErrUnavailable) {
 		t.Fatalf("closed opening Submit() error = %v, want ErrUnavailable", err)
 	}
 	reviewed, err = manager.ListForOwner(ctx, owner.ID, opening.ID)
-	if err != nil || len(reviewed) != 1 || reviewed[0].Status != "accepted" {
+	if err != nil || len(reviewed) != 2 || reviewed[0].Status != "accepted" || reviewed[1].Status != "withdrawn" {
 		t.Fatalf("closed opening review = %#v, %v", reviewed, err)
 	}
 }

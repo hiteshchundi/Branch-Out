@@ -116,6 +116,18 @@ func TestManagerDelegatesOnlySupportedOwnerDecisions(t *testing.T) {
 	}
 }
 
+func TestManagerWithdrawsOnlyScopedSubmittedApplication(t *testing.T) {
+	store := &fakeStore{withdrawn: Application{Status: "withdrawn"}}
+	manager := NewManager(store, fakeProfileLookup{})
+	result, err := manager.Withdraw(context.Background(), 7, " opening-id ")
+	if err != nil || result.Status != "withdrawn" || store.userID != 7 || store.openingID != "opening-id" {
+		t.Fatalf("Withdraw() = %#v, %v; store %#v", result, err, store)
+	}
+	if _, err := manager.Withdraw(context.Background(), 7, " "); !errors.Is(err, ErrWithdrawalUnavailable) {
+		t.Fatalf("blank opening withdrawal error = %v", err)
+	}
+}
+
 type fakeProfileLookup struct {
 	profile profile.Profile
 	err     error
@@ -133,6 +145,7 @@ type fakeStore struct {
 	decision              string
 	got, saved, submitted Application
 	decided               Application
+	withdrawn             Application
 	reviewed              []OwnerApplication
 	err                   error
 }
@@ -160,4 +173,9 @@ func (store *fakeStore) ListForOwner(_ context.Context, userID int64, openingID 
 func (store *fakeStore) Decide(_ context.Context, userID int64, openingID, applicationID, decision string) (Application, error) {
 	store.userID, store.openingID, store.applicationID, store.decision = userID, openingID, applicationID, decision
 	return store.decided, store.err
+}
+
+func (store *fakeStore) Withdraw(_ context.Context, userID int64, openingID string) (Application, error) {
+	store.userID, store.openingID = userID, openingID
+	return store.withdrawn, store.err
 }

@@ -30,7 +30,7 @@ RETURNING
     application.work_sample_context, application.availability,
     application.availability_confirmed, application.proposed_contribution,
     application.status, application.submitted_at, application.created_at,
-    application.updated_at, application.decided_at
+    application.updated_at, application.decided_at, application.withdrawn_at
 `
 
 type DecideApplicationForOwnerParams struct {
@@ -63,6 +63,7 @@ func (q *Queries) DecideApplicationForOwner(ctx context.Context, arg DecideAppli
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DecidedAt,
+		&i.WithdrawnAt,
 	)
 	return i, err
 }
@@ -71,7 +72,7 @@ const getOwnApplication = `-- name: GetOwnApplication :one
 SELECT
     id, opening_id, applicant_user_id, message, work_sample_url,
     work_sample_context, availability, availability_confirmed,
-    proposed_contribution, status, submitted_at, created_at, updated_at, decided_at
+    proposed_contribution, status, submitted_at, created_at, updated_at, decided_at, withdrawn_at
 FROM applications
 WHERE opening_id = $1
   AND applicant_user_id = $2
@@ -100,6 +101,7 @@ func (q *Queries) GetOwnApplication(ctx context.Context, arg GetOwnApplicationPa
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DecidedAt,
+		&i.WithdrawnAt,
 	)
 	return i, err
 }
@@ -130,7 +132,7 @@ SELECT
     application.work_sample_context, application.availability,
     application.availability_confirmed, application.proposed_contribution,
     application.status, application.submitted_at, application.created_at,
-    application.updated_at, application.decided_at,
+    application.updated_at, application.decided_at, application.withdrawn_at,
     profiles.display_name AS applicant_display_name,
     profiles.primary_role AS applicant_primary_role,
     profiles.skills AS applicant_skills,
@@ -143,7 +145,7 @@ JOIN profiles ON profiles.user_id = application.applicant_user_id
 JOIN users ON users.id = application.applicant_user_id
 WHERE application.opening_id = $1
   AND opening.owner_user_id = $2
-  AND application.status IN ('submitted', 'accepted', 'declined')
+  AND application.status IN ('submitted', 'accepted', 'declined', 'withdrawn')
 ORDER BY application.submitted_at ASC, application.id ASC
 `
 
@@ -167,6 +169,7 @@ type ListReviewableApplicationsForOwnerRow struct {
 	CreatedAt                time.Time          `db:"created_at" json:"created_at"`
 	UpdatedAt                time.Time          `db:"updated_at" json:"updated_at"`
 	DecidedAt                pgtype.Timestamptz `db:"decided_at" json:"decided_at"`
+	WithdrawnAt              pgtype.Timestamptz `db:"withdrawn_at" json:"withdrawn_at"`
 	ApplicantDisplayName     string             `db:"applicant_display_name" json:"applicant_display_name"`
 	ApplicantPrimaryRole     string             `db:"applicant_primary_role" json:"applicant_primary_role"`
 	ApplicantSkills          []string           `db:"applicant_skills" json:"applicant_skills"`
@@ -199,6 +202,7 @@ func (q *Queries) ListReviewableApplicationsForOwner(ctx context.Context, arg Li
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DecidedAt,
+			&i.WithdrawnAt,
 			&i.ApplicantDisplayName,
 			&i.ApplicantPrimaryRole,
 			&i.ApplicantSkills,
@@ -234,7 +238,7 @@ RETURNING
     application.work_sample_context, application.availability,
     application.availability_confirmed, application.proposed_contribution,
     application.status, application.submitted_at, application.created_at,
-    application.updated_at, application.decided_at
+    application.updated_at, application.decided_at, application.withdrawn_at
 `
 
 type SubmitOwnApplicationParams struct {
@@ -260,6 +264,7 @@ func (q *Queries) SubmitOwnApplication(ctx context.Context, arg SubmitOwnApplica
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DecidedAt,
+		&i.WithdrawnAt,
 	)
 	return i, err
 }
@@ -291,7 +296,7 @@ WHERE applications.status = 'draft'
 RETURNING
     id, opening_id, applicant_user_id, message, work_sample_url,
     work_sample_context, availability, availability_confirmed,
-    proposed_contribution, status, submitted_at, created_at, updated_at, decided_at
+    proposed_contribution, status, submitted_at, created_at, updated_at, decided_at, withdrawn_at
 `
 
 type UpsertApplicationDraftParams struct {
@@ -334,6 +339,50 @@ func (q *Queries) UpsertApplicationDraft(ctx context.Context, arg UpsertApplicat
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DecidedAt,
+		&i.WithdrawnAt,
+	)
+	return i, err
+}
+
+const withdrawOwnApplication = `-- name: WithdrawOwnApplication :one
+UPDATE applications SET
+    status = 'withdrawn',
+    withdrawn_at = now(),
+    updated_at = now()
+WHERE opening_id = $1
+  AND applicant_user_id = $2
+  AND status = 'submitted'
+RETURNING
+    id, opening_id, applicant_user_id, message, work_sample_url,
+    work_sample_context, availability, availability_confirmed,
+    proposed_contribution, status, submitted_at, created_at, updated_at,
+    decided_at, withdrawn_at
+`
+
+type WithdrawOwnApplicationParams struct {
+	OpeningID       string `db:"opening_id" json:"opening_id"`
+	ApplicantUserID int64  `db:"applicant_user_id" json:"applicant_user_id"`
+}
+
+func (q *Queries) WithdrawOwnApplication(ctx context.Context, arg WithdrawOwnApplicationParams) (Application, error) {
+	row := q.db.QueryRow(ctx, withdrawOwnApplication, arg.OpeningID, arg.ApplicantUserID)
+	var i Application
+	err := row.Scan(
+		&i.ID,
+		&i.OpeningID,
+		&i.ApplicantUserID,
+		&i.Message,
+		&i.WorkSampleUrl,
+		&i.WorkSampleContext,
+		&i.Availability,
+		&i.AvailabilityConfirmed,
+		&i.ProposedContribution,
+		&i.Status,
+		&i.SubmittedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DecidedAt,
+		&i.WithdrawnAt,
 	)
 	return i, err
 }

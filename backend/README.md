@@ -68,6 +68,7 @@ checks PostgreSQL on every request and returns HTTP 503 with
 - `GET /v1/openings/{id}/application` — return the member's private application
 - `PUT /v1/openings/{id}/application` — save the member's private draft
 - `POST /v1/openings/{id}/application/submit` — submit that application
+- `POST /v1/openings/{id}/application/withdraw` — irreversibly withdraw the member's submitted application
 - `GET /v1/openings/{id}/applications` — privately list submitted applications for the opening owner
 - `POST /v1/openings/{id}/applications/{applicationId}/decision` — irreversibly accept or decline a submitted application
 
@@ -111,13 +112,16 @@ opening is published, reject the owner, and create or replace only a `draft`
 application. Submission atomically moves that draft to `submitted` and records
 its submission time. Submitted applications are immutable. Owner review first
 verifies opening ownership, then returns applications that reached submission
-together with completed-profile proof; private drafts never enter the result. Missing and
-differently owned openings share the same HTTP 404 response. Decisions are
-owner-authorized transitions from `submitted` to `accepted` or `declined`.
+together with completed-profile proof; private drafts never enter the result.
+Missing and differently owned openings share the same HTTP 404 response.
+Decisions are owner-authorized transitions from `submitted` to `accepted` or
+`declined`.
 The transition records its decision time and cannot be repeated or reversed.
 Applicants see the result through their existing private application route.
-Withdrawal, messaging, and next-step coordination are intentionally outside this
-milestone.
+Before a decision, the applicant can atomically move their own `submitted`
+application to `withdrawn`; this records the withdrawal time and removes it from
+the owner's decision set while retaining it in private review. Reapplication,
+messaging, and next-step coordination are intentionally outside this milestone.
 
 The complete contract is in [`openapi.yaml`](openapi.yaml).
 
@@ -191,7 +195,8 @@ structured filters, conflicting filters, ordering, and cancellation.
 Application integration coverage includes private draft replacement, self-apply
 rejection, published-opening enforcement, submission, immutability, submitted-
 only owner review, non-owner rejection, irreversible owner decisions, and
-applicant-visible outcomes.
+applicant-visible outcomes. Withdrawal coverage verifies applicant scoping,
+single-transition behavior, owner visibility, and decision exclusion.
 
 ## Package boundaries
 
@@ -221,4 +226,6 @@ application per published opening and submit it through a separate confirmation;
 signed-out application previews remain device-local. Published and closed
 opening owners can privately review submitted applications and applicant proof;
 drafts remain applicant-only. Owners can accept or decline once, and applicants
-load that outcome through the same private application view.
+load that outcome through the same private application view. Applicants can
+withdraw before a decision; owners retain the historical withdrawn record but
+cannot decide it.

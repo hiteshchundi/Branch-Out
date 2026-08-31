@@ -13,7 +13,7 @@ export type ManagedApplication = {
   id: string;
   openingId: string;
   input: ApplicationInput;
-  status: 'draft' | 'submitted' | 'accepted' | 'declined';
+  status: 'draft' | 'submitted' | 'accepted' | 'declined' | 'withdrawn';
 };
 
 export type ApplicantProof = {
@@ -28,6 +28,7 @@ export type ApplicantProof = {
 export type OwnerApplication = ManagedApplication & {
   submittedAt: string;
   decidedAt: string | null;
+  withdrawnAt: string | null;
   applicant: ApplicantProof;
 };
 
@@ -61,7 +62,7 @@ function parseApplication(value: unknown): ManagedApplication {
   if (
     typeof application.id !== 'string'
     || typeof application.openingId !== 'string'
-    || !['draft', 'submitted', 'accepted', 'declined'].includes(application.status as string)
+    || !['draft', 'submitted', 'accepted', 'declined', 'withdrawn'].includes(application.status as string)
     || !validInput(application.input)
   ) {
     throw new Error('The API returned an invalid application.');
@@ -82,6 +83,10 @@ function parseOwnerApplication(value: unknown): OwnerApplication {
     application.status === 'draft'
     || typeof raw.submittedAt !== 'string'
     || (raw.decidedAt !== null && typeof raw.decidedAt !== 'string')
+    || (raw.withdrawnAt !== null && typeof raw.withdrawnAt !== 'string')
+    || (application.status === 'submitted' && (raw.decidedAt !== null || raw.withdrawnAt !== null))
+    || ((application.status === 'accepted' || application.status === 'declined') && (typeof raw.decidedAt !== 'string' || raw.withdrawnAt !== null))
+    || (application.status === 'withdrawn' && (raw.decidedAt !== null || typeof raw.withdrawnAt !== 'string'))
     || !applicant
     || typeof applicant.displayName !== 'string'
     || typeof applicant.primaryRole !== 'string'
@@ -97,6 +102,7 @@ function parseOwnerApplication(value: unknown): OwnerApplication {
     ...application,
     submittedAt: raw.submittedAt,
     decidedAt: raw.decidedAt as string | null,
+    withdrawnAt: raw.withdrawnAt as string | null,
     applicant: applicant as ApplicantProof,
   };
 }
@@ -182,5 +188,21 @@ export function decideApplication(
       throw new Error('The API returned an invalid application decision.');
     }
     return { ...application, decidedAt: raw.decidedAt };
+  });
+}
+
+export function withdrawApplication(openingId: string) {
+  return fetch(
+    `${getAPIBaseURL()}/v1/openings/${encodeURIComponent(openingId)}/application/withdraw`,
+    { credentials: 'include', headers: { Accept: 'application/json' }, method: 'POST' },
+  ).then(async (response) => {
+    if (!response.ok) throw await parseError(response);
+    const body = await response.json() as ApplicationEnvelope;
+    const application = parseApplication(body.data);
+    const raw = body.data as Record<string, unknown>;
+    if (application.status !== 'withdrawn' || typeof raw.withdrawnAt !== 'string') {
+      throw new Error('The API returned an invalid application withdrawal.');
+    }
+    return { ...application, withdrawnAt: raw.withdrawnAt };
   });
 }

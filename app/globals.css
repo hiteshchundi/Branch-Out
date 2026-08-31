@@ -1981,6 +1981,11 @@ main:focus {
   color: #a43131;
 }
 
+.owner-application-status.withdrawn {
+  background: var(--surface-raised);
+  color: var(--muted);
+}
+
 [data-theme='dark'] .owner-application-status.declined {
   color: #ff9b9b;
 }
@@ -2019,6 +2024,10 @@ main:focus {
 .owner-application-decision-confirmation input {
   flex: 0 0 auto;
   margin-top: 3px;
+}
+
+.application-withdraw-confirmation {
+  border-color: color-mix(in srgb, #b43b3b 38%, var(--border));
 }
 
 .owner-application-review-note {
