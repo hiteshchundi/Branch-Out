@@ -16,8 +16,9 @@ import (
 )
 
 var (
-	ErrNotFound    = errors.New("application not found")
-	ErrUnavailable = errors.New("application unavailable")
+	ErrNotFound       = errors.New("application not found")
+	ErrUnavailable    = errors.New("application unavailable")
+	ErrReviewNotFound = errors.New("application review opening not found")
 )
 
 type FieldError struct {
@@ -51,10 +52,25 @@ type Record struct {
 	ApplicantUserID int64
 }
 
+type ApplicantProof struct {
+	DisplayName     string   `json:"displayName"`
+	PrimaryRole     string   `json:"primaryRole"`
+	Skills          []string `json:"skills"`
+	GitHubURL       string   `json:"githubUrl"`
+	PortfolioURL    *string  `json:"portfolioUrl"`
+	EvidenceSummary string   `json:"evidenceSummary"`
+}
+
+type OwnerApplication struct {
+	Application
+	Applicant ApplicantProof `json:"applicant"`
+}
+
 type Store interface {
 	GetOwn(context.Context, int64, string) (Application, error)
 	UpsertDraft(context.Context, Record) (Application, error)
 	Submit(context.Context, int64, string) (Application, error)
+	ListSubmittedForOwner(context.Context, int64, string) ([]OwnerApplication, error)
 }
 
 type ProfileLookup interface {
@@ -105,6 +121,14 @@ func (manager *Manager) Submit(ctx context.Context, userID int64, openingID stri
 		return Application{}, ErrUnavailable
 	}
 	return manager.store.Submit(ctx, userID, openingID)
+}
+
+func (manager *Manager) ListSubmittedForOwner(ctx context.Context, userID int64, openingID string) ([]OwnerApplication, error) {
+	openingID = strings.TrimSpace(openingID)
+	if openingID == "" {
+		return nil, ErrReviewNotFound
+	}
+	return manager.store.ListSubmittedForOwner(ctx, userID, openingID)
 }
 
 func normalizeInput(input Input) (Input, error) {

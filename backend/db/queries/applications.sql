@@ -55,3 +55,32 @@ RETURNING
     application.availability_confirmed, application.proposed_contribution,
     application.status, application.submitted_at, application.created_at,
     application.updated_at;
+
+-- name: GetOwnedOpeningApplicationReviewScope :one
+SELECT id
+FROM project_openings
+WHERE id = sqlc.arg(opening_id)
+  AND owner_user_id = sqlc.arg(owner_user_id);
+
+-- name: ListSubmittedApplicationsForOwner :many
+SELECT
+    application.id, application.opening_id, application.applicant_user_id,
+    application.message, application.work_sample_url,
+    application.work_sample_context, application.availability,
+    application.availability_confirmed, application.proposed_contribution,
+    application.status, application.submitted_at, application.created_at,
+    application.updated_at,
+    profiles.display_name AS applicant_display_name,
+    profiles.primary_role AS applicant_primary_role,
+    profiles.skills AS applicant_skills,
+    users.profile_url AS applicant_github_url,
+    profiles.portfolio_url AS applicant_portfolio_url,
+    profiles.evidence_summary AS applicant_evidence_summary
+FROM applications AS application
+JOIN project_openings AS opening ON opening.id = application.opening_id
+JOIN profiles ON profiles.user_id = application.applicant_user_id
+JOIN users ON users.id = application.applicant_user_id
+WHERE application.opening_id = sqlc.arg(opening_id)
+  AND opening.owner_user_id = sqlc.arg(owner_user_id)
+  AND application.status = 'submitted'
+ORDER BY application.submitted_at ASC, application.id ASC;

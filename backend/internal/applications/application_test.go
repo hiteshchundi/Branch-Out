@@ -89,6 +89,21 @@ func TestManagerGetsAndSubmitsOnlyCurrentUsersApplication(t *testing.T) {
 	}
 }
 
+func TestManagerListsSubmittedApplicationsForOpeningOwner(t *testing.T) {
+	store := &fakeStore{reviewed: []OwnerApplication{{Application: Application{OpeningID: "opening-id", Status: "submitted"}}}}
+	manager := NewManager(store, fakeProfileLookup{})
+	results, err := manager.ListSubmittedForOwner(context.Background(), 11, " opening-id ")
+	if err != nil || len(results) != 1 || results[0].Status != "submitted" {
+		t.Fatalf("ListSubmittedForOwner() = %#v, %v", results, err)
+	}
+	if store.userID != 11 || store.openingID != "opening-id" {
+		t.Fatalf("store scope = %d, %q", store.userID, store.openingID)
+	}
+	if _, err := manager.ListSubmittedForOwner(context.Background(), 11, " "); !errors.Is(err, ErrReviewNotFound) {
+		t.Fatalf("blank opening error = %v", err)
+	}
+}
+
 type fakeProfileLookup struct {
 	profile profile.Profile
 	err     error
@@ -103,6 +118,7 @@ type fakeStore struct {
 	userID                int64
 	openingID             string
 	got, saved, submitted Application
+	reviewed              []OwnerApplication
 	err                   error
 }
 
@@ -119,4 +135,9 @@ func (store *fakeStore) UpsertDraft(_ context.Context, record Record) (Applicati
 func (store *fakeStore) Submit(_ context.Context, userID int64, openingID string) (Application, error) {
 	store.userID, store.openingID = userID, openingID
 	return store.submitted, store.err
+}
+
+func (store *fakeStore) ListSubmittedForOwner(_ context.Context, userID int64, openingID string) ([]OwnerApplication, error) {
+	store.userID, store.openingID = userID, openingID
+	return store.reviewed, store.err
 }

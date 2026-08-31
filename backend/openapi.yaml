@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: Branch-Out API
-  version: 0.5.0
-  description: PostgreSQL-backed discovery, GitHub authentication, member profiles, owner-managed opening lifecycles, and proof-led application submission for Branch-Out.
+  version: 0.6.0
+  description: PostgreSQL-backed discovery, GitHub authentication, member profiles, owner-managed opening lifecycles, proof-led application submission, and private owner review for Branch-Out.
 servers:
   - url: http://localhost:8080
 paths:
@@ -454,6 +454,57 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /v1/openings/{id}/applications:
+    get:
+      operationId: listSubmittedApplicationsForOwner
+      summary: List submitted applications for an opening owner
+      description: Verifies ownership and returns submitted applications only. Applicant drafts are never included.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Submitted applications ordered by submission time.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/OwnerApplication'
+                  meta:
+                    type: object
+                    required: [count]
+                    properties:
+                      count:
+                        type: integer
+                        minimum: 0
+        '401':
+          description: No valid session is present.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: The opening does not exist or is not owned by the current member.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: Submitted applications could not be loaded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /v1/auth/github/start:
     get:
       operationId: startGitHubAuthentication
@@ -839,6 +890,36 @@ components:
         updatedAt:
           type: string
           format: date-time
+    ApplicantProof:
+      type: object
+      required: [displayName, primaryRole, skills, githubUrl, portfolioUrl, evidenceSummary]
+      properties:
+        displayName:
+          type: string
+        primaryRole:
+          type: string
+        skills:
+          type: array
+          items:
+            type: string
+        githubUrl:
+          type: string
+          format: uri
+        portfolioUrl:
+          type:
+            - string
+            - 'null'
+          format: uri
+        evidenceSummary:
+          type: string
+    OwnerApplication:
+      allOf:
+        - $ref: '#/components/schemas/Application'
+        - type: object
+          required: [applicant]
+          properties:
+            applicant:
+              $ref: '#/components/schemas/ApplicantProof'
     ErrorEnvelope:
       type: object
       required: [error]

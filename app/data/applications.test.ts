@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   ApplicationAPIError,
+  listSubmittedApplications,
   loadOwnApplication,
   saveApplicationDraft,
   submitApplication,
@@ -53,6 +54,28 @@ describe('application API client', () => {
     await submitApplication(application.openingId);
     expect(fetcher).toHaveBeenNthCalledWith(1, expect.stringMatching(/\/application$/), expect.objectContaining({ method: 'PUT', body: JSON.stringify(input) }));
     expect(fetcher).toHaveBeenNthCalledWith(2, expect.stringMatching(/\/application\/submit$/), expect.objectContaining({ method: 'POST' }));
+  });
+
+  it('lists submitted applications for an opening owner', async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: [{
+      ...application,
+      status: 'submitted',
+      submittedAt: '2026-08-31T08:00:00Z',
+      applicant: {
+        displayName: 'Asha Rao', primaryRole: 'Software developer', skills: ['Go', 'React'],
+        githubUrl: 'https://github.com/asha', portfolioUrl: null,
+        evidenceSummary: 'Shipped accessible collaboration tools with small teams.',
+      },
+    }] }), { status: 200 }));
+    vi.stubGlobal('fetch', fetcher);
+
+    await expect(listSubmittedApplications('opening/id')).resolves.toMatchObject([
+      { status: 'submitted', applicant: { displayName: 'Asha Rao' } },
+    ]);
+    expect(fetcher).toHaveBeenCalledWith(
+      'http://localhost:8080/v1/openings/opening%2Fid/applications',
+      expect.objectContaining({ credentials: 'include' }),
+    );
   });
 
   it('preserves API errors and rejects malformed successes', async () => {

@@ -7,6 +7,9 @@ package database
 
 import (
 	"context"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const getOwnApplication = `-- name: GetOwnApplication :one
@@ -43,6 +46,116 @@ func (q *Queries) GetOwnApplication(ctx context.Context, arg GetOwnApplicationPa
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const getOwnedOpeningApplicationReviewScope = `-- name: GetOwnedOpeningApplicationReviewScope :one
+SELECT id
+FROM project_openings
+WHERE id = $1
+  AND owner_user_id = $2
+`
+
+type GetOwnedOpeningApplicationReviewScopeParams struct {
+	OpeningID   string `db:"opening_id" json:"opening_id"`
+	OwnerUserID *int64 `db:"owner_user_id" json:"owner_user_id"`
+}
+
+func (q *Queries) GetOwnedOpeningApplicationReviewScope(ctx context.Context, arg GetOwnedOpeningApplicationReviewScopeParams) (string, error) {
+	row := q.db.QueryRow(ctx, getOwnedOpeningApplicationReviewScope, arg.OpeningID, arg.OwnerUserID)
+	var id string
+	err := row.Scan(&id)
+	return id, err
+}
+
+const listSubmittedApplicationsForOwner = `-- name: ListSubmittedApplicationsForOwner :many
+SELECT
+    application.id, application.opening_id, application.applicant_user_id,
+    application.message, application.work_sample_url,
+    application.work_sample_context, application.availability,
+    application.availability_confirmed, application.proposed_contribution,
+    application.status, application.submitted_at, application.created_at,
+    application.updated_at,
+    profiles.display_name AS applicant_display_name,
+    profiles.primary_role AS applicant_primary_role,
+    profiles.skills AS applicant_skills,
+    users.profile_url AS applicant_github_url,
+    profiles.portfolio_url AS applicant_portfolio_url,
+    profiles.evidence_summary AS applicant_evidence_summary
+FROM applications AS application
+JOIN project_openings AS opening ON opening.id = application.opening_id
+JOIN profiles ON profiles.user_id = application.applicant_user_id
+JOIN users ON users.id = application.applicant_user_id
+WHERE application.opening_id = $1
+  AND opening.owner_user_id = $2
+  AND application.status = 'submitted'
+ORDER BY application.submitted_at ASC, application.id ASC
+`
+
+type ListSubmittedApplicationsForOwnerParams struct {
+	OpeningID   string `db:"opening_id" json:"opening_id"`
+	OwnerUserID *int64 `db:"owner_user_id" json:"owner_user_id"`
+}
+
+type ListSubmittedApplicationsForOwnerRow struct {
+	ID                       string             `db:"id" json:"id"`
+	OpeningID                string             `db:"opening_id" json:"opening_id"`
+	ApplicantUserID          int64              `db:"applicant_user_id" json:"applicant_user_id"`
+	Message                  string             `db:"message" json:"message"`
+	WorkSampleUrl            string             `db:"work_sample_url" json:"work_sample_url"`
+	WorkSampleContext        string             `db:"work_sample_context" json:"work_sample_context"`
+	Availability             string             `db:"availability" json:"availability"`
+	AvailabilityConfirmed    bool               `db:"availability_confirmed" json:"availability_confirmed"`
+	ProposedContribution     string             `db:"proposed_contribution" json:"proposed_contribution"`
+	Status                   string             `db:"status" json:"status"`
+	SubmittedAt              pgtype.Timestamptz `db:"submitted_at" json:"submitted_at"`
+	CreatedAt                time.Time          `db:"created_at" json:"created_at"`
+	UpdatedAt                time.Time          `db:"updated_at" json:"updated_at"`
+	ApplicantDisplayName     string             `db:"applicant_display_name" json:"applicant_display_name"`
+	ApplicantPrimaryRole     string             `db:"applicant_primary_role" json:"applicant_primary_role"`
+	ApplicantSkills          []string           `db:"applicant_skills" json:"applicant_skills"`
+	ApplicantGithubUrl       string             `db:"applicant_github_url" json:"applicant_github_url"`
+	ApplicantPortfolioUrl    *string            `db:"applicant_portfolio_url" json:"applicant_portfolio_url"`
+	ApplicantEvidenceSummary string             `db:"applicant_evidence_summary" json:"applicant_evidence_summary"`
+}
+
+func (q *Queries) ListSubmittedApplicationsForOwner(ctx context.Context, arg ListSubmittedApplicationsForOwnerParams) ([]ListSubmittedApplicationsForOwnerRow, error) {
+	rows, err := q.db.Query(ctx, listSubmittedApplicationsForOwner, arg.OpeningID, arg.OwnerUserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListSubmittedApplicationsForOwnerRow{}
+	for rows.Next() {
+		var i ListSubmittedApplicationsForOwnerRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OpeningID,
+			&i.ApplicantUserID,
+			&i.Message,
+			&i.WorkSampleUrl,
+			&i.WorkSampleContext,
+			&i.Availability,
+			&i.AvailabilityConfirmed,
+			&i.ProposedContribution,
+			&i.Status,
+			&i.SubmittedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.ApplicantDisplayName,
+			&i.ApplicantPrimaryRole,
+			&i.ApplicantSkills,
+			&i.ApplicantGithubUrl,
+			&i.ApplicantPortfolioUrl,
+			&i.ApplicantEvidenceSummary,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const submitOwnApplication = `-- name: SubmitOwnApplication :one

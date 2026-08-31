@@ -361,9 +361,22 @@ application**. Submission is a separate, explicit action. The submitted
 application becomes read-only and cannot be replaced by another draft.
 
 Only applications for currently published openings can be saved or submitted.
-The API rejects closed or unavailable openings. Owner review, withdrawal, and
-applicant-owner messaging are not available yet, so the submitted view says so
-plainly.
+The API rejects closed or unavailable openings. After submission, the opening
+owner can review the application privately. Withdrawal and applicant-owner
+messaging are not available yet, so the submitted view says so plainly.
+
+### Review submitted applications
+
+Authenticated opening owners select **Post a project** to load their most recent
+opening. A published or closed opening includes a **Submitted applications**
+section. It shows only submitted applications, ordered by submission time, with
+the applicant's note, work sample, stated contribution, availability, proposed
+first step, skills, profile evidence, GitHub profile, and optional portfolio.
+
+Applicant drafts remain private and never appear in owner review. A member who
+does not own the opening receives the same not-found response as a missing
+opening. Reading the list does not notify applicants, and accept/reject decisions
+and messaging are not available yet.
 
 Close the application with its close button, the shaded area, or `Escape`.
 
@@ -665,9 +678,9 @@ configuration, and operating details live in `backend/README.md`.
   profile previews remain local only.
 - Authenticated openings can be drafted, published, and closed. Reopening and
   moderation do not exist. Signed-out opening previews remain browser-local.
-- Authenticated applications can be saved and submitted, but cannot yet be
-  reviewed by an owner, withdrawn, or used for messaging. Signed-out application
-  previews remain browser-local.
+- Authenticated applications can be saved, submitted, and privately reviewed by
+  the opening owner. Decisions, withdrawal, and messaging are not available.
+  Signed-out application previews remain browser-local.
 - Trial-agreement drafts cannot be sent, mutually accepted, or signed.
 - Outcome feedback and trust-signal candidates cannot be mutually confirmed,
   moderated, or published.

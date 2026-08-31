@@ -3,6 +3,11 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import type { AuthenticatedUser } from '../data/auth';
 import {
+  ApplicationAPIError,
+  listSubmittedApplications,
+  type OwnerApplication,
+} from '../data/applications';
+import {
   closeOpening,
   createOpeningDraft,
   listOwnedOpenings,
@@ -175,6 +180,8 @@ export function CreateOpeningPanel({
   const [loadStatus, setLoadStatus] = useState<'local' | 'loading' | 'ready' | 'error'>(
     isAuthenticated ? 'loading' : 'local',
   );
+  const [reviewApplications, setReviewApplications] = useState<OwnerApplication[]>([]);
+  const [reviewStatus, setReviewStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLElement>(null);
   const stepHeadingRef = useRef<HTMLHeadingElement>(null);
@@ -213,6 +220,34 @@ export function CreateOpeningPanel({
       controller.abort();
     };
   }, [authenticatedUser]);
+
+  useEffect(() => {
+    if (!authenticatedUser || !openingID || openingStatus === null || openingStatus === 'draft') {
+      setReviewApplications([]);
+      setReviewStatus('idle');
+      return;
+    }
+    const controller = new AbortController();
+    let active = true;
+    setReviewStatus('loading');
+    listSubmittedApplications(openingID, controller.signal)
+      .then((applications) => {
+        if (!active) return;
+        setReviewApplications(applications);
+        setReviewStatus('ready');
+      })
+      .catch((error: unknown) => {
+        if (!active || (error instanceof DOMException && error.name === 'AbortError')) return;
+        setReviewStatus('error');
+        if (error instanceof ApplicationAPIError && error.status === 401) {
+          setTransitionMessage('Your session expired. Log in again before reviewing applications.');
+        }
+      });
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [authenticatedUser, openingID, openingStatus]);
 
   const updateDraft = (field: DraftField, value: string) => {
     setDraft((current) => ({ ...current, [field]: value }));
@@ -402,6 +437,59 @@ export function CreateOpeningPanel({
               <div><dt>Compensation</dt><dd>{draft.compensation}</dd></div>
               <div><dt>First milestone</dt><dd>{draft.firstMilestone}</dd></div>
             </dl>
+            {isAuthenticated && (openingStatus === 'published' || openingStatus === 'closed') && (
+              <section aria-labelledby="submitted-applications-title" className="owner-application-review">
+                <div className="owner-application-review-heading">
+                  <div>
+                    <span className="eyebrow">Private owner review</span>
+                    <h4 id="submitted-applications-title">Submitted applications</h4>
+                  </div>
+                  {reviewStatus === 'ready' && <strong>{reviewApplications.length}</strong>}
+                </div>
+                {reviewStatus === 'loading' && <p role="status">Loading submitted applications…</p>}
+                {reviewStatus === 'error' && (
+                  <p role="alert">Submitted applications could not be loaded. Close and reopen this panel to retry.</p>
+                )}
+                {reviewStatus === 'ready' && reviewApplications.length === 0 && (
+                  <p>No submitted applications yet. Applicant drafts remain private.</p>
+                )}
+                {reviewStatus === 'ready' && reviewApplications.length > 0 && (
+                  <ol className="owner-application-list">
+                    {reviewApplications.map((application) => (
+                      <li className="owner-application-card" key={application.id}>
+                        <header>
+                          <div>
+                            <strong>{application.applicant.displayName}</strong>
+                            <span>{application.applicant.primaryRole}</span>
+                          </div>
+                          <time dateTime={application.submittedAt}>
+                            Submitted {new Date(application.submittedAt).toLocaleDateString('en-GB', { dateStyle: 'medium', timeZone: 'UTC' })}
+                          </time>
+                        </header>
+                        <p>{application.input.message}</p>
+                        <dl>
+                          <div><dt>Contribution shown</dt><dd>{application.input.workSampleContext}</dd></div>
+                          <div><dt>Availability</dt><dd>{application.input.availability}</dd></div>
+                          <div><dt>Proposed first step</dt><dd>{application.input.proposedContribution}</dd></div>
+                          <div><dt>Profile evidence</dt><dd>{application.applicant.evidenceSummary}</dd></div>
+                        </dl>
+                        <div className="owner-application-skills" aria-label="Applicant skills">
+                          {application.applicant.skills.map((skill) => <span key={skill}>{skill}</span>)}
+                        </div>
+                        <div className="owner-application-links">
+                          <a href={application.input.workSampleUrl} rel="noreferrer" target="_blank">View work sample</a>
+                          <a href={application.applicant.githubUrl} rel="noreferrer" target="_blank">GitHub profile</a>
+                          {application.applicant.portfolioUrl && (
+                            <a href={application.applicant.portfolioUrl} rel="noreferrer" target="_blank">Portfolio</a>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+                <p className="owner-application-review-note">Decisions and messaging are not available yet. Reviewing an application does not notify the applicant.</p>
+              </section>
+            )}
             {isAuthenticated && openingStatus === 'draft' && (
               <div className="opening-lifecycle-confirmation">
                 <label>

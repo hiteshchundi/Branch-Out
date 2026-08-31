@@ -16,6 +16,20 @@ export type ManagedApplication = {
   status: 'draft' | 'submitted';
 };
 
+export type ApplicantProof = {
+  displayName: string;
+  primaryRole: string;
+  skills: string[];
+  githubUrl: string;
+  portfolioUrl: string | null;
+  evidenceSummary: string;
+};
+
+export type OwnerApplication = ManagedApplication & {
+  submittedAt: string;
+  applicant: ApplicantProof;
+};
+
 type ApplicationEnvelope = { data?: unknown };
 type ApplicationErrorEnvelope = { error?: { code?: unknown; field?: unknown } };
 
@@ -56,6 +70,31 @@ function parseApplication(value: unknown): ManagedApplication {
     openingId: application.openingId,
     input: application.input,
     status: application.status as ManagedApplication['status'],
+  };
+}
+
+function parseOwnerApplication(value: unknown): OwnerApplication {
+  const application = parseApplication(value);
+  const raw = value as Record<string, unknown>;
+  const applicant = raw.applicant as Record<string, unknown> | undefined;
+  if (
+    application.status !== 'submitted'
+    || typeof raw.submittedAt !== 'string'
+    || !applicant
+    || typeof applicant.displayName !== 'string'
+    || typeof applicant.primaryRole !== 'string'
+    || !Array.isArray(applicant.skills)
+    || applicant.skills.some((skill) => typeof skill !== 'string')
+    || typeof applicant.githubUrl !== 'string'
+    || (applicant.portfolioUrl !== null && typeof applicant.portfolioUrl !== 'string')
+    || typeof applicant.evidenceSummary !== 'string'
+  ) {
+    throw new Error('The API returned an invalid owner application.');
+  }
+  return {
+    ...application,
+    submittedAt: raw.submittedAt,
+    applicant: applicant as ApplicantProof,
   };
 }
 
@@ -105,4 +144,15 @@ export function saveApplicationDraft(openingId: string, input: ApplicationInput)
 
 export function submitApplication(openingId: string) {
   return applicationRequest(openingId, { method: 'POST' });
+}
+
+export async function listSubmittedApplications(openingId: string, signal?: AbortSignal) {
+  const response = await fetch(
+    `${getAPIBaseURL()}/v1/openings/${encodeURIComponent(openingId)}/applications`,
+    { credentials: 'include', headers: { Accept: 'application/json' }, signal },
+  );
+  if (!response.ok) throw await parseError(response);
+  const body = await response.json() as ApplicationEnvelope;
+  if (!Array.isArray(body.data)) throw new Error('The API returned invalid owner applications.');
+  return body.data.map(parseOwnerApplication);
 }

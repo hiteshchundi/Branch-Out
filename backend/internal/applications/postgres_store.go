@@ -60,6 +60,39 @@ func (store *PostgresStore) Submit(ctx context.Context, userID int64, openingID 
 	return fromDatabase(row), nil
 }
 
+func (store *PostgresStore) ListSubmittedForOwner(ctx context.Context, userID int64, openingID string) ([]OwnerApplication, error) {
+	if _, err := store.queries.GetOwnedOpeningApplicationReviewScope(ctx, database.GetOwnedOpeningApplicationReviewScopeParams{
+		OpeningID: openingID, OwnerUserID: &userID,
+	}); errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrReviewNotFound
+	} else if err != nil {
+		return nil, err
+	}
+	rows, err := store.queries.ListSubmittedApplicationsForOwner(ctx, database.ListSubmittedApplicationsForOwnerParams{
+		OpeningID: openingID, OwnerUserID: &userID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	results := make([]OwnerApplication, 0, len(rows))
+	for _, row := range rows {
+		application := fromDatabase(database.Application{
+			ID: row.ID, OpeningID: row.OpeningID, ApplicantUserID: row.ApplicantUserID,
+			Message: row.Message, WorkSampleUrl: row.WorkSampleUrl,
+			WorkSampleContext: row.WorkSampleContext, Availability: row.Availability,
+			AvailabilityConfirmed: row.AvailabilityConfirmed,
+			ProposedContribution:  row.ProposedContribution, Status: row.Status,
+			SubmittedAt: row.SubmittedAt, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
+		})
+		results = append(results, OwnerApplication{Application: application, Applicant: ApplicantProof{
+			DisplayName: row.ApplicantDisplayName, PrimaryRole: row.ApplicantPrimaryRole,
+			Skills: row.ApplicantSkills, GitHubURL: row.ApplicantGithubUrl,
+			PortfolioURL: row.ApplicantPortfolioUrl, EvidenceSummary: row.ApplicantEvidenceSummary,
+		}})
+	}
+	return results, nil
+}
+
 func fromDatabase(row database.Application) Application {
 	var submittedAt *time.Time
 	if row.SubmittedAt.Valid {

@@ -16,6 +16,28 @@ type applicationResponse struct {
 	Data applications.Application `json:"data"`
 }
 
+type ownerApplicationsResponse struct {
+	Data []applications.OwnerApplication `json:"data"`
+	Meta struct {
+		Count int `json:"count"`
+	} `json:"meta"`
+}
+
+func (api *API) listSubmittedApplications(writer http.ResponseWriter, request *http.Request) {
+	writer.Header().Set("Cache-Control", "no-store")
+	user, ok := api.requireUser(writer, request)
+	if !ok {
+		return
+	}
+	results, err := api.applications.ListSubmittedForOwner(request.Context(), user.ID, request.PathValue("id"))
+	if api.writeApplicationError(writer, err) {
+		return
+	}
+	response := ownerApplicationsResponse{Data: results}
+	response.Meta.Count = len(results)
+	writeJSON(writer, http.StatusOK, response)
+}
+
 func (api *API) getOwnApplication(writer http.ResponseWriter, request *http.Request) {
 	writer.Header().Set("Cache-Control", "no-store")
 	user, ok := api.requireUser(writer, request)
@@ -88,6 +110,8 @@ func (api *API) writeApplicationError(writer http.ResponseWriter, err error) boo
 		writeError(writer, http.StatusNotFound, apiError{Code: "application_not_found", Message: "No application was found for this opening."})
 	case errors.Is(err, applications.ErrUnavailable):
 		writeError(writer, http.StatusConflict, apiError{Code: "application_unavailable", Message: "This application cannot be changed or submitted."})
+	case errors.Is(err, applications.ErrReviewNotFound):
+		writeError(writer, http.StatusNotFound, apiError{Code: "opening_not_found", Message: "This opening was not found."})
 	default:
 		api.logger.Error("manage application failed", "error", err)
 		writeError(writer, http.StatusInternalServerError, apiError{Code: "internal_error", Message: "The application request could not be completed."})

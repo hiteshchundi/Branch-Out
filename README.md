@@ -197,7 +197,9 @@ Saving remains private. After reviewing a completed draft, the owner must
 explicitly confirm that its details are safe for public release before selecting
 **Publish opening**. Published openings can be closed only after a separate
 confirmation; closure removes them from discovery and cannot currently be
-reversed. Signed-out drafts never publish.
+reversed. Published and closed openings also show their owner a private list of
+submitted applications with applicant proof; drafts are never exposed.
+Signed-out drafts never publish.
 
 ## Proof-led applications
 
@@ -215,7 +217,9 @@ and save separately for each project. Signed-out visitors keep a device-local
 preview. Signed-in members with a completed profile can save one private draft
 per published opening and submit it only after a separate confirmation. A
 submitted application becomes read-only. Members cannot apply to their own
-opening, and owner review is not part of this milestone.
+opening. Opening owners can privately review submitted applications and the
+applicant's completed-profile proof. Decisions, messaging, and withdrawal are
+not part of this milestone.
 
 ## Two-week trial agreements
 
@@ -270,8 +274,9 @@ and backend systems.
 - The project-opening creator stores signed-out previews in the current browser
   and authenticated drafts in the member account.
 - Signed-out application previews stay in the current browser. Authenticated
-  application drafts and submissions persist in the member account, but owner
-  review, withdrawal, and messaging are not implemented.
+  application drafts and submissions persist in the member account, and only
+  submitted applications appear in private owner review. Decisions, withdrawal,
+  and messaging are not implemented.
 - Trial-agreement drafts stay in the current browser and are not sent or
   accepted by another person.
 - Outcome-review drafts and trust candidates stay local and are not confirmed or

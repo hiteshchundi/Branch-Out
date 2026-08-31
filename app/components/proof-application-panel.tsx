@@ -254,7 +254,7 @@ export function ProofApplicationPanel({
               <h3>{applicationStatus === 'submitted' ? 'Your application is submitted.' : 'Your proof-led draft is complete.'}</h3>
               <p>
                 {applicationStatus === 'submitted'
-                  ? 'It is stored in your Branch-Out account and can no longer be edited. Owner review is not yet available.'
+                  ? 'It is stored in your Branch-Out account and can no longer be edited. The opening owner can review it privately; decisions and messaging are not available yet.'
                   : isAuthenticated
                     ? 'It is saved privately to your Branch-Out account and has not been submitted.'
                     : 'It is saved on this device and has not been sent.'}

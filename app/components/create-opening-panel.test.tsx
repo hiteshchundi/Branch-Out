@@ -138,7 +138,8 @@ describe('CreateOpeningPanel', () => {
     const fetcher = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [managedDraft()] }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: managedDraft() }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ data: managedDraft(completeDraft.projectName, 'published') }), { status: 200 }));
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: managedDraft(completeDraft.projectName, 'published') }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 }));
     vi.stubGlobal('fetch', fetcher);
     render(<CreateOpeningPanel authenticatedUser={authenticatedUser} onClose={vi.fn()} onOpeningChanged={onOpeningChanged} />);
     await screen.findByLabelText(/project name/i);
@@ -154,7 +155,7 @@ describe('CreateOpeningPanel', () => {
     fireEvent.click(publishButton);
 
     expect(await screen.findByText('Published opening')).toBeInTheDocument();
-    expect(fetcher).toHaveBeenLastCalledWith(
+    expect(fetcher).toHaveBeenCalledWith(
       `http://localhost:8080/v1/openings/${managedDraft().id}/publish`,
       expect.objectContaining({ method: 'POST', credentials: 'include' }),
     );
@@ -166,7 +167,9 @@ describe('CreateOpeningPanel', () => {
     const published = managedDraft(completeDraft.projectName, 'published');
     const fetcher = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [published] }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ data: { ...published, publicationStatus: 'closed' } }), { status: 200 }));
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: { ...published, publicationStatus: 'closed' } }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 }));
     vi.stubGlobal('fetch', fetcher);
     render(<CreateOpeningPanel authenticatedUser={authenticatedUser} onClose={vi.fn()} onOpeningChanged={onOpeningChanged} />);
 
@@ -181,10 +184,44 @@ describe('CreateOpeningPanel', () => {
     expect(onOpeningChanged).toHaveBeenCalledOnce();
   });
 
+  it('shows only submitted applications in the private owner review', async () => {
+    const published = managedDraft(completeDraft.projectName, 'published');
+    const submitted = {
+      id: '71717171-7171-4171-a171-717171717171',
+      openingId: published.id,
+      status: 'submitted',
+      submittedAt: '2026-08-31T08:00:00Z',
+      input: {
+        message: 'I have built accessible climate dashboards for planning teams.',
+        workSampleUrl: 'https://github.com/asha/climate',
+        workSampleContext: 'I implemented the comparison interface and accessibility tests.',
+        availability: 'Seven hours weekly from next Monday',
+        availabilityConfirmed: true,
+        proposedContribution: 'Audit the current data flow and prototype the region selector.',
+      },
+      applicant: {
+        displayName: 'Asha Rao', primaryRole: 'Software developer', skills: ['React', 'Accessibility'],
+        githubUrl: 'https://github.com/asha', portfolioUrl: null,
+        evidenceSummary: 'Shipped accessible tools with regional planning teams.',
+      },
+    };
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [published] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [submitted], meta: { count: 1 } }), { status: 200 }));
+    vi.stubGlobal('fetch', fetcher);
+    render(<CreateOpeningPanel authenticatedUser={authenticatedUser} onClose={vi.fn()} />);
+
+    expect(await screen.findByRole('heading', { name: /submitted applications/i })).toBeInTheDocument();
+    expect(await screen.findByText('Asha Rao')).toBeInTheDocument();
+    expect(screen.getByText(submitted.input.proposedContribution)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /view work sample/i })).toHaveAttribute('href', submitted.input.workSampleUrl);
+    expect(screen.getByText(/decisions and messaging are not available/i)).toBeInTheDocument();
+  });
+
   it('starts a fresh draft after loading a closed opening', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      data: [managedDraft(completeDraft.projectName, 'closed')],
-    }), { status: 200 })));
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [managedDraft(completeDraft.projectName, 'closed')] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 })));
     render(<CreateOpeningPanel authenticatedUser={authenticatedUser} onClose={vi.fn()} />);
 
     expect(await screen.findByText('Opening closed')).toBeInTheDocument();

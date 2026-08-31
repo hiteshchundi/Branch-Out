@@ -86,6 +86,13 @@ func TestPostgresApplicationLifecycle(t *testing.T) {
 	if _, err := manager.Submit(ctx, applicant.ID, opening.ID); !errors.Is(err, ErrUnavailable) {
 		t.Fatalf("repeated Submit() error = %v, want ErrUnavailable", err)
 	}
+	reviewed, err := manager.ListSubmittedForOwner(ctx, owner.ID, opening.ID)
+	if err != nil || len(reviewed) != 1 || reviewed[0].ID != submitted.ID || reviewed[0].Applicant.DisplayName != "First Applicant" {
+		t.Fatalf("ListSubmittedForOwner() = %#v, %v", reviewed, err)
+	}
+	if _, err := manager.ListSubmittedForOwner(ctx, applicant.ID, opening.ID); !errors.Is(err, ErrReviewNotFound) {
+		t.Fatalf("non-owner review error = %v, want ErrReviewNotFound", err)
+	}
 
 	if _, err := manager.SaveDraft(ctx, secondApplicant.ID, opening.ID, validInput()); err != nil {
 		t.Fatalf("second applicant SaveDraft() error = %v", err)
@@ -95,6 +102,10 @@ func TestPostgresApplicationLifecycle(t *testing.T) {
 	}
 	if _, err := manager.Submit(ctx, secondApplicant.ID, opening.ID); !errors.Is(err, ErrUnavailable) {
 		t.Fatalf("closed opening Submit() error = %v, want ErrUnavailable", err)
+	}
+	reviewed, err = manager.ListSubmittedForOwner(ctx, owner.ID, opening.ID)
+	if err != nil || len(reviewed) != 1 {
+		t.Fatalf("closed opening review = %#v, %v", reviewed, err)
 	}
 }
 

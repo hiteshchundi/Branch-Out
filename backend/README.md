@@ -68,6 +68,7 @@ checks PostgreSQL on every request and returns HTTP 503 with
 - `GET /v1/openings/{id}/application` — return the member's private application
 - `PUT /v1/openings/{id}/application` — save the member's private draft
 - `POST /v1/openings/{id}/application/submit` — submit that application
+- `GET /v1/openings/{id}/applications` — privately list submitted applications for the opening owner
 
 Discovery accepts optional filters. Structured values use the labels already
 shown by the frontend.
@@ -107,7 +108,10 @@ profile. A member can keep one private application per published opening and
 cannot apply to an opening they own. Saving uses one statement to verify the
 opening is published, reject the owner, and create or replace only a `draft`
 application. Submission atomically moves that draft to `submitted` and records
-its submission time. Submitted applications are immutable. Owner review,
+its submission time. Submitted applications are immutable. Owner review first
+verifies opening ownership, then returns only submitted applications together
+with completed-profile proof; private drafts never enter the result. Missing and
+differently owned openings share the same HTTP 404 response. Decisions,
 withdrawal, and messaging are intentionally outside this milestone.
 
 The complete contract is in [`openapi.yaml`](openapi.yaml).
@@ -180,7 +184,8 @@ and replacement, authoritative GitHub identity, owner-only draft updates, draft
 isolation from discovery, full-catalogue retrieval, text search, combined
 structured filters, conflicting filters, ordering, and cancellation.
 Application integration coverage includes private draft replacement, self-apply
-rejection, published-opening enforcement, submission, and immutability.
+rejection, published-opening enforcement, submission, immutability, submitted-
+only owner review, and non-owner rejection.
 
 ## Package boundaries
 
@@ -207,4 +212,6 @@ discovery also reads this API directly, including text and structured filters,
 and never substitutes frontend sample data when the API is unavailable.
 Authenticated members with completed profiles can also save one private
 application per published opening and submit it through a separate confirmation;
-signed-out application previews remain device-local.
+signed-out application previews remain device-local. Published and closed
+opening owners can privately review submitted applications and applicant proof;
+drafts remain applicant-only.

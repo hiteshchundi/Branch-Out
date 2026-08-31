@@ -20,12 +20,32 @@ func TestApplicationRoutesRequireAuthentication(t *testing.T) {
 		{http.MethodGet, "/v1/openings/opening-id/application"},
 		{http.MethodPut, "/v1/openings/opening-id/application"},
 		{http.MethodPost, "/v1/openings/opening-id/application/submit"},
+		{http.MethodGet, "/v1/openings/opening-id/applications"},
 	} {
 		response := httptest.NewRecorder()
 		api.ServeHTTP(response, httptest.NewRequest(target.method, target.path, bytes.NewBufferString("{}")))
 		if response.Code != http.StatusUnauthorized {
 			t.Fatalf("%s %s = %d", target.method, target.path, response.Code)
 		}
+	}
+}
+
+func TestOpeningOwnerListsOnlyReviewableApplications(t *testing.T) {
+	calls := &applicationManagerCalls{}
+	manager := fakeApplicationManager{calls: calls, reviewed: []applications.OwnerApplication{{
+		Application: applications.Application{ID: "application-id", OpeningID: "opening-id", Status: "submitted"},
+		Applicant:   applications.ApplicantProof{DisplayName: "Asha Rao", PrimaryRole: "Software developer"},
+	}}}
+	api := applicationTestAPI(manager, fakeAuthenticator{user: auth.User{ID: 22}})
+	response := httptest.NewRecorder()
+	api.ServeHTTP(response, authenticatedApplicationRequest(http.MethodGet, "/v1/openings/opening-id/applications", nil))
+	var envelope ownerApplicationsResponse
+	_ = json.NewDecoder(response.Body).Decode(&envelope)
+	if response.Code != http.StatusOK || envelope.Meta.Count != 1 || envelope.Data[0].Applicant.DisplayName != "Asha Rao" {
+		t.Fatalf("response = %d, %#v", response.Code, envelope)
+	}
+	if calls.operation != "review" || calls.userID != 22 || calls.openingID != "opening-id" {
+		t.Fatalf("calls = %#v", calls)
 	}
 }
 
@@ -76,6 +96,7 @@ func TestApplicationRejectsInvalidRequestAndMapsDomainErrors(t *testing.T) {
 		{profile.ErrNotFound, http.StatusConflict, "profile_required"},
 		{applications.ErrNotFound, http.StatusNotFound, "application_not_found"},
 		{applications.ErrUnavailable, http.StatusConflict, "application_unavailable"},
+		{applications.ErrReviewNotFound, http.StatusNotFound, "opening_not_found"},
 	}
 	for _, test := range tests {
 		api := applicationTestAPI(fakeApplicationManager{err: test.err}, fakeAuthenticator{user: auth.User{ID: 7}})
@@ -124,9 +145,10 @@ type applicationManagerCalls struct {
 }
 
 type fakeApplicationManager struct {
-	calls  *applicationManagerCalls
-	result applications.Application
-	err    error
+	calls    *applicationManagerCalls
+	result   applications.Application
+	reviewed []applications.OwnerApplication
+	err      error
 }
 
 func (fake fakeApplicationManager) GetOwn(_ context.Context, userID int64, openingID string) (applications.Application, error) {
@@ -148,4 +170,11 @@ func (fake fakeApplicationManager) Submit(_ context.Context, userID int64, openi
 		fake.calls.userID, fake.calls.openingID, fake.calls.operation = userID, openingID, "submit"
 	}
 	return fake.result, fake.err
+}
+
+func (fake fakeApplicationManager) ListSubmittedForOwner(_ context.Context, userID int64, openingID string) ([]applications.OwnerApplication, error) {
+	if fake.calls != nil {
+		fake.calls.userID, fake.calls.openingID, fake.calls.operation = userID, openingID, "review"
+	}
+	return fake.reviewed, fake.err
 }
