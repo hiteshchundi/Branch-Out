@@ -7,9 +7,66 @@ package database
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const decideTrialProposalForOwner = `-- name: DecideTrialProposalForOwner :one
+UPDATE trial_proposals AS proposal SET
+    proposal_status = $1,
+    decided_at = now(),
+    updated_at = now()
+FROM project_openings AS opening
+WHERE proposal.id = $2
+  AND proposal.opening_id = $3
+  AND proposal.proposal_status = 'sent'
+  AND opening.id = proposal.opening_id
+  AND opening.owner_user_id = $4
+  AND $1::text IN ('accepted', 'declined')
+RETURNING proposal.id, proposal.application_id, proposal.opening_id, proposal.applicant_user_id, proposal.outcome, proposal.deliverable, proposal.non_goals, proposal.start_date, proposal.end_date, proposal.weekly_hours, proposal.check_in_cadence, proposal.access_level, proposal.confidentiality, proposal.ip_ownership, proposal.exit_plan, proposal.terms_confirmed, proposal.proposal_status, proposal.created_at, proposal.updated_at, proposal.sent_at, proposal.decided_at
+`
+
+type DecideTrialProposalForOwnerParams struct {
+	Decision    string `db:"decision" json:"decision"`
+	ProposalID  string `db:"proposal_id" json:"proposal_id"`
+	OpeningID   string `db:"opening_id" json:"opening_id"`
+	OwnerUserID *int64 `db:"owner_user_id" json:"owner_user_id"`
+}
+
+func (q *Queries) DecideTrialProposalForOwner(ctx context.Context, arg DecideTrialProposalForOwnerParams) (TrialProposal, error) {
+	row := q.db.QueryRow(ctx, decideTrialProposalForOwner,
+		arg.Decision,
+		arg.ProposalID,
+		arg.OpeningID,
+		arg.OwnerUserID,
+	)
+	var i TrialProposal
+	err := row.Scan(
+		&i.ID,
+		&i.ApplicationID,
+		&i.OpeningID,
+		&i.ApplicantUserID,
+		&i.Outcome,
+		&i.Deliverable,
+		&i.NonGoals,
+		&i.StartDate,
+		&i.EndDate,
+		&i.WeeklyHours,
+		&i.CheckInCadence,
+		&i.AccessLevel,
+		&i.Confidentiality,
+		&i.IpOwnership,
+		&i.ExitPlan,
+		&i.TermsConfirmed,
+		&i.ProposalStatus,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.SentAt,
+		&i.DecidedAt,
+	)
+	return i, err
+}
 
 const getOwnTrialProposal = `-- name: GetOwnTrialProposal :one
 SELECT
@@ -19,7 +76,7 @@ SELECT
     proposal.weekly_hours, proposal.check_in_cadence, proposal.access_level,
     proposal.confidentiality, proposal.ip_ownership, proposal.exit_plan,
     proposal.terms_confirmed, proposal.proposal_status,
-    proposal.created_at, proposal.updated_at
+    proposal.created_at, proposal.updated_at, proposal.sent_at, proposal.decided_at
 FROM trial_proposals AS proposal
 JOIN applications AS application ON application.id = proposal.application_id
 WHERE proposal.opening_id = $1
@@ -55,6 +112,174 @@ func (q *Queries) GetOwnTrialProposal(ctx context.Context, arg GetOwnTrialPropos
 		&i.ProposalStatus,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SentAt,
+		&i.DecidedAt,
+	)
+	return i, err
+}
+
+const getOwnedOpeningTrialProposalReviewScope = `-- name: GetOwnedOpeningTrialProposalReviewScope :one
+SELECT id
+FROM project_openings
+WHERE id = $1
+  AND owner_user_id = $2
+`
+
+type GetOwnedOpeningTrialProposalReviewScopeParams struct {
+	OpeningID   string `db:"opening_id" json:"opening_id"`
+	OwnerUserID *int64 `db:"owner_user_id" json:"owner_user_id"`
+}
+
+func (q *Queries) GetOwnedOpeningTrialProposalReviewScope(ctx context.Context, arg GetOwnedOpeningTrialProposalReviewScopeParams) (string, error) {
+	row := q.db.QueryRow(ctx, getOwnedOpeningTrialProposalReviewScope, arg.OpeningID, arg.OwnerUserID)
+	var id string
+	err := row.Scan(&id)
+	return id, err
+}
+
+const listTrialProposalsForOwner = `-- name: ListTrialProposalsForOwner :many
+SELECT
+    proposal.id, proposal.application_id, proposal.opening_id,
+    proposal.applicant_user_id, proposal.outcome, proposal.deliverable,
+    proposal.non_goals, proposal.start_date, proposal.end_date,
+    proposal.weekly_hours, proposal.check_in_cadence, proposal.access_level,
+    proposal.confidentiality, proposal.ip_ownership, proposal.exit_plan,
+    proposal.terms_confirmed, proposal.proposal_status,
+    proposal.created_at, proposal.updated_at, proposal.sent_at, proposal.decided_at,
+    profiles.display_name AS applicant_display_name,
+    profiles.primary_role AS applicant_primary_role,
+    users.profile_url AS applicant_github_url
+FROM trial_proposals AS proposal
+JOIN project_openings AS opening ON opening.id = proposal.opening_id
+JOIN profiles ON profiles.user_id = proposal.applicant_user_id
+JOIN users ON users.id = proposal.applicant_user_id
+WHERE proposal.opening_id = $1
+  AND opening.owner_user_id = $2
+  AND proposal.proposal_status IN ('sent', 'accepted', 'declined')
+ORDER BY proposal.sent_at ASC, proposal.id ASC
+`
+
+type ListTrialProposalsForOwnerParams struct {
+	OpeningID   string `db:"opening_id" json:"opening_id"`
+	OwnerUserID *int64 `db:"owner_user_id" json:"owner_user_id"`
+}
+
+type ListTrialProposalsForOwnerRow struct {
+	ID                   string             `db:"id" json:"id"`
+	ApplicationID        string             `db:"application_id" json:"application_id"`
+	OpeningID            string             `db:"opening_id" json:"opening_id"`
+	ApplicantUserID      int64              `db:"applicant_user_id" json:"applicant_user_id"`
+	Outcome              string             `db:"outcome" json:"outcome"`
+	Deliverable          string             `db:"deliverable" json:"deliverable"`
+	NonGoals             string             `db:"non_goals" json:"non_goals"`
+	StartDate            pgtype.Date        `db:"start_date" json:"start_date"`
+	EndDate              pgtype.Date        `db:"end_date" json:"end_date"`
+	WeeklyHours          int32              `db:"weekly_hours" json:"weekly_hours"`
+	CheckInCadence       string             `db:"check_in_cadence" json:"check_in_cadence"`
+	AccessLevel          string             `db:"access_level" json:"access_level"`
+	Confidentiality      string             `db:"confidentiality" json:"confidentiality"`
+	IpOwnership          string             `db:"ip_ownership" json:"ip_ownership"`
+	ExitPlan             string             `db:"exit_plan" json:"exit_plan"`
+	TermsConfirmed       bool               `db:"terms_confirmed" json:"terms_confirmed"`
+	ProposalStatus       string             `db:"proposal_status" json:"proposal_status"`
+	CreatedAt            time.Time          `db:"created_at" json:"created_at"`
+	UpdatedAt            time.Time          `db:"updated_at" json:"updated_at"`
+	SentAt               pgtype.Timestamptz `db:"sent_at" json:"sent_at"`
+	DecidedAt            pgtype.Timestamptz `db:"decided_at" json:"decided_at"`
+	ApplicantDisplayName string             `db:"applicant_display_name" json:"applicant_display_name"`
+	ApplicantPrimaryRole string             `db:"applicant_primary_role" json:"applicant_primary_role"`
+	ApplicantGithubUrl   string             `db:"applicant_github_url" json:"applicant_github_url"`
+}
+
+func (q *Queries) ListTrialProposalsForOwner(ctx context.Context, arg ListTrialProposalsForOwnerParams) ([]ListTrialProposalsForOwnerRow, error) {
+	rows, err := q.db.Query(ctx, listTrialProposalsForOwner, arg.OpeningID, arg.OwnerUserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListTrialProposalsForOwnerRow{}
+	for rows.Next() {
+		var i ListTrialProposalsForOwnerRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ApplicationID,
+			&i.OpeningID,
+			&i.ApplicantUserID,
+			&i.Outcome,
+			&i.Deliverable,
+			&i.NonGoals,
+			&i.StartDate,
+			&i.EndDate,
+			&i.WeeklyHours,
+			&i.CheckInCadence,
+			&i.AccessLevel,
+			&i.Confidentiality,
+			&i.IpOwnership,
+			&i.ExitPlan,
+			&i.TermsConfirmed,
+			&i.ProposalStatus,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.SentAt,
+			&i.DecidedAt,
+			&i.ApplicantDisplayName,
+			&i.ApplicantPrimaryRole,
+			&i.ApplicantGithubUrl,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const sendOwnTrialProposal = `-- name: SendOwnTrialProposal :one
+UPDATE trial_proposals AS proposal SET
+    proposal_status = 'sent',
+    sent_at = now(),
+    updated_at = now()
+FROM applications AS application
+WHERE proposal.opening_id = $1
+  AND proposal.applicant_user_id = $2
+  AND proposal.proposal_status = 'draft'
+  AND application.id = proposal.application_id
+  AND application.status = 'accepted'
+RETURNING proposal.id, proposal.application_id, proposal.opening_id, proposal.applicant_user_id, proposal.outcome, proposal.deliverable, proposal.non_goals, proposal.start_date, proposal.end_date, proposal.weekly_hours, proposal.check_in_cadence, proposal.access_level, proposal.confidentiality, proposal.ip_ownership, proposal.exit_plan, proposal.terms_confirmed, proposal.proposal_status, proposal.created_at, proposal.updated_at, proposal.sent_at, proposal.decided_at
+`
+
+type SendOwnTrialProposalParams struct {
+	OpeningID       string `db:"opening_id" json:"opening_id"`
+	ApplicantUserID int64  `db:"applicant_user_id" json:"applicant_user_id"`
+}
+
+func (q *Queries) SendOwnTrialProposal(ctx context.Context, arg SendOwnTrialProposalParams) (TrialProposal, error) {
+	row := q.db.QueryRow(ctx, sendOwnTrialProposal, arg.OpeningID, arg.ApplicantUserID)
+	var i TrialProposal
+	err := row.Scan(
+		&i.ID,
+		&i.ApplicationID,
+		&i.OpeningID,
+		&i.ApplicantUserID,
+		&i.Outcome,
+		&i.Deliverable,
+		&i.NonGoals,
+		&i.StartDate,
+		&i.EndDate,
+		&i.WeeklyHours,
+		&i.CheckInCadence,
+		&i.AccessLevel,
+		&i.Confidentiality,
+		&i.IpOwnership,
+		&i.ExitPlan,
+		&i.TermsConfirmed,
+		&i.ProposalStatus,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.SentAt,
+		&i.DecidedAt,
 	)
 	return i, err
 }
@@ -95,7 +320,7 @@ RETURNING
     id, application_id, opening_id, applicant_user_id, outcome, deliverable,
     non_goals, start_date, end_date, weekly_hours, check_in_cadence,
     access_level, confidentiality, ip_ownership, exit_plan, terms_confirmed,
-    proposal_status, created_at, updated_at
+    proposal_status, created_at, updated_at, sent_at, decided_at
 `
 
 type UpsertOwnTrialProposalDraftParams struct {
@@ -155,6 +380,8 @@ func (q *Queries) UpsertOwnTrialProposalDraft(ctx context.Context, arg UpsertOwn
 		&i.ProposalStatus,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SentAt,
+		&i.DecidedAt,
 	)
 	return i, err
 }

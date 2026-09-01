@@ -88,25 +88,27 @@ type Session struct {
 }
 
 type TrialProposal struct {
-	ID              string      `db:"id" json:"id"`
-	ApplicationID   string      `db:"application_id" json:"application_id"`
-	OpeningID       string      `db:"opening_id" json:"opening_id"`
-	ApplicantUserID int64       `db:"applicant_user_id" json:"applicant_user_id"`
-	Outcome         string      `db:"outcome" json:"outcome"`
-	Deliverable     string      `db:"deliverable" json:"deliverable"`
-	NonGoals        string      `db:"non_goals" json:"non_goals"`
-	StartDate       pgtype.Date `db:"start_date" json:"start_date"`
-	EndDate         pgtype.Date `db:"end_date" json:"end_date"`
-	WeeklyHours     int32       `db:"weekly_hours" json:"weekly_hours"`
-	CheckInCadence  string      `db:"check_in_cadence" json:"check_in_cadence"`
-	AccessLevel     string      `db:"access_level" json:"access_level"`
-	Confidentiality string      `db:"confidentiality" json:"confidentiality"`
-	IpOwnership     string      `db:"ip_ownership" json:"ip_ownership"`
-	ExitPlan        string      `db:"exit_plan" json:"exit_plan"`
-	TermsConfirmed  bool        `db:"terms_confirmed" json:"terms_confirmed"`
-	ProposalStatus  string      `db:"proposal_status" json:"proposal_status"`
-	CreatedAt       time.Time   `db:"created_at" json:"created_at"`
-	UpdatedAt       time.Time   `db:"updated_at" json:"updated_at"`
+	ID              string             `db:"id" json:"id"`
+	ApplicationID   string             `db:"application_id" json:"application_id"`
+	OpeningID       string             `db:"opening_id" json:"opening_id"`
+	ApplicantUserID int64              `db:"applicant_user_id" json:"applicant_user_id"`
+	Outcome         string             `db:"outcome" json:"outcome"`
+	Deliverable     string             `db:"deliverable" json:"deliverable"`
+	NonGoals        string             `db:"non_goals" json:"non_goals"`
+	StartDate       pgtype.Date        `db:"start_date" json:"start_date"`
+	EndDate         pgtype.Date        `db:"end_date" json:"end_date"`
+	WeeklyHours     int32              `db:"weekly_hours" json:"weekly_hours"`
+	CheckInCadence  string             `db:"check_in_cadence" json:"check_in_cadence"`
+	AccessLevel     string             `db:"access_level" json:"access_level"`
+	Confidentiality string             `db:"confidentiality" json:"confidentiality"`
+	IpOwnership     string             `db:"ip_ownership" json:"ip_ownership"`
+	ExitPlan        string             `db:"exit_plan" json:"exit_plan"`
+	TermsConfirmed  bool               `db:"terms_confirmed" json:"terms_confirmed"`
+	ProposalStatus  string             `db:"proposal_status" json:"proposal_status"`
+	CreatedAt       time.Time          `db:"created_at" json:"created_at"`
+	UpdatedAt       time.Time          `db:"updated_at" json:"updated_at"`
+	SentAt          pgtype.Timestamptz `db:"sent_at" json:"sent_at"`
+	DecidedAt       pgtype.Timestamptz `db:"decided_at" json:"decided_at"`
 }
 
 type User struct {

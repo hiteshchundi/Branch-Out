@@ -18,6 +18,12 @@ import {
   type OpeningDraftInput,
   type PublicationStatus,
 } from '../data/opening-drafts';
+import {
+  decideTrialProposal,
+  listTrialProposalsForOwner,
+  TrialProposalAPIError,
+  type OwnerTrialProposal,
+} from '../data/trial-proposals';
 import { useAccessibleDialog } from './use-accessible-dialog';
 
 export const OPENING_DRAFT_STORAGE_KEY = 'branch-out-opening-draft';
@@ -186,6 +192,11 @@ export function CreateOpeningPanel({
   const [pendingDecision, setPendingDecision] = useState<{ applicationID: string; decision: 'accepted' | 'declined' } | null>(null);
   const [decisionConfirmed, setDecisionConfirmed] = useState(false);
   const [decidingApplicationID, setDecidingApplicationID] = useState<string | null>(null);
+  const [reviewProposals, setReviewProposals] = useState<OwnerTrialProposal[]>([]);
+  const [proposalReviewStatus, setProposalReviewStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [pendingTrialDecision, setPendingTrialDecision] = useState<{ proposalID: string; decision: 'accepted' | 'declined' } | null>(null);
+  const [trialDecisionConfirmed, setTrialDecisionConfirmed] = useState(false);
+  const [decidingProposalID, setDecidingProposalID] = useState<string | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLElement>(null);
   const stepHeadingRef = useRef<HTMLHeadingElement>(null);
@@ -229,11 +240,14 @@ export function CreateOpeningPanel({
     if (!authenticatedUser || !openingID || openingStatus === null || openingStatus === 'draft') {
       setReviewApplications([]);
       setReviewStatus('idle');
+      setReviewProposals([]);
+      setProposalReviewStatus('idle');
       return;
     }
     const controller = new AbortController();
     let active = true;
     setReviewStatus('loading');
+    setProposalReviewStatus('loading');
     listSubmittedApplications(openingID, controller.signal)
       .then((applications) => {
         if (!active) return;
@@ -245,6 +259,19 @@ export function CreateOpeningPanel({
         setReviewStatus('error');
         if (error instanceof ApplicationAPIError && error.status === 401) {
           setTransitionMessage('Your session expired. Log in again before reviewing applications.');
+        }
+      });
+    listTrialProposalsForOwner(openingID, controller.signal)
+      .then((proposals) => {
+        if (!active) return;
+        setReviewProposals(proposals);
+        setProposalReviewStatus('ready');
+      })
+      .catch((error: unknown) => {
+        if (!active || (error instanceof DOMException && error.name === 'AbortError')) return;
+        setProposalReviewStatus('error');
+        if (error instanceof TrialProposalAPIError && error.status === 401) {
+          setTransitionMessage('Your session expired. Log in again before reviewing trial proposals.');
         }
       });
     return () => {
@@ -411,6 +438,43 @@ export function CreateOpeningPanel({
     }
   };
 
+  const chooseTrialDecision = (proposalID: string, decision: 'accepted' | 'declined') => {
+    setPendingTrialDecision({ proposalID, decision });
+    setTrialDecisionConfirmed(false);
+    setTransitionMessage('');
+  };
+
+  const confirmTrialDecision = async () => {
+    if (!openingID || !pendingTrialDecision || !trialDecisionConfirmed) return;
+    setDecidingProposalID(pendingTrialDecision.proposalID);
+    setTransitionMessage('');
+    try {
+      const decided = await decideTrialProposal(openingID, pendingTrialDecision.proposalID, pendingTrialDecision.decision);
+      setReviewProposals((current) => current.map((proposal) => (
+        proposal.id === decided.id
+          ? { ...proposal, status: decided.status, decidedAt: decided.decidedAt }
+          : proposal
+      )));
+      setTransitionMessage(
+        pendingTrialDecision.decision === 'accepted'
+          ? 'Trial proposal accepted. Both people can now see the mutually accepted record.'
+          : 'Trial proposal declined. The applicant can now see the final decision.',
+      );
+      setPendingTrialDecision(null);
+      setTrialDecisionConfirmed(false);
+    } catch (error) {
+      setTransitionMessage(
+        error instanceof TrialProposalAPIError && error.status === 401
+          ? 'Your session expired. Log in again before deciding this proposal.'
+          : error instanceof TrialProposalAPIError && error.code === 'trial_proposal_decision_unavailable'
+            ? 'This proposal was already decided or is no longer available.'
+            : 'This trial proposal decision could not be saved. Please try again.',
+      );
+    } finally {
+      setDecidingProposalID(null);
+    }
+  };
+
   const startAnotherDraft = () => {
     setDraft(emptyDraft);
     setStep(0);
@@ -556,6 +620,66 @@ export function CreateOpeningPanel({
                   </ol>
                 )}
                 <p className="owner-application-review-note">Accept and decline decisions are irreversible. Messaging and next-step coordination are not available yet.</p>
+              </section>
+            )}
+            {isAuthenticated && (openingStatus === 'published' || openingStatus === 'closed') && (
+              <section aria-labelledby="trial-proposals-title" className="owner-application-review">
+                <div className="owner-application-review-heading">
+                  <div>
+                    <span className="eyebrow">Private agreement review</span>
+                    <h4 id="trial-proposals-title">Sent trial proposals</h4>
+                  </div>
+                  {proposalReviewStatus === 'ready' && <strong>{reviewProposals.length}</strong>}
+                </div>
+                {proposalReviewStatus === 'loading' && <p role="status">Loading sent trial proposals…</p>}
+                {proposalReviewStatus === 'error' && <p role="alert">Trial proposals could not be loaded. Close and reopen this panel to retry.</p>}
+                {proposalReviewStatus === 'ready' && reviewProposals.length === 0 && <p>No sent proposals yet. Applicant drafts remain private.</p>}
+                {proposalReviewStatus === 'ready' && reviewProposals.length > 0 && (
+                  <ol className="owner-application-list">
+                    {reviewProposals.map((proposal) => (
+                      <li className="owner-application-card" key={proposal.id}>
+                        <header>
+                          <div><strong>{proposal.applicant.displayName}</strong><span>{proposal.applicant.primaryRole}</span></div>
+                          {proposal.sentAt && <time dateTime={proposal.sentAt}>Sent {new Date(proposal.sentAt).toLocaleDateString('en-GB', { dateStyle: 'medium', timeZone: 'UTC' })}</time>}
+                        </header>
+                        <strong className={`owner-application-status ${proposal.status}`}>{proposal.status === 'sent' ? 'Awaiting decision' : proposal.status === 'accepted' ? 'Mutually accepted' : 'Declined'}</strong>
+                        <p>{proposal.input.outcome}</p>
+                        <dl>
+                          <div><dt>Deliverable</dt><dd>{proposal.input.deliverable}</dd></div>
+                          <div><dt>Dates</dt><dd>{proposal.input.startDate} to {proposal.input.endDate}</dd></div>
+                          <div><dt>Time</dt><dd>{proposal.input.weeklyHours} hours/week · {proposal.input.checkInCadence}</dd></div>
+                          <div><dt>Access</dt><dd>{proposal.input.accessLevel}</dd></div>
+                          <div><dt>Ownership expectation</dt><dd>{proposal.input.ipOwnership}</dd></div>
+                          <div><dt>Exit plan</dt><dd>{proposal.input.exitPlan}</dd></div>
+                        </dl>
+                        <div className="owner-application-links"><a href={proposal.applicant.githubUrl} rel="noreferrer" target="_blank">Applicant GitHub profile</a></div>
+                        {proposal.status === 'sent' && (
+                          <div className="owner-application-decision">
+                            <div>
+                              <button className="secondary-button" disabled={decidingProposalID !== null} onClick={() => chooseTrialDecision(proposal.id, 'accepted')} type="button">Accept trial proposal</button>
+                              <button className="text-button danger-button" disabled={decidingProposalID !== null} onClick={() => chooseTrialDecision(proposal.id, 'declined')} type="button">Decline trial proposal</button>
+                            </div>
+                            {pendingTrialDecision?.proposalID === proposal.id && (
+                              <div className="owner-application-decision-confirmation">
+                                <label>
+                                  <input checked={trialDecisionConfirmed} onChange={(event) => setTrialDecisionConfirmed(event.target.checked)} type="checkbox" />
+                                  <span>I reviewed every trial term and understand this {pendingTrialDecision.decision === 'accepted' ? 'acceptance creates the mutual Branch-Out record' : 'decline'} and cannot be reversed.</span>
+                                </label>
+                                <div>
+                                  <button className="primary-button" disabled={!trialDecisionConfirmed || decidingProposalID !== null} onClick={confirmTrialDecision} type="button">
+                                    {decidingProposalID === proposal.id ? 'Saving decision…' : `Confirm proposal ${pendingTrialDecision.decision === 'accepted' ? 'acceptance' : 'decline'}`}
+                                  </button>
+                                  <button className="text-button" disabled={decidingProposalID !== null} onClick={() => setPendingTrialDecision(null)} type="button">Cancel</button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </li>
+                    ))}
+                  </ol>
+                )}
+                <p className="owner-application-review-note">Proposal decisions are irreversible. An acceptance records both approvals but is not a legal signature or contract.</p>
               </section>
             )}
             {isAuthenticated && openingStatus === 'draft' && (

@@ -237,9 +237,11 @@ The **Plan trial** action inside each project detail opens a three-step draft:
 Signed-out visitors and signed-in members without an accepted application keep
 a separate device-local preview for each project. Once an application is
 accepted, the applicant can save one complete private proposal to their account
-and restore it on another device. The opening owner cannot see it yet. Each
-visible step validates independently, and completion clearly states that the
-proposal has not been sent, accepted, or converted into a legal agreement.
+and restore it on another device. A separate confirmation sends it privately to
+the opening owner and makes it read-only. The owner can then accept or decline
+once after reviewing every term. Acceptance records both approvals, while the
+interface clearly states that this is a planning record rather than a legal
+agreement or electronic signature.
 
 ## Outcome feedback and trust candidates
 
@@ -285,8 +287,10 @@ and backend systems.
   withdraw a submission before that decision. Reapplication, messaging, and
   next-step coordination are not implemented.
 - Trial-agreement previews stay in the current browser until the applicant is
-  accepted. Accepted applicants can persist one private account proposal, but
-  sending it to the opening owner and mutual acceptance are not implemented.
+  accepted. Accepted applicants can save and explicitly send one proposal;
+  opening owners can privately accept or decline once. Counterproposals,
+  signatures, trial execution tracking, and replacement proposals are not
+  implemented.
 - Outcome-review drafts and trust candidates stay local and are not confirmed or
   published.
 - Saved openings stay only in the current browser and are not synchronized.

@@ -57,6 +57,9 @@ type ApplicationManager interface {
 type TrialProposalManager interface {
 	GetOwn(context.Context, int64, string) (trialproposals.Proposal, error)
 	SaveOwnDraft(context.Context, int64, string, trialproposals.Input) (trialproposals.Proposal, error)
+	SendOwn(context.Context, int64, string) (trialproposals.Proposal, error)
+	ListForOwner(context.Context, int64, string) ([]trialproposals.OwnerProposal, error)
+	Decide(context.Context, int64, string, string, string) (trialproposals.Proposal, error)
 }
 
 type listResponse struct {
@@ -99,6 +102,9 @@ func New(repository openings.Repository, openingManager OpeningManager, applicat
 	routes.HandleFunc("POST /v1/openings/{id}/applications/{applicationId}/decision", api.decideApplication)
 	routes.HandleFunc("GET /v1/openings/{id}/trial-proposal", api.getOwnTrialProposal)
 	routes.HandleFunc("PUT /v1/openings/{id}/trial-proposal", api.saveOwnTrialProposal)
+	routes.HandleFunc("POST /v1/openings/{id}/trial-proposal/send", api.sendOwnTrialProposal)
+	routes.HandleFunc("GET /v1/openings/{id}/trial-proposals", api.listTrialProposalsForOwner)
+	routes.HandleFunc("POST /v1/openings/{id}/trial-proposals/{proposalId}/decision", api.decideTrialProposal)
 	routes.HandleFunc("GET /v1/auth/github/start", api.startGitHubAuth)
 	routes.HandleFunc("GET /v1/auth/github/callback", api.finishGitHubAuth)
 	routes.HandleFunc("GET /v1/session", api.currentSession)
@@ -118,6 +124,9 @@ func New(repository openings.Repository, openingManager OpeningManager, applicat
 	routes.HandleFunc("OPTIONS /v1/openings/{id}/applications", api.preflight)
 	routes.HandleFunc("OPTIONS /v1/openings/{id}/applications/{applicationId}/decision", api.preflight)
 	routes.HandleFunc("OPTIONS /v1/openings/{id}/trial-proposal", api.preflight)
+	routes.HandleFunc("OPTIONS /v1/openings/{id}/trial-proposal/send", api.preflight)
+	routes.HandleFunc("OPTIONS /v1/openings/{id}/trial-proposals", api.preflight)
+	routes.HandleFunc("OPTIONS /v1/openings/{id}/trial-proposals/{proposalId}/decision", api.preflight)
 	routes.HandleFunc("/", api.notFound)
 
 	return api.recoverPanics(api.logRequests(api.cors(routes)))

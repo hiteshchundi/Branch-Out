@@ -73,6 +73,9 @@ checks PostgreSQL on every request and returns HTTP 503 with
 - `POST /v1/openings/{id}/applications/{applicationId}/decision` — irreversibly accept or decline a submitted application
 - `GET /v1/openings/{id}/trial-proposal` — return the accepted applicant's private proposal draft
 - `PUT /v1/openings/{id}/trial-proposal` — create or replace that private proposal draft
+- `POST /v1/openings/{id}/trial-proposal/send` — irreversibly send the applicant's proposal
+- `GET /v1/openings/{id}/trial-proposals` — privately list sent proposals for the opening owner
+- `POST /v1/openings/{id}/trial-proposals/{proposalId}/decision` — irreversibly accept or decline a sent proposal
 
 Discovery accepts optional filters. Structured values use the labels already
 shown by the frontend.
@@ -129,10 +132,14 @@ Trial-proposal routes require an authenticated member whose application for the
 opening is already `accepted`. Eligibility, applicant identity, and opening
 identity are selected together inside the database write; client-supplied IDs
 are never trusted. One complete `draft` proposal is stored per accepted
-application, and later saves replace its bounded terms while retaining the same
-proposal ID. Reads are scoped to the same applicant and accepted application.
-The opening owner cannot read the proposal in this phase, and no send, review,
-mutual-acceptance, or legal-agreement transition is implied.
+application, and later draft saves replace its bounded terms while retaining the
+same proposal ID. Reads are scoped to the same applicant and accepted
+application. Sending atomically changes a draft to `sent`, records its send time,
+and prevents later edits. Owner review first verifies opening ownership and
+never returns drafts. The owner can transition a sent proposal once to
+`accepted` or `declined`; the decision records its time and cannot be reversed.
+Acceptance records both approvals but does not claim a legal signature or
+contract. Counterproposals and replacement proposals are outside this milestone.
 
 The complete contract is in [`openapi.yaml`](openapi.yaml).
 
@@ -210,8 +217,9 @@ only owner review, non-owner rejection, irreversible owner decisions, and
 applicant-visible outcomes. Withdrawal coverage verifies applicant scoping,
 single-transition behavior, owner visibility, and decision exclusion.
 Trial-proposal integration coverage verifies pre-acceptance rejection, accepted
-application linkage, private applicant reads, replacement with a stable ID, and
-isolation from other members.
+application linkage, private applicant reads, replacement with a stable ID,
+draft isolation from owners, immutable sending, owner-only review, irreversible
+decisions, and applicant-visible outcomes.
 
 ## Package boundaries
 
@@ -246,5 +254,7 @@ drafts remain applicant-only. Owners can accept or decline once, and applicants
 load that outcome through the same private application view. Applicants can
 withdraw before a decision; owners retain the historical withdrawn record but
 cannot decide it. Accepted applicants can persist one private two-week trial
-proposal tied to that application; other members cannot load it. Proposal
-sending and mutual acceptance remain outside this milestone.
+proposal tied to that application, send it after a separate confirmation, and
+load its final state. Opening owners can review only sent proposals and accept
+or decline once. Counterproposals, signatures, and trial execution remain
+outside this milestone.

@@ -6,7 +6,7 @@ SELECT
     proposal.weekly_hours, proposal.check_in_cadence, proposal.access_level,
     proposal.confidentiality, proposal.ip_ownership, proposal.exit_plan,
     proposal.terms_confirmed, proposal.proposal_status,
-    proposal.created_at, proposal.updated_at
+    proposal.created_at, proposal.updated_at, proposal.sent_at, proposal.decided_at
 FROM trial_proposals AS proposal
 JOIN applications AS application ON application.id = proposal.application_id
 WHERE proposal.opening_id = sqlc.arg(opening_id)
@@ -49,4 +49,58 @@ RETURNING
     id, application_id, opening_id, applicant_user_id, outcome, deliverable,
     non_goals, start_date, end_date, weekly_hours, check_in_cadence,
     access_level, confidentiality, ip_ownership, exit_plan, terms_confirmed,
-    proposal_status, created_at, updated_at;
+    proposal_status, created_at, updated_at, sent_at, decided_at;
+
+-- name: SendOwnTrialProposal :one
+UPDATE trial_proposals AS proposal SET
+    proposal_status = 'sent',
+    sent_at = now(),
+    updated_at = now()
+FROM applications AS application
+WHERE proposal.opening_id = sqlc.arg(opening_id)
+  AND proposal.applicant_user_id = sqlc.arg(applicant_user_id)
+  AND proposal.proposal_status = 'draft'
+  AND application.id = proposal.application_id
+  AND application.status = 'accepted'
+RETURNING proposal.*;
+
+-- name: GetOwnedOpeningTrialProposalReviewScope :one
+SELECT id
+FROM project_openings
+WHERE id = sqlc.arg(opening_id)
+  AND owner_user_id = sqlc.arg(owner_user_id);
+
+-- name: ListTrialProposalsForOwner :many
+SELECT
+    proposal.id, proposal.application_id, proposal.opening_id,
+    proposal.applicant_user_id, proposal.outcome, proposal.deliverable,
+    proposal.non_goals, proposal.start_date, proposal.end_date,
+    proposal.weekly_hours, proposal.check_in_cadence, proposal.access_level,
+    proposal.confidentiality, proposal.ip_ownership, proposal.exit_plan,
+    proposal.terms_confirmed, proposal.proposal_status,
+    proposal.created_at, proposal.updated_at, proposal.sent_at, proposal.decided_at,
+    profiles.display_name AS applicant_display_name,
+    profiles.primary_role AS applicant_primary_role,
+    users.profile_url AS applicant_github_url
+FROM trial_proposals AS proposal
+JOIN project_openings AS opening ON opening.id = proposal.opening_id
+JOIN profiles ON profiles.user_id = proposal.applicant_user_id
+JOIN users ON users.id = proposal.applicant_user_id
+WHERE proposal.opening_id = sqlc.arg(opening_id)
+  AND opening.owner_user_id = sqlc.arg(owner_user_id)
+  AND proposal.proposal_status IN ('sent', 'accepted', 'declined')
+ORDER BY proposal.sent_at ASC, proposal.id ASC;
+
+-- name: DecideTrialProposalForOwner :one
+UPDATE trial_proposals AS proposal SET
+    proposal_status = sqlc.arg(decision),
+    decided_at = now(),
+    updated_at = now()
+FROM project_openings AS opening
+WHERE proposal.id = sqlc.arg(proposal_id)
+  AND proposal.opening_id = sqlc.arg(opening_id)
+  AND proposal.proposal_status = 'sent'
+  AND opening.id = proposal.opening_id
+  AND opening.owner_user_id = sqlc.arg(owner_user_id)
+  AND sqlc.arg(decision)::text IN ('accepted', 'declined')
+RETURNING proposal.*;

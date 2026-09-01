@@ -451,15 +451,25 @@ browser. Branch-Out safely ignores malformed stored fields.
 After the opening owner accepts an application, the applicant sees **Save
 private proposal**. All three sections must then be complete because the
 proposal is stored as one validated account record. The private draft can be
-restored on another device, but the opening owner cannot see it in this phase.
+restored on another device, and the opening owner cannot see it before it is
+sent.
 
 Select **Complete trial draft** after Safeguards. The completion summary shows
 the outcome, dates, weekly time, check-in cadence, access level, and exit plan.
 It explicitly states whether the draft is device-local or private to the
-applicant's account, and that it has not been sent, accepted, or turned into a
-legal agreement. Sending, owner review, mutual acceptance, and legal execution
-remain later lifecycle steps. Close the flow with its close button, the shaded
-area, or `Escape`.
+applicant's account. For an account draft, confirm that sending records the
+applicant's approval and makes every term read-only, then select **Send to
+opening owner**. The proposal becomes visible only in that owner's private
+opening review.
+
+The opening owner sees every sent term under **Sent trial proposals**. Selecting
+**Accept trial proposal** or **Decline trial proposal** opens a separate
+irreversible-action confirmation. Acceptance records the applicant's approval
+from sending and the owner's explicit approval as a mutually accepted
+Branch-Out record. Decline is also final. Neither decision is a legal agreement,
+electronic signature, or substitute for appropriate contracts. Counterproposals
+and replacement proposals are not available. Close the flow with its close
+button, the shaded area, or `Escape`.
 
 ## Review a trial outcome
 
@@ -708,7 +718,9 @@ configuration, and operating details live in `backend/README.md`.
   which the applicant can see. Applicants can permanently withdraw before that
   decision. Reapplication, messaging, and next-step coordination are not
   available. Signed-out application previews remain browser-local.
-- Trial-agreement drafts cannot be sent, mutually accepted, or signed.
+- Accepted applicants can send one trial proposal and opening owners can accept
+  or decline once. Counterproposals, replacements, execution tracking, and
+  electronic signatures are not available.
 - Outcome feedback and trust-signal candidates cannot be mutually confirmed,
   moderated, or published.
 - Saved openings do not synchronize between browsers or devices.

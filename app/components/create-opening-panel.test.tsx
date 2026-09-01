@@ -139,6 +139,7 @@ describe('CreateOpeningPanel', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [managedDraft()] }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: managedDraft() }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: managedDraft(completeDraft.projectName, 'published') }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 }));
     vi.stubGlobal('fetch', fetcher);
     render(<CreateOpeningPanel authenticatedUser={authenticatedUser} onClose={vi.fn()} onOpeningChanged={onOpeningChanged} />);
@@ -168,7 +169,9 @@ describe('CreateOpeningPanel', () => {
     const fetcher = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [published] }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: { ...published, publicationStatus: 'closed' } }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 }));
     vi.stubGlobal('fetch', fetcher);
     render(<CreateOpeningPanel authenticatedUser={authenticatedUser} onClose={vi.fn()} onOpeningChanged={onOpeningChanged} />);
@@ -210,6 +213,7 @@ describe('CreateOpeningPanel', () => {
     const fetcher = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [published] }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [submitted], meta: { count: 1 } }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: { ...submitted, status: 'accepted', decidedAt: '2026-08-31T09:00:00Z' } }), { status: 200 }));
     vi.stubGlobal('fetch', fetcher);
     render(<CreateOpeningPanel authenticatedUser={authenticatedUser} onClose={vi.fn()} />);
@@ -230,12 +234,58 @@ describe('CreateOpeningPanel', () => {
       `http://localhost:8080/v1/openings/${published.id}/applications/${submitted.id}/decision`,
       expect.objectContaining({ method: 'POST', body: JSON.stringify({ decision: 'accepted' }) }),
     );
-    expect(screen.getByText(/decisions are irreversible/i)).toBeInTheDocument();
+    expect(screen.getByText(/accept and decline decisions are irreversible/i)).toBeInTheDocument();
+  });
+
+  it('privately reviews and explicitly accepts a sent trial proposal', async () => {
+    const published = managedDraft(completeDraft.projectName, 'published');
+    const sentProposal = {
+      id: '81818181-8181-4181-a181-818181818181',
+      applicationId: '71717171-7171-4171-a171-717171717171', openingId: published.id,
+      status: 'sent', sentAt: '2026-09-01T08:00:00Z', decidedAt: null,
+      input: {
+        outcome: 'Build a usable regional comparison flow with documented decisions.',
+        deliverable: 'A tested comparison component and a short implementation note.',
+        nonGoals: 'No authentication or production data access.',
+        startDate: '2026-09-02', endDate: '2026-09-16', weeklyHours: 8,
+        checkInCadence: 'Async update every two days', accessLevel: 'Limited repository access',
+        confidentiality: 'Synthetic data during trial',
+        ipOwnership: 'Open-source contribution under the project license',
+        exitPlan: 'Remove repository access and hand over all documented trial work.', termsConfirmed: true,
+      },
+      applicant: { displayName: 'Asha Rao', primaryRole: 'Software developer', githubUrl: 'https://github.com/asha' },
+    };
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [published] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [sentProposal] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: {
+        ...sentProposal, applicant: undefined, status: 'accepted', decidedAt: '2026-09-01T09:00:00Z',
+      } }), { status: 200 }));
+    vi.stubGlobal('fetch', fetcher);
+    render(<CreateOpeningPanel authenticatedUser={authenticatedUser} onClose={vi.fn()} />);
+
+    expect(await screen.findByRole('heading', { name: /sent trial proposals/i })).toBeInTheDocument();
+    expect(await screen.findByText(sentProposal.input.deliverable)).toBeInTheDocument();
+    const acceptButton = screen.getByRole('button', { name: /accept trial proposal/i });
+    fireEvent.click(acceptButton);
+    const confirmButton = screen.getByRole('button', { name: /confirm proposal acceptance/i });
+    expect(confirmButton).toBeDisabled();
+    fireEvent.click(screen.getByLabelText(/acceptance creates the mutual Branch-Out record/i));
+    fireEvent.click(confirmButton);
+
+    expect(await screen.findByText('Mutually accepted')).toBeInTheDocument();
+    expect(fetcher).toHaveBeenLastCalledWith(
+      `http://localhost:8080/v1/openings/${published.id}/trial-proposals/${sentProposal.id}/decision`,
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ decision: 'accepted' }) }),
+    );
+    expect(screen.getByText(/not a legal signature or contract/i)).toBeInTheDocument();
   });
 
   it('starts a fresh draft after loading a closed opening', async () => {
     vi.stubGlobal('fetch', vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [managedDraft(completeDraft.projectName, 'closed')] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 })));
     render(<CreateOpeningPanel authenticatedUser={authenticatedUser} onClose={vi.fn()} />);
 

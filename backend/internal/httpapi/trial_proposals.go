@@ -15,6 +15,17 @@ type trialProposalResponse struct {
 	Data trialproposals.Proposal `json:"data"`
 }
 
+type trialProposalListResponse struct {
+	Data []trialproposals.OwnerProposal `json:"data"`
+	Meta struct {
+		Count int `json:"count"`
+	} `json:"meta"`
+}
+
+type trialProposalDecisionRequest struct {
+	Decision string `json:"decision"`
+}
+
 func (api *API) getOwnTrialProposal(writer http.ResponseWriter, request *http.Request) {
 	writer.Header().Set("Cache-Control", "no-store")
 	user, ok := api.requireUser(writer, request)
@@ -52,6 +63,60 @@ func (api *API) saveOwnTrialProposal(writer http.ResponseWriter, request *http.R
 	writeJSON(writer, http.StatusOK, trialProposalResponse{Data: result})
 }
 
+func (api *API) sendOwnTrialProposal(writer http.ResponseWriter, request *http.Request) {
+	writer.Header().Set("Cache-Control", "no-store")
+	user, ok := api.requireUser(writer, request)
+	if !ok {
+		return
+	}
+	result, err := api.trialProposals.SendOwn(request.Context(), user.ID, request.PathValue("id"))
+	if api.writeTrialProposalError(writer, err) {
+		return
+	}
+	writeJSON(writer, http.StatusOK, trialProposalResponse{Data: result})
+}
+
+func (api *API) listTrialProposalsForOwner(writer http.ResponseWriter, request *http.Request) {
+	writer.Header().Set("Cache-Control", "no-store")
+	user, ok := api.requireUser(writer, request)
+	if !ok {
+		return
+	}
+	results, err := api.trialProposals.ListForOwner(request.Context(), user.ID, request.PathValue("id"))
+	if api.writeTrialProposalError(writer, err) {
+		return
+	}
+	response := trialProposalListResponse{Data: results}
+	response.Meta.Count = len(results)
+	writeJSON(writer, http.StatusOK, response)
+}
+
+func (api *API) decideTrialProposal(writer http.ResponseWriter, request *http.Request) {
+	writer.Header().Set("Cache-Control", "no-store")
+	user, ok := api.requireUser(writer, request)
+	if !ok {
+		return
+	}
+	var input trialProposalDecisionRequest
+	decoder := json.NewDecoder(http.MaxBytesReader(writer, request.Body, maximumTrialProposalBody))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil {
+		writeError(writer, http.StatusBadRequest, apiError{Code: "invalid_request", Message: "Provide an accepted or declined trial proposal decision."})
+		return
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		writeError(writer, http.StatusBadRequest, apiError{Code: "invalid_request", Message: "Provide exactly one trial proposal decision."})
+		return
+	}
+	result, err := api.trialProposals.Decide(
+		request.Context(), user.ID, request.PathValue("id"), request.PathValue("proposalId"), input.Decision,
+	)
+	if api.writeTrialProposalError(writer, err) {
+		return
+	}
+	writeJSON(writer, http.StatusOK, trialProposalResponse{Data: result})
+}
+
 func (api *API) writeTrialProposalError(writer http.ResponseWriter, err error) bool {
 	if err == nil {
 		return false
@@ -64,6 +129,12 @@ func (api *API) writeTrialProposalError(writer http.ResponseWriter, err error) b
 		writeError(writer, http.StatusNotFound, apiError{Code: "trial_proposal_not_found", Message: "No trial proposal was found for this opening."})
 	case errors.Is(err, trialproposals.ErrUnavailable):
 		writeError(writer, http.StatusConflict, apiError{Code: "trial_proposal_unavailable", Message: "An accepted application is required to save this trial proposal."})
+	case errors.Is(err, trialproposals.ErrSendUnavailable):
+		writeError(writer, http.StatusConflict, apiError{Code: "trial_proposal_send_unavailable", Message: "Only a complete unsent proposal can be sent."})
+	case errors.Is(err, trialproposals.ErrReviewNotFound):
+		writeError(writer, http.StatusNotFound, apiError{Code: "trial_proposal_review_not_found", Message: "This opening is not available for trial proposal review."})
+	case errors.Is(err, trialproposals.ErrDecisionUnavailable):
+		writeError(writer, http.StatusConflict, apiError{Code: "trial_proposal_decision_unavailable", Message: "This trial proposal is not available for a decision."})
 	default:
 		api.logger.Error("manage trial proposal failed", "error", err)
 		writeError(writer, http.StatusInternalServerError, apiError{Code: "internal_error", Message: "The trial proposal request could not be completed."})

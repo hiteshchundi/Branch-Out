@@ -7,6 +7,8 @@ import type { ProjectOpening } from '../data/projects';
 import {
   loadOwnTrialProposal,
   saveOwnTrialProposal,
+  sendOwnTrialProposal,
+  type ManagedTrialProposal,
   type TrialProposalInput,
 } from '../data/trial-proposals';
 import { useAccessibleDialog } from './use-accessible-dialog';
@@ -166,6 +168,9 @@ export function TrialAgreementPanel({
   const [isComplete, setIsComplete] = useState(false);
   const [accountStatus, setAccountStatus] = useState<AccountDraftStatus>(authenticatedUser ? 'loading' : 'local');
   const [isSaving, setIsSaving] = useState(false);
+  const [proposalStatus, setProposalStatus] = useState<ManagedTrialProposal['status']>('draft');
+  const [sendConfirmed, setSendConfirmed] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLElement>(null);
   useAccessibleDialog({ dialogRef, initialFocusRef: closeButtonRef, onClose });
@@ -181,7 +186,11 @@ export function TrialAgreementPanel({
           return;
         }
         const proposal = await loadOwnTrialProposal(project.id, controller.signal);
-        if (proposal) setDraft(fromProposalInput(proposal.input));
+        if (proposal) {
+          setDraft(fromProposalInput(proposal.input));
+          setProposalStatus(proposal.status);
+          if (proposal.status !== 'draft') setIsComplete(true);
+        }
         setAccountStatus('accepted');
       })
       .catch((error: unknown) => {
@@ -210,6 +219,10 @@ export function TrialAgreementPanel({
 
   const persistDraft = async () => {
     if (accountStatus !== 'accepted') return persistLocalDraft();
+    if (proposalStatus !== 'draft') {
+      setSaveMessage('Sent proposals are read-only. The owner must record the next decision.');
+      return false;
+    }
 
     const nextErrors = validateEntireDraft(draft);
     if (Object.keys(nextErrors).length > 0) {
@@ -232,6 +245,22 @@ export function TrialAgreementPanel({
       return false;
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleSend = async () => {
+    if (accountStatus !== 'accepted' || proposalStatus !== 'draft' || !sendConfirmed) return;
+    setIsSending(true);
+    setSaveMessage('');
+    try {
+      const proposal = await sendOwnTrialProposal(project.id);
+      setProposalStatus(proposal.status);
+      setSendConfirmed(false);
+      setSaveMessage('Trial proposal sent privately to the opening owner.');
+    } catch {
+      setSaveMessage('The proposal could not be sent. It remains private and unsent.');
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -260,16 +289,21 @@ export function TrialAgreementPanel({
         <div className="trial-project-context"><span>{project.stage}</span><strong>{project.title}</strong><small>{project.ownerName} · {project.commitment}</small></div>
 
         {accountStatus === 'loading' && <p aria-live="polite" className="save-message">Checking your application and private draft…</p>}
-        {accountStatus === 'accepted' && <p className="save-message">Your application was accepted. This proposal is private to your account until a later send-and-accept step is added.</p>}
+        {accountStatus === 'accepted' && proposalStatus === 'draft' && <p className="save-message">Your application was accepted. Save the complete proposal privately, then explicitly send it to the opening owner.</p>}
+        {accountStatus === 'accepted' && proposalStatus === 'sent' && <p className="save-message">Your proposal is with the opening owner for review and can no longer be edited.</p>}
+        {accountStatus === 'accepted' && proposalStatus === 'accepted' && <p className="save-message">Both people explicitly accepted this trial proposal. It remains a planning record, not a legal signature.</p>}
+        {accountStatus === 'accepted' && proposalStatus === 'declined' && <p className="save-message">The opening owner declined this proposal. The decision is final for this proposal.</p>}
         {accountStatus === 'preview' && <p className="save-message">Account saving unlocks after your application is accepted. This preview stays only on this device.</p>}
         {accountStatus === 'error' && <p className="save-message">Your application could not be checked. This preview will stay only on this device.</p>}
 
         {isComplete ? (
-          <div className="trial-complete" role="status">
-            <span aria-hidden="true" className="complete-mark">✓</span>
-            <span className="eyebrow">Draft ready for mutual review</span>
-            <h3>The trial boundaries are clear.</h3>
-            <p>{accountStatus === 'accepted' ? 'This proposal is saved privately to your Branch-Out account.' : 'This draft is saved only on this device.'} It has not been sent, accepted, or turned into a legal agreement.</p>
+          <div className="trial-complete">
+            <div role="status">
+              <span aria-hidden="true" className="complete-mark">✓</span>
+              <span className="eyebrow">{proposalStatus === 'accepted' ? 'Mutually accepted proposal' : proposalStatus === 'declined' ? 'Proposal declined' : proposalStatus === 'sent' ? 'Sent for owner review' : 'Draft ready for mutual review'}</span>
+              <h3>{proposalStatus === 'accepted' ? 'The small bet is mutually agreed.' : 'The trial boundaries are clear.'}</h3>
+              <p>{proposalStatus === 'accepted' ? 'You approved these terms by sending them, and the opening owner explicitly accepted them.' : proposalStatus === 'declined' ? 'The opening owner declined these terms. This record cannot be edited or resubmitted.' : proposalStatus === 'sent' ? 'This proposal was sent privately to the opening owner and is awaiting an irreversible accept or decline decision.' : accountStatus === 'accepted' ? 'This proposal is saved privately to your Branch-Out account and has not been sent yet.' : 'This draft is saved only on this device. It has not been sent or accepted.'} It is not a legal agreement or electronic signature.</p>
+            </div>
             <dl>
               <div><dt>Outcome</dt><dd>{draft.outcome}</dd></div>
               <div><dt>Dates</dt><dd>{draft.startDate} to {draft.endDate}</dd></div>
@@ -277,6 +311,18 @@ export function TrialAgreementPanel({
               <div><dt>Access</dt><dd>{draft.accessLevel}</dd></div>
               <div><dt>Exit plan</dt><dd>{draft.exitPlan}</dd></div>
             </dl>
+            {accountStatus === 'accepted' && proposalStatus === 'draft' && (
+              <div className="opening-lifecycle-confirmation">
+                <label>
+                  <input checked={sendConfirmed} onChange={(event) => setSendConfirmed(event.target.checked)} type="checkbox" />
+                  <span>I reviewed every term and understand sending records my approval and makes this proposal read-only.</span>
+                </label>
+                <button className="primary-button" disabled={!sendConfirmed || isSending} onClick={handleSend} type="button">
+                  {isSending ? 'Sending…' : 'Send to opening owner'}
+                </button>
+              </div>
+            )}
+            {saveMessage && <p aria-live="polite" className="save-message">{saveMessage}</p>}
             <button className="primary-button" onClick={onClose} type="button">Return to opening</button>
           </div>
         ) : (
@@ -312,7 +358,7 @@ export function TrialAgreementPanel({
               </div>}
 
               <footer className="trial-actions">
-                <div><button className="secondary-button" disabled={accountStatus === 'loading' || isSaving} onClick={() => void persistDraft()} type="button">{accountStatus === 'accepted' ? 'Save private proposal' : 'Save draft'}</button>{saveMessage && <span aria-live="polite" className="save-message">{saveMessage}</span>}</div>
+                <div><button className="secondary-button" disabled={accountStatus === 'loading' || isSaving || proposalStatus !== 'draft'} onClick={() => void persistDraft()} type="button">{accountStatus === 'accepted' ? 'Save private proposal' : 'Save draft'}</button>{saveMessage && <span aria-live="polite" className="save-message">{saveMessage}</span>}</div>
                 <div>{step > 0 && <button className="text-button" onClick={() => setStep((current) => current - 1)} type="button">Back</button>}<button className="primary-button" disabled={accountStatus === 'loading' || isSaving} type="submit">{isSaving ? 'Saving…' : step === 2 ? 'Complete trial draft' : 'Continue'}</button></div>
               </footer>
             </form>

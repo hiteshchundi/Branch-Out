@@ -80,12 +80,36 @@ func TestManagerLoadsOnlyCurrentApplicantsProposal(t *testing.T) {
 	}
 }
 
+func TestManagerScopesSendAndOwnerDecisionTransitions(t *testing.T) {
+	store := &fakeStore{
+		sent:    Proposal{Status: "sent"},
+		listed:  []OwnerProposal{{Proposal: Proposal{ID: "proposal-id", Status: "sent"}}},
+		decided: Proposal{Status: "accepted"},
+	}
+	manager := NewManager(store)
+	if proposal, err := manager.SendOwn(context.Background(), 7, " opening-id "); err != nil || proposal.Status != "sent" || store.userID != 7 {
+		t.Fatalf("SendOwn() = %#v, %v; store %#v", proposal, err, store)
+	}
+	if proposals, err := manager.ListForOwner(context.Background(), 8, " opening-id "); err != nil || len(proposals) != 1 || store.userID != 8 {
+		t.Fatalf("ListForOwner() = %#v, %v; store %#v", proposals, err, store)
+	}
+	if proposal, err := manager.Decide(context.Background(), 8, " opening-id ", " proposal-id ", "accepted"); err != nil || proposal.Status != "accepted" || store.proposalID != "proposal-id" {
+		t.Fatalf("Decide() = %#v, %v; store %#v", proposal, err, store)
+	}
+	if _, err := manager.Decide(context.Background(), 8, "opening-id", "proposal-id", "counter"); !errors.Is(err, ErrDecisionUnavailable) {
+		t.Fatalf("invalid Decide() error = %v", err)
+	}
+}
+
 type fakeStore struct {
-	record     Record
-	userID     int64
-	openingID  string
-	got, saved Proposal
-	err        error
+	record                    Record
+	userID                    int64
+	openingID                 string
+	proposalID                string
+	decision                  string
+	got, saved, sent, decided Proposal
+	listed                    []OwnerProposal
+	err                       error
 }
 
 func (store *fakeStore) GetOwn(_ context.Context, userID int64, openingID string) (Proposal, error) {
@@ -96,4 +120,19 @@ func (store *fakeStore) GetOwn(_ context.Context, userID int64, openingID string
 func (store *fakeStore) UpsertOwnDraft(_ context.Context, record Record) (Proposal, error) {
 	store.record = record
 	return store.saved, store.err
+}
+
+func (store *fakeStore) SendOwn(_ context.Context, userID int64, openingID string) (Proposal, error) {
+	store.userID, store.openingID = userID, openingID
+	return store.sent, store.err
+}
+
+func (store *fakeStore) ListForOwner(_ context.Context, userID int64, openingID string) ([]OwnerProposal, error) {
+	store.userID, store.openingID = userID, openingID
+	return store.listed, store.err
+}
+
+func (store *fakeStore) Decide(_ context.Context, userID int64, openingID, proposalID, decision string) (Proposal, error) {
+	store.userID, store.openingID, store.proposalID, store.decision = userID, openingID, proposalID, decision
+	return store.decided, store.err
 }

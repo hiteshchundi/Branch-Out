@@ -13,8 +13,11 @@ import (
 )
 
 var (
-	ErrNotFound    = errors.New("trial proposal not found")
-	ErrUnavailable = errors.New("trial proposal unavailable")
+	ErrNotFound            = errors.New("trial proposal not found")
+	ErrUnavailable         = errors.New("trial proposal unavailable")
+	ErrSendUnavailable     = errors.New("trial proposal send unavailable")
+	ErrReviewNotFound      = errors.New("trial proposal review opening not found")
+	ErrDecisionUnavailable = errors.New("trial proposal decision unavailable")
 )
 
 type FieldError struct {
@@ -40,13 +43,26 @@ type Input struct {
 }
 
 type Proposal struct {
-	ID            string    `json:"id"`
-	ApplicationID string    `json:"applicationId"`
-	OpeningID     string    `json:"openingId"`
-	Input         Input     `json:"input"`
-	Status        string    `json:"status"`
-	CreatedAt     time.Time `json:"createdAt"`
-	UpdatedAt     time.Time `json:"updatedAt"`
+	ID            string     `json:"id"`
+	ApplicationID string     `json:"applicationId"`
+	OpeningID     string     `json:"openingId"`
+	Input         Input      `json:"input"`
+	Status        string     `json:"status"`
+	SentAt        *time.Time `json:"sentAt"`
+	DecidedAt     *time.Time `json:"decidedAt"`
+	CreatedAt     time.Time  `json:"createdAt"`
+	UpdatedAt     time.Time  `json:"updatedAt"`
+}
+
+type Applicant struct {
+	DisplayName string `json:"displayName"`
+	PrimaryRole string `json:"primaryRole"`
+	GitHubURL   string `json:"githubUrl"`
+}
+
+type OwnerProposal struct {
+	Proposal
+	Applicant Applicant `json:"applicant"`
 }
 
 type Record struct {
@@ -57,6 +73,35 @@ type Record struct {
 type Store interface {
 	GetOwn(context.Context, int64, string) (Proposal, error)
 	UpsertOwnDraft(context.Context, Record) (Proposal, error)
+	SendOwn(context.Context, int64, string) (Proposal, error)
+	ListForOwner(context.Context, int64, string) ([]OwnerProposal, error)
+	Decide(context.Context, int64, string, string, string) (Proposal, error)
+}
+
+func (manager *Manager) SendOwn(ctx context.Context, userID int64, openingID string) (Proposal, error) {
+	openingID = strings.TrimSpace(openingID)
+	if openingID == "" {
+		return Proposal{}, ErrSendUnavailable
+	}
+	return manager.store.SendOwn(ctx, userID, openingID)
+}
+
+func (manager *Manager) ListForOwner(ctx context.Context, userID int64, openingID string) ([]OwnerProposal, error) {
+	openingID = strings.TrimSpace(openingID)
+	if openingID == "" {
+		return nil, ErrReviewNotFound
+	}
+	return manager.store.ListForOwner(ctx, userID, openingID)
+}
+
+func (manager *Manager) Decide(ctx context.Context, userID int64, openingID, proposalID, decision string) (Proposal, error) {
+	openingID = strings.TrimSpace(openingID)
+	proposalID = strings.TrimSpace(proposalID)
+	decision = strings.TrimSpace(decision)
+	if openingID == "" || proposalID == "" || (decision != "accepted" && decision != "declined") {
+		return Proposal{}, ErrDecisionUnavailable
+	}
+	return manager.store.Decide(ctx, userID, openingID, proposalID, decision)
 }
 
 type Manager struct {

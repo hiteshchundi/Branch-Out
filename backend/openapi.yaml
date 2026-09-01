@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: Branch-Out API
-  version: 0.9.0
-  description: PostgreSQL-backed discovery, GitHub authentication, member profiles, owner-managed opening lifecycles, proof-led applications, private owner review, immutable decisions, applicant withdrawal, and accepted-applicant trial proposal drafts for Branch-Out.
+  version: 0.10.0
+  description: PostgreSQL-backed discovery, GitHub authentication, member profiles, owner-managed opening lifecycles, proof-led applications, applicant withdrawal, and private trial proposal sending, owner review, and immutable mutual decisions for Branch-Out.
 servers:
   - url: http://localhost:8080
 paths:
@@ -503,6 +503,165 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '500':
           description: The proposal draft could not be saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /v1/openings/{id}/trial-proposal/send:
+    post:
+      operationId: sendOwnTrialProposal
+      summary: Send the accepted applicant's private proposal to the opening owner
+      description: Irreversibly changes a complete draft to sent. Sending records the applicant's approval and makes the proposal read-only.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The proposal was sent privately to the opening owner.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/TrialProposal'
+        '401':
+          description: No valid session is present.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: The proposal is missing, already sent, or already decided.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: The proposal could not be sent.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /v1/openings/{id}/trial-proposals:
+    get:
+      operationId: listTrialProposalsForOwner
+      summary: List sent trial proposals for the opening owner
+      description: Verifies opening ownership and returns sent or decided proposals. Applicant drafts remain private.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Owner-visible proposals ordered by send time.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/OwnerTrialProposal'
+                  meta:
+                    type: object
+                    required: [count]
+                    properties:
+                      count:
+                        type: integer
+                        minimum: 0
+        '401':
+          description: No valid session is present.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: The opening does not exist or is not owned by the current member.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: Sent proposals could not be loaded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /v1/openings/{id}/trial-proposals/{proposalId}/decision:
+    post:
+      operationId: decideTrialProposal
+      summary: Accept or decline a sent trial proposal
+      description: Requires opening ownership and a sent proposal. The first owner decision is immutable; acceptance records both approvals but is not a legal signature.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: proposalId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TrialProposalDecisionInput'
+      responses:
+        '200':
+          description: The immutable owner decision was recorded.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/TrialProposal'
+        '400':
+          description: The decision request is malformed or unsupported.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: No valid session is present.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: The opening does not exist or is not owned by the current member.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: The proposal is missing, not sent, or already decided.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: The proposal decision could not be recorded.
           content:
             application/json:
               schema:
@@ -1141,7 +1300,7 @@ components:
           const: true
     TrialProposal:
       type: object
-      required: [id, applicationId, openingId, input, status, createdAt, updatedAt]
+      required: [id, applicationId, openingId, input, status, sentAt, decidedAt, createdAt, updatedAt]
       properties:
         id:
           type: string
@@ -1155,13 +1314,50 @@ components:
           $ref: '#/components/schemas/TrialProposalInput'
         status:
           type: string
-          const: draft
+          enum: [draft, sent, accepted, declined]
+        sentAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        decidedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
         createdAt:
           type: string
           format: date-time
         updatedAt:
           type: string
           format: date-time
+    TrialProposalApplicant:
+      type: object
+      required: [displayName, primaryRole, githubUrl]
+      properties:
+        displayName:
+          type: string
+        primaryRole:
+          type: string
+        githubUrl:
+          type: string
+          format: uri
+    OwnerTrialProposal:
+      allOf:
+        - $ref: '#/components/schemas/TrialProposal'
+        - type: object
+          required: [applicant]
+          properties:
+            applicant:
+              $ref: '#/components/schemas/TrialProposalApplicant'
+    TrialProposalDecisionInput:
+      type: object
+      additionalProperties: false
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [accepted, declined]
     Application:
       type: object
       required: [id, openingId, input, status, submittedAt, decidedAt, withdrawnAt, createdAt, updatedAt]

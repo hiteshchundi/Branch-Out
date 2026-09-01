@@ -91,7 +91,7 @@ describe('TrialAgreementPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: /complete trial draft/i }));
     const status = await screen.findByRole('status');
     expect(status).toHaveTextContent(/draft ready for mutual review/i);
-    expect(status).toHaveTextContent(/has not been sent, accepted/i);
+    expect(status).toHaveTextContent(/has not been sent or accepted/i);
   });
 
   it('closes with Escape', () => {
@@ -109,7 +109,7 @@ describe('TrialAgreementPanel', () => {
       } }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: {
         id: 'proposal-id', applicationId: 'application-id', openingId: project.id,
-        input: { ...serverDraft, weeklyHours: 8 }, status: 'draft',
+        input: { ...serverDraft, weeklyHours: 8 }, status: 'draft', sentAt: null, decidedAt: null,
       } }), { status: 200 }));
     vi.stubGlobal('fetch', fetcher);
 
@@ -129,7 +129,7 @@ describe('TrialAgreementPanel', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ error: { code: 'trial_proposal_not_found' } }), { status: 404 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: {
         id: 'proposal-id', applicationId: 'application-id', openingId: project.id,
-        input: { ...completeDraft, weeklyHours: 8 }, status: 'draft',
+        input: { ...completeDraft, weeklyHours: 8 }, status: 'draft', sentAt: null, decidedAt: null,
       } }), { status: 200 }));
     vi.stubGlobal('fetch', fetcher);
 
@@ -142,7 +142,61 @@ describe('TrialAgreementPanel', () => {
     await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(3));
     expect(fetcher.mock.calls[2][1]).toEqual(expect.objectContaining({ method: 'PUT' }));
     expect(await screen.findByRole('status')).toHaveTextContent(/saved privately to your Branch-Out account/i);
-    expect(screen.getByRole('status')).toHaveTextContent(/has not been sent, accepted/i);
+    expect(screen.getByRole('status')).toHaveTextContent(/has not been sent yet/i);
+    expect(screen.getByRole('button', { name: /send to opening owner/i })).toBeDisabled();
+  });
+
+  it('requires explicit applicant confirmation before sending the read-only proposal', async () => {
+    localStorage.setItem(trialAgreementStorageKey(project.id), JSON.stringify(completeDraft));
+    const draftProposal = {
+      id: 'proposal-id', applicationId: 'application-id', openingId: project.id,
+      input: { ...completeDraft, weeklyHours: 8 }, status: 'draft', sentAt: null, decidedAt: null,
+    };
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: {
+        id: 'application-id', openingId: project.id, input: applicationInput, status: 'accepted',
+      } }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: draftProposal }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: draftProposal }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: {
+        ...draftProposal, status: 'sent', sentAt: '2026-09-01T10:00:00Z',
+      } }), { status: 200 }));
+    vi.stubGlobal('fetch', fetcher);
+
+    render(<TrialAgreementPanel authenticatedUser={authenticatedUser} onClose={vi.fn()} project={project} />);
+    await screen.findByText(/application was accepted/i);
+    fireEvent.click(screen.getByRole('button', { name: /continue/i }));
+    fireEvent.click(screen.getByRole('button', { name: /continue/i }));
+    fireEvent.click(screen.getByRole('button', { name: /complete trial draft/i }));
+    const sendButton = await screen.findByRole('button', { name: /send to opening owner/i });
+    expect(sendButton).toBeDisabled();
+    fireEvent.click(screen.getByLabelText(/sending records my approval/i));
+    fireEvent.click(sendButton);
+
+    expect(await screen.findByRole('status')).toHaveTextContent(/awaiting an irreversible accept or decline/i);
+    expect(fetcher).toHaveBeenLastCalledWith(
+      `http://localhost:8080/v1/openings/${project.id}/trial-proposal/send`,
+      expect.objectContaining({ method: 'POST', credentials: 'include' }),
+    );
+  });
+
+  it('shows an immutable mutually accepted proposal on load', async () => {
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: {
+        id: 'application-id', openingId: project.id, input: applicationInput, status: 'accepted',
+      } }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: {
+        id: 'proposal-id', applicationId: 'application-id', openingId: project.id,
+        input: { ...completeDraft, weeklyHours: 8 }, status: 'accepted',
+        sentAt: '2026-09-01T10:00:00Z', decidedAt: '2026-09-01T11:00:00Z',
+      } }), { status: 200 }));
+    vi.stubGlobal('fetch', fetcher);
+
+    render(<TrialAgreementPanel authenticatedUser={authenticatedUser} onClose={vi.fn()} project={project} />);
+
+    expect(await screen.findByText(/mutually accepted proposal/i)).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent(/opening owner explicitly accepted/i);
+    expect(screen.queryByRole('button', { name: /send to opening owner/i })).not.toBeInTheDocument();
   });
 
   it('keeps a signed-in non-accepted applicant in device preview mode', async () => {

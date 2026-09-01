@@ -96,6 +96,38 @@ func TestPostgresTrialProposalLifecycle(t *testing.T) {
 	if _, err := manager.SaveOwnDraft(ctx, otherApplicant.ID, opening.ID, validTrialInput()); !errors.Is(err, ErrUnavailable) {
 		t.Fatalf("other applicant SaveOwnDraft() error = %v, want ErrUnavailable", err)
 	}
+
+	sent, err := manager.SendOwn(ctx, applicant.ID, opening.ID)
+	if err != nil || sent.Status != "sent" || sent.SentAt == nil || sent.DecidedAt != nil {
+		t.Fatalf("SendOwn() = %#v, %v", sent, err)
+	}
+	if _, err := manager.SaveOwnDraft(ctx, applicant.ID, opening.ID, validTrialInput()); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("sent SaveOwnDraft() error = %v, want ErrUnavailable", err)
+	}
+	if _, err := manager.SendOwn(ctx, applicant.ID, opening.ID); !errors.Is(err, ErrSendUnavailable) {
+		t.Fatalf("repeated SendOwn() error = %v, want ErrSendUnavailable", err)
+	}
+	review, err := manager.ListForOwner(ctx, owner.ID, opening.ID)
+	if err != nil || len(review) != 1 || review[0].ID != proposal.ID || review[0].Applicant.DisplayName != "Accepted Applicant" {
+		t.Fatalf("ListForOwner() = %#v, %v", review, err)
+	}
+	if _, err := manager.ListForOwner(ctx, otherApplicant.ID, opening.ID); !errors.Is(err, ErrReviewNotFound) {
+		t.Fatalf("non-owner ListForOwner() error = %v, want ErrReviewNotFound", err)
+	}
+	if _, err := manager.Decide(ctx, otherApplicant.ID, opening.ID, proposal.ID, "accepted"); !errors.Is(err, ErrReviewNotFound) {
+		t.Fatalf("non-owner Decide() error = %v, want ErrReviewNotFound", err)
+	}
+	accepted, err := manager.Decide(ctx, owner.ID, opening.ID, proposal.ID, "accepted")
+	if err != nil || accepted.Status != "accepted" || accepted.DecidedAt == nil {
+		t.Fatalf("Decide() = %#v, %v", accepted, err)
+	}
+	if _, err := manager.Decide(ctx, owner.ID, opening.ID, proposal.ID, "declined"); !errors.Is(err, ErrDecisionUnavailable) {
+		t.Fatalf("repeated Decide() error = %v, want ErrDecisionUnavailable", err)
+	}
+	loaded, err = manager.GetOwn(ctx, applicant.ID, opening.ID)
+	if err != nil || loaded.Status != "accepted" || loaded.DecidedAt == nil {
+		t.Fatalf("accepted GetOwn() = %#v, %v", loaded, err)
+	}
 }
 
 func validTrialInput() Input {
