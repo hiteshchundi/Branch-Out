@@ -5,6 +5,8 @@ import {
   saveOwnTrialProposal,
   sendOwnTrialProposal,
   decideTrialProposal,
+  addTrialCheckIn,
+  listTrialCheckIns,
   TrialProposalAPIError,
   type TrialProposalInput,
 } from './trial-proposals';
@@ -89,6 +91,24 @@ describe('trial proposal API client', () => {
     expect(fetcher).toHaveBeenLastCalledWith(
       `http://localhost:8080/v1/openings/${proposal.openingId}/trial-proposals/${proposal.id}/decision`,
       expect.objectContaining({ method: 'POST', body: JSON.stringify({ decision: 'accepted' }) }),
+    );
+  });
+
+  it('lists and appends participant trial check-ins', async () => {
+    const checkIn = {
+      id: '91919191-9191-4191-a191-919191919191', proposalId: proposal.id,
+      kind: 'progress', update: 'Completed the API boundary and added focused tests.', evidenceUrl: '',
+      author: { displayName: 'Asha Rao' }, authorRole: 'applicant', createdAt: '2026-09-02T10:00:00Z',
+    } as const;
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [checkIn] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: checkIn }), { status: 201 }));
+    vi.stubGlobal('fetch', fetcher);
+    await expect(listTrialCheckIns(proposal.id)).resolves.toEqual([checkIn]);
+    await expect(addTrialCheckIn(proposal.id, { kind: 'progress', update: checkIn.update, evidenceUrl: '' })).resolves.toEqual(checkIn);
+    expect(fetcher).toHaveBeenLastCalledWith(
+      `http://localhost:8080/v1/trial-proposals/${proposal.id}/check-ins`,
+      expect.objectContaining({ method: 'POST', credentials: 'include' }),
     );
   });
 });

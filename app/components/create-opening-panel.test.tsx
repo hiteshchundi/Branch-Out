@@ -125,7 +125,7 @@ describe('CreateOpeningPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
 
     expect(await screen.findByText(/private draft saved to your account/i)).toBeInTheDocument();
-    expect(fetcher).toHaveBeenLastCalledWith(
+    expect(fetcher).toHaveBeenCalledWith(
       'http://localhost:8080/v1/openings/61616161-6161-4161-a161-616161616161',
       expect.objectContaining({ method: 'PUT', credentials: 'include' }),
     );
@@ -275,7 +275,7 @@ describe('CreateOpeningPanel', () => {
     fireEvent.click(confirmButton);
 
     expect(await screen.findByText('Mutually accepted')).toBeInTheDocument();
-    expect(fetcher).toHaveBeenLastCalledWith(
+    expect(fetcher).toHaveBeenCalledWith(
       `http://localhost:8080/v1/openings/${published.id}/trial-proposals/${sentProposal.id}/decision`,
       expect.objectContaining({ method: 'POST', body: JSON.stringify({ decision: 'accepted' }) }),
     );

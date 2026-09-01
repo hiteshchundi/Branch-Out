@@ -195,7 +195,7 @@ describe('TrialAgreementPanel', () => {
     render(<TrialAgreementPanel authenticatedUser={authenticatedUser} onClose={vi.fn()} project={project} />);
 
     expect(await screen.findByText(/mutually accepted proposal/i)).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent(/opening owner explicitly accepted/i);
+    expect(screen.getByText(/opening owner explicitly accepted/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /send to opening owner/i })).not.toBeInTheDocument();
   });
 

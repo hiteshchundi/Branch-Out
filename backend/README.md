@@ -76,6 +76,8 @@ checks PostgreSQL on every request and returns HTTP 503 with
 - `POST /v1/openings/{id}/trial-proposal/send` — irreversibly send the applicant's proposal
 - `GET /v1/openings/{id}/trial-proposals` — privately list sent proposals for the opening owner
 - `POST /v1/openings/{id}/trial-proposals/{proposalId}/decision` — irreversibly accept or decline a sent proposal
+- `GET /v1/trial-proposals/{proposalId}/check-ins` — list the accepted trial's participant-only execution log
+- `POST /v1/trial-proposals/{proposalId}/check-ins` — append an immutable progress, blocker, or milestone check-in
 
 Discovery accepts optional filters. Structured values use the labels already
 shown by the frontend.
@@ -140,6 +142,12 @@ never returns drafts. The owner can transition a sent proposal once to
 `accepted` or `declined`; the decision records its time and cannot be reversed.
 Acceptance records both approvals but does not claim a legal signature or
 contract. Counterproposals and replacement proposals are outside this milestone.
+
+Check-in routes require a mutually accepted proposal and authorize exactly its
+applicant or opening owner. The database scopes every list and insert to that
+participant relationship. Entries are append-only, timestamped, and categorized
+as progress, blocker, or milestone; an optional evidence URL must use HTTP or
+HTTPS. Check-ins do not complete the trial or publish evidence.
 
 The complete contract is in [`openapi.yaml`](openapi.yaml).
 
@@ -256,5 +264,8 @@ withdraw before a decision; owners retain the historical withdrawn record but
 cannot decide it. Accepted applicants can persist one private two-week trial
 proposal tied to that application, send it after a separate confirmation, and
 load its final state. Opening owners can review only sent proposals and accept
-or decline once. Counterproposals, signatures, and trial execution remain
-outside this milestone.
+or decline once. A mutually accepted proposal then exposes an immutable private
+execution log to exactly the applicant and opening owner. Either participant can
+append progress, blocker, or milestone check-ins with an optional safe evidence
+URL. Editing or deleting check-ins, completion decisions, counterproposals, and
+signatures remain outside this milestone.

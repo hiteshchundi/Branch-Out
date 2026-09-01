@@ -25,6 +25,7 @@ import {
   type OwnerTrialProposal,
 } from '../data/trial-proposals';
 import { useAccessibleDialog } from './use-accessible-dialog';
+import { TrialCheckInLog } from './trial-check-in-log';
 
 export const OPENING_DRAFT_STORAGE_KEY = 'branch-out-opening-draft';
 
@@ -675,6 +676,7 @@ export function CreateOpeningPanel({
                             )}
                           </div>
                         )}
+                        {proposal.status === 'accepted' && <TrialCheckInLog proposalId={proposal.id} />}
                       </li>
                     ))}
                   </ol>

@@ -471,6 +471,23 @@ electronic signature, or substitute for appropriate contracts. Counterproposals
 and replacement proposals are not available. Close the flow with its close
 button, the shaded area, or `Escape`.
 
+### Record trial execution
+
+After mutual acceptance, both the applicant's proposal summary and the opening
+owner's private review show **Trial check-ins**. The log is available only to
+those two participants. Either person can append one of three explicit entry
+types:
+
+- **Progress** for a concrete change since the last update
+- **Blocker** for an issue that needs attention or a scope decision
+- **Milestone** for work that was reviewed or reached an agreed boundary
+
+Every entry requires 20–1000 characters and may include one complete HTTP or
+HTTPS evidence link. Branch-Out records the author role and UTC timestamp.
+Entries cannot be edited or deleted, which preserves the shared execution
+history. The log does not itself complete a trial, publish evidence, or create a
+trust signal.
+
 ## Review a trial outcome
 
 **What it is:** A project-specific post-trial review that connects observable
@@ -719,8 +736,10 @@ configuration, and operating details live in `backend/README.md`.
   decision. Reapplication, messaging, and next-step coordination are not
   available. Signed-out application previews remain browser-local.
 - Accepted applicants can send one trial proposal and opening owners can accept
-  or decline once. Counterproposals, replacements, execution tracking, and
-  electronic signatures are not available.
+  or decline once. Mutually accepted proposals have a participant-only,
+  immutable progress/blocker/milestone log. Editing or deleting check-ins,
+  completion decisions, counterproposals, replacements, and electronic
+  signatures are not available.
 - Outcome feedback and trust-signal candidates cannot be mutually confirmed,
   moderated, or published.
 - Saved openings do not synchronize between browsers or devices.

@@ -12,6 +12,7 @@ import {
   type TrialProposalInput,
 } from '../data/trial-proposals';
 import { useAccessibleDialog } from './use-accessible-dialog';
+import { TrialCheckInLog } from './trial-check-in-log';
 
 export type TrialAgreementDraft = {
   outcome: string;
@@ -169,6 +170,7 @@ export function TrialAgreementPanel({
   const [accountStatus, setAccountStatus] = useState<AccountDraftStatus>(authenticatedUser ? 'loading' : 'local');
   const [isSaving, setIsSaving] = useState(false);
   const [proposalStatus, setProposalStatus] = useState<ManagedTrialProposal['status']>('draft');
+  const [proposalID, setProposalID] = useState<string | null>(null);
   const [sendConfirmed, setSendConfirmed] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -188,6 +190,7 @@ export function TrialAgreementPanel({
         const proposal = await loadOwnTrialProposal(project.id, controller.signal);
         if (proposal) {
           setDraft(fromProposalInput(proposal.input));
+          setProposalID(proposal.id);
           setProposalStatus(proposal.status);
           if (proposal.status !== 'draft') setIsComplete(true);
         }
@@ -238,6 +241,7 @@ export function TrialAgreementPanel({
     try {
       const proposal = await saveOwnTrialProposal(project.id, toProposalInput(draft));
       setDraft(fromProposalInput(proposal.input));
+      setProposalID(proposal.id);
       setSaveMessage('Private trial proposal saved to your Branch-Out account.');
       return true;
     } catch {
@@ -254,6 +258,7 @@ export function TrialAgreementPanel({
     setSaveMessage('');
     try {
       const proposal = await sendOwnTrialProposal(project.id);
+      setProposalID(proposal.id);
       setProposalStatus(proposal.status);
       setSendConfirmed(false);
       setSaveMessage('Trial proposal sent privately to the opening owner.');
@@ -323,6 +328,7 @@ export function TrialAgreementPanel({
               </div>
             )}
             {saveMessage && <p aria-live="polite" className="save-message">{saveMessage}</p>}
+            {proposalStatus === 'accepted' && proposalID && <TrialCheckInLog proposalId={proposalID} />}
             <button className="primary-button" onClick={onClose} type="button">Return to opening</button>
           </div>
         ) : (

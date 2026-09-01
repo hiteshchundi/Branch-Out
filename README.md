@@ -243,6 +243,12 @@ once after reviewing every term. Acceptance records both approvals, while the
 interface clearly states that this is a planning record rather than a legal
 agreement or electronic signature.
 
+Once accepted, the proposal becomes a private shared execution log for the
+applicant and opening owner. Either participant can append a timestamped
+**Progress**, **Blocker**, or **Milestone** check-in with an optional HTTP or
+HTTPS evidence link. Check-ins are immutable so the timeline remains an honest
+record; they are never shown in public discovery.
+
 ## Outcome feedback and trust candidates
 
 **Preview outcome review** inside a project's trial milestone opens a three-step
@@ -288,9 +294,10 @@ and backend systems.
   next-step coordination are not implemented.
 - Trial-agreement previews stay in the current browser until the applicant is
   accepted. Accepted applicants can save and explicitly send one proposal;
-  opening owners can privately accept or decline once. Counterproposals,
-  signatures, trial execution tracking, and replacement proposals are not
-  implemented.
+  opening owners can privately accept or decline once. Mutually accepted
+  proposals provide a participant-only immutable execution log. Check-in edits,
+  deletions, file uploads, completion decisions, counterproposals, signatures,
+  and replacement proposals are not implemented.
 - Outcome-review drafts and trust candidates stay local and are not confirmed or
   published.
 - Saved openings stay only in the current browser and are not synchronized.

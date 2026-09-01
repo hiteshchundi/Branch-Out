@@ -101,6 +101,55 @@ func TestManagerScopesSendAndOwnerDecisionTransitions(t *testing.T) {
 	}
 }
 
+func TestManagerCreatesNormalizedParticipantCheckIn(t *testing.T) {
+	store := &fakeStore{createdCheckIn: CheckIn{ID: "check-in-id", Kind: "progress"}}
+	manager := NewManager(store)
+	manager.random = strings.NewReader(strings.Repeat("b", 16))
+	result, err := manager.AddCheckIn(context.Background(), 7, " proposal-id ", CheckInInput{
+		Kind: " progress ", Update: "  Completed the API boundary and added focused tests.  ",
+		EvidenceURL: " https://github.com/example/repo/pull/12 ",
+	})
+	if err != nil || result.ID != "check-in-id" {
+		t.Fatalf("AddCheckIn() = %#v, %v", result, err)
+	}
+	if store.checkInRecord.ID != "62626262-6262-4262-a262-626262626262" || store.checkInRecord.ProposalID != "proposal-id" || store.checkInRecord.AuthorUserID != 7 {
+		t.Fatalf("record = %#v", store.checkInRecord)
+	}
+	if store.checkInRecord.Input.Update != "Completed the API boundary and added focused tests." {
+		t.Fatalf("update = %q", store.checkInRecord.Input.Update)
+	}
+}
+
+func TestManagerValidatesCheckInsBeforePersistence(t *testing.T) {
+	manager := NewManager(&fakeStore{})
+	for _, test := range []struct {
+		name  string
+		input CheckInInput
+		field string
+	}{
+		{"kind", CheckInInput{Kind: "note", Update: "A long enough execution update for validation."}, "kind"},
+		{"update", CheckInInput{Kind: "progress", Update: "too short"}, "update"},
+		{"evidence", CheckInInput{Kind: "blocker", Update: "Blocked by an unavailable test dependency today.", EvidenceURL: "javascript:alert(1)"}, "evidenceUrl"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := manager.AddCheckIn(context.Background(), 7, "proposal-id", test.input)
+			var fieldError *FieldError
+			if !errors.As(err, &fieldError) || fieldError.Field != test.field {
+				t.Fatalf("error = %#v, want %s", err, test.field)
+			}
+		})
+	}
+}
+
+func TestManagerListsOnlyParticipantWorkspace(t *testing.T) {
+	store := &fakeStore{checkIns: []CheckIn{{ID: "check-in-id"}}}
+	manager := NewManager(store)
+	results, err := manager.ListCheckIns(context.Background(), 8, " proposal-id ")
+	if err != nil || len(results) != 1 || store.userID != 8 || store.proposalID != "proposal-id" {
+		t.Fatalf("ListCheckIns() = %#v, %v; store %#v", results, err, store)
+	}
+}
+
 type fakeStore struct {
 	record                    Record
 	userID                    int64
@@ -109,6 +158,9 @@ type fakeStore struct {
 	decision                  string
 	got, saved, sent, decided Proposal
 	listed                    []OwnerProposal
+	checkIns                  []CheckIn
+	createdCheckIn            CheckIn
+	checkInRecord             CheckInRecord
 	err                       error
 }
 
@@ -135,4 +187,14 @@ func (store *fakeStore) ListForOwner(_ context.Context, userID int64, openingID 
 func (store *fakeStore) Decide(_ context.Context, userID int64, openingID, proposalID, decision string) (Proposal, error) {
 	store.userID, store.openingID, store.proposalID, store.decision = userID, openingID, proposalID, decision
 	return store.decided, store.err
+}
+
+func (store *fakeStore) ListCheckIns(_ context.Context, userID int64, proposalID string) ([]CheckIn, error) {
+	store.userID, store.proposalID = userID, proposalID
+	return store.checkIns, store.err
+}
+
+func (store *fakeStore) CreateCheckIn(_ context.Context, record CheckInRecord) (CheckIn, error) {
+	store.checkInRecord = record
+	return store.createdCheckIn, store.err
 }

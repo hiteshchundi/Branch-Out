@@ -64,6 +64,68 @@ WHERE proposal.opening_id = sqlc.arg(opening_id)
   AND application.status = 'accepted'
 RETURNING proposal.*;
 
+-- name: GetTrialWorkspaceForParticipant :one
+SELECT proposal.id
+FROM trial_proposals AS proposal
+JOIN project_openings AS opening ON opening.id = proposal.opening_id
+WHERE proposal.id = sqlc.arg(proposal_id)
+  AND proposal.proposal_status = 'accepted'
+  AND (
+      proposal.applicant_user_id = sqlc.arg(participant_user_id)
+      OR opening.owner_user_id = sqlc.arg(participant_user_id)
+  );
+
+-- name: ListTrialCheckInsForParticipant :many
+SELECT
+    check_in.id, check_in.proposal_id, check_in.author_user_id,
+    check_in.check_in_kind, check_in.update_text, check_in.evidence_url,
+    check_in.created_at, profiles.display_name AS author_display_name,
+    CASE
+        WHEN check_in.author_user_id = proposal.applicant_user_id THEN 'applicant'
+        ELSE 'owner'
+    END AS author_role
+FROM trial_check_ins AS check_in
+JOIN trial_proposals AS proposal ON proposal.id = check_in.proposal_id
+JOIN project_openings AS opening ON opening.id = proposal.opening_id
+JOIN profiles ON profiles.user_id = check_in.author_user_id
+WHERE check_in.proposal_id = sqlc.arg(proposal_id)
+  AND proposal.proposal_status = 'accepted'
+  AND (
+      proposal.applicant_user_id = sqlc.arg(participant_user_id)
+      OR opening.owner_user_id = sqlc.arg(participant_user_id)
+  )
+ORDER BY check_in.created_at ASC, check_in.id ASC;
+
+-- name: CreateTrialCheckInForParticipant :one
+WITH inserted AS (
+    INSERT INTO trial_check_ins (
+        id, proposal_id, author_user_id, check_in_kind, update_text, evidence_url
+    )
+    SELECT
+        sqlc.arg(id), proposal.id, sqlc.arg(author_user_id),
+        sqlc.arg(check_in_kind), sqlc.arg(update_text), sqlc.arg(evidence_url)
+    FROM trial_proposals AS proposal
+    JOIN project_openings AS opening ON opening.id = proposal.opening_id
+    WHERE proposal.id = sqlc.arg(proposal_id)
+      AND proposal.proposal_status = 'accepted'
+      AND (
+          proposal.applicant_user_id = sqlc.arg(author_user_id)
+          OR opening.owner_user_id = sqlc.arg(author_user_id)
+      )
+    RETURNING *
+)
+SELECT
+    inserted.id, inserted.proposal_id, inserted.author_user_id,
+    inserted.check_in_kind, inserted.update_text, inserted.evidence_url,
+    inserted.created_at, profiles.display_name AS author_display_name,
+    CASE
+        WHEN inserted.author_user_id = proposal.applicant_user_id THEN 'applicant'
+        ELSE 'owner'
+    END AS author_role
+FROM inserted
+JOIN trial_proposals AS proposal ON proposal.id = inserted.proposal_id
+JOIN profiles ON profiles.user_id = inserted.author_user_id;
+
 -- name: GetOwnedOpeningTrialProposalReviewScope :one
 SELECT id
 FROM project_openings

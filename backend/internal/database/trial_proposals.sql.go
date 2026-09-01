@@ -12,6 +12,82 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const createTrialCheckInForParticipant = `-- name: CreateTrialCheckInForParticipant :one
+WITH inserted AS (
+    INSERT INTO trial_check_ins (
+        id, proposal_id, author_user_id, check_in_kind, update_text, evidence_url
+    )
+    SELECT
+        $1, proposal.id, $2,
+        $3, $4, $5
+    FROM trial_proposals AS proposal
+    JOIN project_openings AS opening ON opening.id = proposal.opening_id
+    WHERE proposal.id = $6
+      AND proposal.proposal_status = 'accepted'
+      AND (
+          proposal.applicant_user_id = $2
+          OR opening.owner_user_id = $2
+      )
+    RETURNING id, proposal_id, author_user_id, check_in_kind, update_text, evidence_url, created_at
+)
+SELECT
+    inserted.id, inserted.proposal_id, inserted.author_user_id,
+    inserted.check_in_kind, inserted.update_text, inserted.evidence_url,
+    inserted.created_at, profiles.display_name AS author_display_name,
+    CASE
+        WHEN inserted.author_user_id = proposal.applicant_user_id THEN 'applicant'
+        ELSE 'owner'
+    END AS author_role
+FROM inserted
+JOIN trial_proposals AS proposal ON proposal.id = inserted.proposal_id
+JOIN profiles ON profiles.user_id = inserted.author_user_id
+`
+
+type CreateTrialCheckInForParticipantParams struct {
+	ID           string `db:"id" json:"id"`
+	AuthorUserID int64  `db:"author_user_id" json:"author_user_id"`
+	CheckInKind  string `db:"check_in_kind" json:"check_in_kind"`
+	UpdateText   string `db:"update_text" json:"update_text"`
+	EvidenceUrl  string `db:"evidence_url" json:"evidence_url"`
+	ProposalID   string `db:"proposal_id" json:"proposal_id"`
+}
+
+type CreateTrialCheckInForParticipantRow struct {
+	ID                string    `db:"id" json:"id"`
+	ProposalID        string    `db:"proposal_id" json:"proposal_id"`
+	AuthorUserID      int64     `db:"author_user_id" json:"author_user_id"`
+	CheckInKind       string    `db:"check_in_kind" json:"check_in_kind"`
+	UpdateText        string    `db:"update_text" json:"update_text"`
+	EvidenceUrl       string    `db:"evidence_url" json:"evidence_url"`
+	CreatedAt         time.Time `db:"created_at" json:"created_at"`
+	AuthorDisplayName string    `db:"author_display_name" json:"author_display_name"`
+	AuthorRole        string    `db:"author_role" json:"author_role"`
+}
+
+func (q *Queries) CreateTrialCheckInForParticipant(ctx context.Context, arg CreateTrialCheckInForParticipantParams) (CreateTrialCheckInForParticipantRow, error) {
+	row := q.db.QueryRow(ctx, createTrialCheckInForParticipant,
+		arg.ID,
+		arg.AuthorUserID,
+		arg.CheckInKind,
+		arg.UpdateText,
+		arg.EvidenceUrl,
+		arg.ProposalID,
+	)
+	var i CreateTrialCheckInForParticipantRow
+	err := row.Scan(
+		&i.ID,
+		&i.ProposalID,
+		&i.AuthorUserID,
+		&i.CheckInKind,
+		&i.UpdateText,
+		&i.EvidenceUrl,
+		&i.CreatedAt,
+		&i.AuthorDisplayName,
+		&i.AuthorRole,
+	)
+	return i, err
+}
+
 const decideTrialProposalForOwner = `-- name: DecideTrialProposalForOwner :one
 UPDATE trial_proposals AS proposal SET
     proposal_status = $1,
@@ -135,6 +211,99 @@ func (q *Queries) GetOwnedOpeningTrialProposalReviewScope(ctx context.Context, a
 	var id string
 	err := row.Scan(&id)
 	return id, err
+}
+
+const getTrialWorkspaceForParticipant = `-- name: GetTrialWorkspaceForParticipant :one
+SELECT proposal.id
+FROM trial_proposals AS proposal
+JOIN project_openings AS opening ON opening.id = proposal.opening_id
+WHERE proposal.id = $1
+  AND proposal.proposal_status = 'accepted'
+  AND (
+      proposal.applicant_user_id = $2
+      OR opening.owner_user_id = $2
+  )
+`
+
+type GetTrialWorkspaceForParticipantParams struct {
+	ProposalID        string `db:"proposal_id" json:"proposal_id"`
+	ParticipantUserID int64  `db:"participant_user_id" json:"participant_user_id"`
+}
+
+func (q *Queries) GetTrialWorkspaceForParticipant(ctx context.Context, arg GetTrialWorkspaceForParticipantParams) (string, error) {
+	row := q.db.QueryRow(ctx, getTrialWorkspaceForParticipant, arg.ProposalID, arg.ParticipantUserID)
+	var id string
+	err := row.Scan(&id)
+	return id, err
+}
+
+const listTrialCheckInsForParticipant = `-- name: ListTrialCheckInsForParticipant :many
+SELECT
+    check_in.id, check_in.proposal_id, check_in.author_user_id,
+    check_in.check_in_kind, check_in.update_text, check_in.evidence_url,
+    check_in.created_at, profiles.display_name AS author_display_name,
+    CASE
+        WHEN check_in.author_user_id = proposal.applicant_user_id THEN 'applicant'
+        ELSE 'owner'
+    END AS author_role
+FROM trial_check_ins AS check_in
+JOIN trial_proposals AS proposal ON proposal.id = check_in.proposal_id
+JOIN project_openings AS opening ON opening.id = proposal.opening_id
+JOIN profiles ON profiles.user_id = check_in.author_user_id
+WHERE check_in.proposal_id = $1
+  AND proposal.proposal_status = 'accepted'
+  AND (
+      proposal.applicant_user_id = $2
+      OR opening.owner_user_id = $2
+  )
+ORDER BY check_in.created_at ASC, check_in.id ASC
+`
+
+type ListTrialCheckInsForParticipantParams struct {
+	ProposalID        string `db:"proposal_id" json:"proposal_id"`
+	ParticipantUserID int64  `db:"participant_user_id" json:"participant_user_id"`
+}
+
+type ListTrialCheckInsForParticipantRow struct {
+	ID                string    `db:"id" json:"id"`
+	ProposalID        string    `db:"proposal_id" json:"proposal_id"`
+	AuthorUserID      int64     `db:"author_user_id" json:"author_user_id"`
+	CheckInKind       string    `db:"check_in_kind" json:"check_in_kind"`
+	UpdateText        string    `db:"update_text" json:"update_text"`
+	EvidenceUrl       string    `db:"evidence_url" json:"evidence_url"`
+	CreatedAt         time.Time `db:"created_at" json:"created_at"`
+	AuthorDisplayName string    `db:"author_display_name" json:"author_display_name"`
+	AuthorRole        string    `db:"author_role" json:"author_role"`
+}
+
+func (q *Queries) ListTrialCheckInsForParticipant(ctx context.Context, arg ListTrialCheckInsForParticipantParams) ([]ListTrialCheckInsForParticipantRow, error) {
+	rows, err := q.db.Query(ctx, listTrialCheckInsForParticipant, arg.ProposalID, arg.ParticipantUserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListTrialCheckInsForParticipantRow{}
+	for rows.Next() {
+		var i ListTrialCheckInsForParticipantRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProposalID,
+			&i.AuthorUserID,
+			&i.CheckInKind,
+			&i.UpdateText,
+			&i.EvidenceUrl,
+			&i.CreatedAt,
+			&i.AuthorDisplayName,
+			&i.AuthorRole,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listTrialProposalsForOwner = `-- name: ListTrialProposalsForOwner :many

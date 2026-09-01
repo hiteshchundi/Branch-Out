@@ -2863,6 +2863,86 @@ main:focus {
   text-align: left;
 }
 
+.trial-check-in-log {
+  border-top: 1px solid var(--border);
+  margin-top: 30px;
+  padding-top: 28px;
+  text-align: left;
+}
+
+.trial-check-in-log > header,
+.trial-check-in-list > li > header {
+  align-items: flex-start;
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.trial-check-in-log h5 {
+  font-size: 1.25rem;
+  margin: 4px 0 0;
+}
+
+.trial-check-in-boundary {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.trial-check-in-list {
+  display: grid;
+  gap: 12px;
+  list-style: none;
+  margin: 20px 0;
+  padding: 0;
+}
+
+.trial-check-in-list > li {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px;
+}
+
+.trial-check-in-list header div,
+.trial-check-in-form {
+  display: grid;
+  gap: 8px;
+}
+
+.trial-check-in-list time,
+.trial-check-in-list header span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.trial-check-in-kind {
+  border-radius: 999px;
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  margin-top: 14px;
+  padding: 5px 9px;
+  text-transform: uppercase;
+}
+
+.trial-check-in-kind.progress { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.trial-check-in-kind.blocker { background: color-mix(in srgb, var(--danger) 14%, transparent); }
+.trial-check-in-kind.milestone { background: color-mix(in srgb, var(--accent-strong) 18%, transparent); }
+
+.trial-check-in-list p { line-height: 1.6; }
+
+.trial-check-in-form {
+  border-top: 1px solid var(--border);
+  grid-template-columns: minmax(150px, 0.35fr) 1fr;
+  margin-top: 22px;
+  padding-top: 22px;
+}
+
+.trial-check-in-form > button,
+.trial-check-in-form > .save-message {
+  justify-self: start;
+}
+
 .trial-complete dl > div {
   background: var(--surface);
   padding: 15px;
@@ -3393,6 +3473,10 @@ main:focus {
     grid-template-columns: 1fr;
   }
 
+  .trial-check-in-form {
+    grid-template-columns: 1fr;
+  }
+
   .outcome-form-grid {
     grid-template-columns: 1fr;
   }
@@ -3554,6 +3638,10 @@ main:focus {
 
   .trial-complete dl > div {
     grid-column: auto !important;
+  }
+
+  .trial-check-in-list > li > header {
+    flex-direction: column;
   }
 
   .behavior-picker > div {

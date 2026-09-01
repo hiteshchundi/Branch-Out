@@ -87,6 +87,16 @@ type Session struct {
 	CreatedAt time.Time `db:"created_at" json:"created_at"`
 }
 
+type TrialCheckIn struct {
+	ID           string    `db:"id" json:"id"`
+	ProposalID   string    `db:"proposal_id" json:"proposal_id"`
+	AuthorUserID int64     `db:"author_user_id" json:"author_user_id"`
+	CheckInKind  string    `db:"check_in_kind" json:"check_in_kind"`
+	UpdateText   string    `db:"update_text" json:"update_text"`
+	EvidenceUrl  string    `db:"evidence_url" json:"evidence_url"`
+	CreatedAt    time.Time `db:"created_at" json:"created_at"`
+}
+
 type TrialProposal struct {
 	ID              string             `db:"id" json:"id"`
 	ApplicationID   string             `db:"application_id" json:"application_id"`

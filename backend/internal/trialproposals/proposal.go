@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -18,6 +19,7 @@ var (
 	ErrSendUnavailable     = errors.New("trial proposal send unavailable")
 	ErrReviewNotFound      = errors.New("trial proposal review opening not found")
 	ErrDecisionUnavailable = errors.New("trial proposal decision unavailable")
+	ErrWorkspaceNotFound   = errors.New("trial workspace not found")
 )
 
 type FieldError struct {
@@ -65,6 +67,34 @@ type OwnerProposal struct {
 	Applicant Applicant `json:"applicant"`
 }
 
+type CheckInInput struct {
+	Kind        string `json:"kind"`
+	Update      string `json:"update"`
+	EvidenceURL string `json:"evidenceUrl"`
+}
+
+type CheckIn struct {
+	ID          string        `json:"id"`
+	ProposalID  string        `json:"proposalId"`
+	Kind        string        `json:"kind"`
+	Update      string        `json:"update"`
+	EvidenceURL string        `json:"evidenceUrl"`
+	Author      CheckInAuthor `json:"author"`
+	AuthorRole  string        `json:"authorRole"`
+	CreatedAt   time.Time     `json:"createdAt"`
+}
+
+type CheckInAuthor struct {
+	DisplayName string `json:"displayName"`
+}
+
+type CheckInRecord struct {
+	ID           string
+	ProposalID   string
+	AuthorUserID int64
+	Input        CheckInInput
+}
+
 type Record struct {
 	Proposal
 	ApplicantUserID int64
@@ -76,6 +106,8 @@ type Store interface {
 	SendOwn(context.Context, int64, string) (Proposal, error)
 	ListForOwner(context.Context, int64, string) ([]OwnerProposal, error)
 	Decide(context.Context, int64, string, string, string) (Proposal, error)
+	ListCheckIns(context.Context, int64, string) ([]CheckIn, error)
+	CreateCheckIn(context.Context, CheckInRecord) (CheckIn, error)
 }
 
 func (manager *Manager) SendOwn(ctx context.Context, userID int64, openingID string) (Proposal, error) {
@@ -102,6 +134,46 @@ func (manager *Manager) Decide(ctx context.Context, userID int64, openingID, pro
 		return Proposal{}, ErrDecisionUnavailable
 	}
 	return manager.store.Decide(ctx, userID, openingID, proposalID, decision)
+}
+
+func (manager *Manager) ListCheckIns(ctx context.Context, userID int64, proposalID string) ([]CheckIn, error) {
+	proposalID = strings.TrimSpace(proposalID)
+	if proposalID == "" {
+		return nil, ErrWorkspaceNotFound
+	}
+	return manager.store.ListCheckIns(ctx, userID, proposalID)
+}
+
+func (manager *Manager) AddCheckIn(ctx context.Context, userID int64, proposalID string, input CheckInInput) (CheckIn, error) {
+	proposalID = strings.TrimSpace(proposalID)
+	input.Kind = strings.TrimSpace(input.Kind)
+	input.Update = strings.TrimSpace(input.Update)
+	input.EvidenceURL = strings.TrimSpace(input.EvidenceURL)
+	if proposalID == "" {
+		return CheckIn{}, ErrWorkspaceNotFound
+	}
+	if input.Kind != "progress" && input.Kind != "blocker" && input.Kind != "milestone" {
+		return CheckIn{}, &FieldError{Field: "kind", Message: "kind is unsupported"}
+	}
+	if length := len([]rune(input.Update)); length < 20 || length > 1000 {
+		return CheckIn{}, &FieldError{Field: "update", Message: "update has an invalid length"}
+	}
+	if len(input.EvidenceURL) > 2048 {
+		return CheckIn{}, &FieldError{Field: "evidenceUrl", Message: "evidenceUrl is too long"}
+	}
+	if input.EvidenceURL != "" {
+		parsed, err := url.ParseRequestURI(input.EvidenceURL)
+		if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
+			return CheckIn{}, &FieldError{Field: "evidenceUrl", Message: "evidenceUrl must be a complete http or https URL"}
+		}
+	}
+	id, err := randomID(manager.random)
+	if err != nil {
+		return CheckIn{}, fmt.Errorf("generate trial check-in ID: %w", err)
+	}
+	return manager.store.CreateCheckIn(ctx, CheckInRecord{
+		ID: id, ProposalID: proposalID, AuthorUserID: userID, Input: input,
+	})
 }
 
 type Manager struct {

@@ -40,6 +40,7 @@ func TestPostgresTrialProposalLifecycle(t *testing.T) {
 	applicant := createTrialTestUser(t, ctx, authStore, profileService, identifier+1, "Accepted Applicant")
 	otherApplicant := createTrialTestUser(t, ctx, authStore, profileService, identifier+2, "Other Applicant")
 	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), "DELETE FROM trial_check_ins WHERE author_user_id = ANY($1)", []int64{owner.ID, applicant.ID, otherApplicant.ID})
 		_, _ = pool.Exec(context.Background(), "DELETE FROM trial_proposals WHERE applicant_user_id = ANY($1)", []int64{applicant.ID, otherApplicant.ID})
 		_, _ = pool.Exec(context.Background(), "DELETE FROM applications WHERE applicant_user_id = ANY($1)", []int64{applicant.ID, otherApplicant.ID})
 		_, _ = pool.Exec(context.Background(), "DELETE FROM project_openings WHERE owner_user_id = $1", owner.ID)
@@ -127,6 +128,31 @@ func TestPostgresTrialProposalLifecycle(t *testing.T) {
 	loaded, err = manager.GetOwn(ctx, applicant.ID, opening.ID)
 	if err != nil || loaded.Status != "accepted" || loaded.DecidedAt == nil {
 		t.Fatalf("accepted GetOwn() = %#v, %v", loaded, err)
+	}
+	if _, err := manager.ListCheckIns(ctx, otherApplicant.ID, proposal.ID); !errors.Is(err, ErrWorkspaceNotFound) {
+		t.Fatalf("non-participant ListCheckIns() error = %v, want ErrWorkspaceNotFound", err)
+	}
+	if _, err := manager.AddCheckIn(ctx, otherApplicant.ID, proposal.ID, CheckInInput{
+		Kind: "progress", Update: "Attempted to add an update outside the accepted collaboration.",
+	}); !errors.Is(err, ErrWorkspaceNotFound) {
+		t.Fatalf("non-participant AddCheckIn() error = %v, want ErrWorkspaceNotFound", err)
+	}
+	applicantCheckIn, err := manager.AddCheckIn(ctx, applicant.ID, proposal.ID, CheckInInput{
+		Kind: "progress", Update: "Completed the API boundary and added focused integration tests.",
+		EvidenceURL: "https://github.com/example/comparison/pull/12",
+	})
+	if err != nil || applicantCheckIn.AuthorRole != "applicant" || applicantCheckIn.Author.DisplayName != "Accepted Applicant" {
+		t.Fatalf("applicant AddCheckIn() = %#v, %v", applicantCheckIn, err)
+	}
+	ownerCheckIn, err := manager.AddCheckIn(ctx, owner.ID, proposal.ID, CheckInInput{
+		Kind: "milestone", Update: "Reviewed the bounded deliverable and confirmed the milestone is ready.",
+	})
+	if err != nil || ownerCheckIn.AuthorRole != "owner" || ownerCheckIn.Author.DisplayName != "Trial Owner" {
+		t.Fatalf("owner AddCheckIn() = %#v, %v", ownerCheckIn, err)
+	}
+	checkIns, err := manager.ListCheckIns(ctx, applicant.ID, proposal.ID)
+	if err != nil || len(checkIns) != 2 || checkIns[0].Kind != "progress" || checkIns[1].Kind != "milestone" {
+		t.Fatalf("ListCheckIns() = %#v, %v", checkIns, err)
 	}
 }
 

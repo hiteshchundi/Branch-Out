@@ -117,6 +117,52 @@ func (store *PostgresStore) Decide(ctx context.Context, userID int64, openingID,
 	return fromDatabase(row), nil
 }
 
+func (store *PostgresStore) ListCheckIns(ctx context.Context, userID int64, proposalID string) ([]CheckIn, error) {
+	if _, err := store.queries.GetTrialWorkspaceForParticipant(ctx, database.GetTrialWorkspaceForParticipantParams{
+		ProposalID: proposalID, ParticipantUserID: userID,
+	}); errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrWorkspaceNotFound
+	} else if err != nil {
+		return nil, err
+	}
+	rows, err := store.queries.ListTrialCheckInsForParticipant(ctx, database.ListTrialCheckInsForParticipantParams{
+		ProposalID: proposalID, ParticipantUserID: userID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	results := make([]CheckIn, 0, len(rows))
+	for _, row := range rows {
+		results = append(results, CheckIn{
+			ID: row.ID, ProposalID: row.ProposalID, Kind: row.CheckInKind,
+			Update: row.UpdateText, EvidenceURL: row.EvidenceUrl,
+			Author:     CheckInAuthor{DisplayName: row.AuthorDisplayName},
+			AuthorRole: row.AuthorRole, CreatedAt: row.CreatedAt,
+		})
+	}
+	return results, nil
+}
+
+func (store *PostgresStore) CreateCheckIn(ctx context.Context, record CheckInRecord) (CheckIn, error) {
+	row, err := store.queries.CreateTrialCheckInForParticipant(ctx, database.CreateTrialCheckInForParticipantParams{
+		ID: record.ID, ProposalID: record.ProposalID, AuthorUserID: record.AuthorUserID,
+		CheckInKind: record.Input.Kind, UpdateText: record.Input.Update,
+		EvidenceUrl: record.Input.EvidenceURL,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return CheckIn{}, ErrWorkspaceNotFound
+	}
+	if err != nil {
+		return CheckIn{}, err
+	}
+	return CheckIn{
+		ID: row.ID, ProposalID: row.ProposalID, Kind: row.CheckInKind,
+		Update: row.UpdateText, EvidenceURL: row.EvidenceUrl,
+		Author:     CheckInAuthor{DisplayName: row.AuthorDisplayName},
+		AuthorRole: row.AuthorRole, CreatedAt: row.CreatedAt,
+	}, nil
+}
+
 func fromDatabase(row database.TrialProposal) Proposal {
 	var sentAt *time.Time
 	if row.SentAt.Valid {

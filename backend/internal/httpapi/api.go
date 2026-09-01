@@ -60,6 +60,8 @@ type TrialProposalManager interface {
 	SendOwn(context.Context, int64, string) (trialproposals.Proposal, error)
 	ListForOwner(context.Context, int64, string) ([]trialproposals.OwnerProposal, error)
 	Decide(context.Context, int64, string, string, string) (trialproposals.Proposal, error)
+	ListCheckIns(context.Context, int64, string) ([]trialproposals.CheckIn, error)
+	AddCheckIn(context.Context, int64, string, trialproposals.CheckInInput) (trialproposals.CheckIn, error)
 }
 
 type listResponse struct {
@@ -105,6 +107,8 @@ func New(repository openings.Repository, openingManager OpeningManager, applicat
 	routes.HandleFunc("POST /v1/openings/{id}/trial-proposal/send", api.sendOwnTrialProposal)
 	routes.HandleFunc("GET /v1/openings/{id}/trial-proposals", api.listTrialProposalsForOwner)
 	routes.HandleFunc("POST /v1/openings/{id}/trial-proposals/{proposalId}/decision", api.decideTrialProposal)
+	routes.HandleFunc("GET /v1/trial-proposals/{proposalId}/check-ins", api.listTrialCheckIns)
+	routes.HandleFunc("POST /v1/trial-proposals/{proposalId}/check-ins", api.addTrialCheckIn)
 	routes.HandleFunc("GET /v1/auth/github/start", api.startGitHubAuth)
 	routes.HandleFunc("GET /v1/auth/github/callback", api.finishGitHubAuth)
 	routes.HandleFunc("GET /v1/session", api.currentSession)
@@ -127,6 +131,7 @@ func New(repository openings.Repository, openingManager OpeningManager, applicat
 	routes.HandleFunc("OPTIONS /v1/openings/{id}/trial-proposal/send", api.preflight)
 	routes.HandleFunc("OPTIONS /v1/openings/{id}/trial-proposals", api.preflight)
 	routes.HandleFunc("OPTIONS /v1/openings/{id}/trial-proposals/{proposalId}/decision", api.preflight)
+	routes.HandleFunc("OPTIONS /v1/trial-proposals/{proposalId}/check-ins", api.preflight)
 	routes.HandleFunc("/", api.notFound)
 
 	return api.recoverPanics(api.logRequests(api.cors(routes)))

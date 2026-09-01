@@ -29,6 +29,20 @@ export type OwnerTrialProposal = ManagedTrialProposal & {
   applicant: { displayName: string; primaryRole: string; githubUrl: string };
 };
 
+export type TrialCheckInInput = {
+  kind: 'progress' | 'blocker' | 'milestone';
+  update: string;
+  evidenceUrl: string;
+};
+
+export type TrialCheckIn = TrialCheckInInput & {
+  id: string;
+  proposalId: string;
+  author: { displayName: string };
+  authorRole: 'applicant' | 'owner';
+  createdAt: string;
+};
+
 type APIEnvelope = { data?: unknown };
 type APIErrorEnvelope = { error?: { code?: unknown; field?: unknown } };
 
@@ -98,6 +112,34 @@ function parseOwnerTrialProposal(value: unknown): OwnerTrialProposal {
     || typeof applicant.githubUrl !== 'string'
   ) throw new Error('The API returned an invalid owner trial proposal.');
   return { ...proposal, applicant: applicant as OwnerTrialProposal['applicant'] };
+}
+
+function parseTrialCheckIn(value: unknown): TrialCheckIn {
+  if (!value || typeof value !== 'object') throw new Error('The API returned an invalid trial check-in.');
+  const checkIn = value as Record<string, unknown>;
+  const author = checkIn.author as Record<string, unknown> | undefined;
+  if (
+    typeof checkIn.id !== 'string'
+    || typeof checkIn.proposalId !== 'string'
+    || !['progress', 'blocker', 'milestone'].includes(checkIn.kind as string)
+    || typeof checkIn.update !== 'string'
+    || typeof checkIn.evidenceUrl !== 'string'
+    || (checkIn.evidenceUrl !== '' && !isHTTPURL(checkIn.evidenceUrl))
+    || !author
+    || typeof author.displayName !== 'string'
+    || !['applicant', 'owner'].includes(checkIn.authorRole as string)
+    || typeof checkIn.createdAt !== 'string'
+  ) throw new Error('The API returned an invalid trial check-in.');
+  return checkIn as TrialCheckIn;
+}
+
+function isHTTPURL(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
 }
 
 async function parseError(response: Response) {
@@ -176,4 +218,28 @@ export async function decideTrialProposal(
   if (!response.ok) throw await parseError(response);
   const body = await response.json() as APIEnvelope;
   return parseTrialProposal(body.data);
+}
+
+export async function listTrialCheckIns(proposalId: string, signal?: AbortSignal) {
+  const response = await fetch(
+    `${getAPIBaseURL()}/v1/trial-proposals/${encodeURIComponent(proposalId)}/check-ins`,
+    { credentials: 'include', headers: { Accept: 'application/json' }, signal },
+  );
+  if (!response.ok) throw await parseError(response);
+  const body = await response.json() as APIEnvelope;
+  if (!Array.isArray(body.data)) throw new Error('The API returned invalid trial check-ins.');
+  return body.data.map(parseTrialCheckIn);
+}
+
+export async function addTrialCheckIn(proposalId: string, input: TrialCheckInInput) {
+  const response = await fetch(
+    `${getAPIBaseURL()}/v1/trial-proposals/${encodeURIComponent(proposalId)}/check-ins`,
+    {
+      body: JSON.stringify(input), credentials: 'include',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, method: 'POST',
+    },
+  );
+  if (!response.ok) throw await parseError(response);
+  const body = await response.json() as APIEnvelope;
+  return parseTrialCheckIn(body.data);
 }

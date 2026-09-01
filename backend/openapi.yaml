@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Branch-Out API
-  version: 0.10.0
+  version: 0.11.0
   description: PostgreSQL-backed discovery, GitHub authentication, member profiles, owner-managed opening lifecycles, proof-led applications, applicant withdrawal, and private trial proposal sending, owner review, and immutable mutual decisions for Branch-Out.
 servers:
   - url: http://localhost:8080
@@ -662,6 +662,112 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '500':
           description: The proposal decision could not be recorded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /v1/trial-proposals/{proposalId}/check-ins:
+    get:
+      operationId: listTrialCheckIns
+      summary: List the accepted trial's private execution log
+      description: Returns immutable check-ins only when the current member is the proposal applicant or opening owner and the proposal is mutually accepted.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: proposalId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Check-ins ordered chronologically.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TrialCheckIn'
+                  meta:
+                    type: object
+                    required: [count]
+                    properties:
+                      count:
+                        type: integer
+                        minimum: 0
+        '401':
+          description: No valid session is present.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: No accepted trial workspace is available to the current member.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: The private execution log could not be loaded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    post:
+      operationId: addTrialCheckIn
+      summary: Append an immutable private trial check-in
+      description: Allows either participant in a mutually accepted proposal to append a timestamped progress, blocker, or milestone entry. Existing entries cannot be edited or deleted.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: proposalId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TrialCheckInInput'
+      responses:
+        '201':
+          description: The check-in was appended to the private execution log.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/TrialCheckIn'
+        '400':
+          description: The check-in is malformed or fails validation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: No valid session is present.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: No accepted trial workspace is available to the current member.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: The check-in could not be appended.
           content:
             application/json:
               schema:
@@ -1358,6 +1464,48 @@ components:
         decision:
           type: string
           enum: [accepted, declined]
+    TrialCheckInInput:
+      type: object
+      additionalProperties: false
+      required: [kind, update, evidenceUrl]
+      properties:
+        kind:
+          type: string
+          enum: [progress, blocker, milestone]
+        update:
+          type: string
+          minLength: 20
+          maxLength: 1000
+        evidenceUrl:
+          type: string
+          maxLength: 2048
+          description: An optional complete HTTP or HTTPS evidence link; use an empty string when absent.
+    TrialCheckInAuthor:
+      type: object
+      required: [displayName]
+      properties:
+        displayName:
+          type: string
+    TrialCheckIn:
+      allOf:
+        - $ref: '#/components/schemas/TrialCheckInInput'
+        - type: object
+          required: [id, proposalId, author, authorRole, createdAt]
+          properties:
+            id:
+              type: string
+              format: uuid
+            proposalId:
+              type: string
+              format: uuid
+            author:
+              $ref: '#/components/schemas/TrialCheckInAuthor'
+            authorRole:
+              type: string
+              enum: [applicant, owner]
+            createdAt:
+              type: string
+              format: date-time
     Application:
       type: object
       required: [id, openingId, input, status, submittedAt, decidedAt, withdrawnAt, createdAt, updatedAt]

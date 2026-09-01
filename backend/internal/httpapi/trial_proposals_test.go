@@ -70,6 +70,26 @@ func TestAcceptedApplicantSavesAndLoadsPrivateTrialProposal(t *testing.T) {
 	}
 }
 
+func TestTrialParticipantsListAndAddCheckIns(t *testing.T) {
+	calls := &trialProposalCalls{}
+	checkIn := trialproposals.CheckIn{ID: "check-in-id", ProposalID: "proposal-id", Kind: "progress", Update: "Completed the API boundary and added focused tests."}
+	manager := fakeTrialProposalManager{calls: calls, checkInResult: checkIn, checkInList: []trialproposals.CheckIn{checkIn}}
+	api := trialProposalTestAPI(manager, fakeAuthenticator{user: auth.User{ID: 7}})
+
+	list := httptest.NewRecorder()
+	api.ServeHTTP(list, authenticatedApplicationRequest(http.MethodGet, "/v1/trial-proposals/proposal-id/check-ins", nil))
+	if list.Code != http.StatusOK || calls.operation != "list-check-ins" || !bytes.Contains(list.Body.Bytes(), []byte("check-in-id")) {
+		t.Fatalf("list = %d, calls %#v: %s", list.Code, calls, list.Body.String())
+	}
+
+	add := httptest.NewRecorder()
+	body := bytes.NewBufferString(`{"kind":"progress","update":"Completed the API boundary and added focused tests.","evidenceUrl":""}`)
+	api.ServeHTTP(add, authenticatedApplicationRequest(http.MethodPost, "/v1/trial-proposals/proposal-id/check-ins", body))
+	if add.Code != http.StatusCreated || calls.operation != "add-check-in" || calls.checkInInput.Kind != "progress" {
+		t.Fatalf("add = %d, calls %#v: %s", add.Code, calls, add.Body.String())
+	}
+}
+
 func TestTrialProposalRejectsInvalidBodyAndMapsDomainErrors(t *testing.T) {
 	for _, body := range []string{`{"unknown":true}`, `{} {}`} {
 		api := trialProposalTestAPI(fakeTrialProposalManager{}, fakeAuthenticator{user: auth.User{ID: 7}})
@@ -91,6 +111,7 @@ func TestTrialProposalRejectsInvalidBodyAndMapsDomainErrors(t *testing.T) {
 		{trialproposals.ErrSendUnavailable, http.StatusConflict, "trial_proposal_send_unavailable"},
 		{trialproposals.ErrReviewNotFound, http.StatusNotFound, "trial_proposal_review_not_found"},
 		{trialproposals.ErrDecisionUnavailable, http.StatusConflict, "trial_proposal_decision_unavailable"},
+		{trialproposals.ErrWorkspaceNotFound, http.StatusNotFound, "trial_workspace_not_found"},
 	} {
 		api := trialProposalTestAPI(fakeTrialProposalManager{err: test.err}, fakeAuthenticator{user: auth.User{ID: 7}})
 		body, _ := json.Marshal(validTrialProposalRequest())
@@ -122,19 +143,22 @@ func trialProposalTestAPI(manager fakeTrialProposalManager, authentication fakeA
 }
 
 type trialProposalCalls struct {
-	operation  string
-	userID     int64
-	openingID  string
-	input      trialproposals.Input
-	proposalID string
-	decision   string
+	operation    string
+	userID       int64
+	openingID    string
+	input        trialproposals.Input
+	proposalID   string
+	decision     string
+	checkInInput trialproposals.CheckInInput
 }
 
 type fakeTrialProposalManager struct {
-	calls      *trialProposalCalls
-	result     trialproposals.Proposal
-	listResult []trialproposals.OwnerProposal
-	err        error
+	calls         *trialProposalCalls
+	result        trialproposals.Proposal
+	listResult    []trialproposals.OwnerProposal
+	checkInResult trialproposals.CheckIn
+	checkInList   []trialproposals.CheckIn
+	err           error
 }
 
 func (fake fakeTrialProposalManager) GetOwn(_ context.Context, userID int64, openingID string) (trialproposals.Proposal, error) {
@@ -171,4 +195,18 @@ func (fake fakeTrialProposalManager) Decide(_ context.Context, userID int64, ope
 		fake.calls.proposalID, fake.calls.decision = proposalID, decision
 	}
 	return fake.result, fake.err
+}
+
+func (fake fakeTrialProposalManager) ListCheckIns(_ context.Context, userID int64, proposalID string) ([]trialproposals.CheckIn, error) {
+	if fake.calls != nil {
+		fake.calls.operation, fake.calls.userID, fake.calls.proposalID = "list-check-ins", userID, proposalID
+	}
+	return fake.checkInList, fake.err
+}
+
+func (fake fakeTrialProposalManager) AddCheckIn(_ context.Context, userID int64, proposalID string, input trialproposals.CheckInInput) (trialproposals.CheckIn, error) {
+	if fake.calls != nil {
+		fake.calls.operation, fake.calls.userID, fake.calls.proposalID, fake.calls.checkInInput = "add-check-in", userID, proposalID, input
+	}
+	return fake.checkInResult, fake.err
 }
