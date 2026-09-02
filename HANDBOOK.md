@@ -521,7 +521,7 @@ only once and cannot edit or delete the result.
 The counterpart may use **Acknowledge receipt** and confirm that action once.
 Acknowledgement records delivery only: it does not approve, endorse, or alter
 the review. Neither review is published, scored, or turned into a badge. Public
-trust signals remain unavailable until moderation and publication controls exist.
+trust signals remain unavailable until a separate publication flow exists.
 
 ### Review the private account-backed candidate
 
@@ -537,8 +537,8 @@ candidate from fixed rules:
 - **No trust signal candidate:** a stopped-early outcome
 
 Every factor appears beside the result. Branch-Out stores no numeric or hidden
-score. This candidate is not a profile badge and cannot be published; moderation
-and publication controls remain a separate future phase.
+score. This candidate is not a profile badge and cannot be published; signal
+publication remains a separate future phase.
 
 ### Report a safety concern
 
@@ -547,10 +547,11 @@ review** below the private candidate. Choose harassment, privacy, fraud, spam,
 or another concern; explain it in 30–1000 characters; and confirm the disclosure.
 
 Submitting shares the report and an immutable snapshot of the private item with
-authorized moderators. It does not automatically remove content or penalize a
+authorized moderators. Submission alone does not remove content or penalize a
 member. You cannot report your own feedback or submit the same report twice.
 Moderators can permanently uphold or dismiss a pending report with required
-notes.
+notes. Upholding replaces targeted feedback with a content-free removal record
+and suppresses the affected private trust candidate for both participants.
 
 ### Review the moderator queue
 
@@ -570,8 +571,9 @@ after the API records the decision. The dialog keeps keyboard focus contained,
 closes with `Escape`, and returns focus to its header control.
 
 The dashboard does not cache reports in browser storage. Captured evidence stays
-private to authorized moderators. Enforcement, sanctions, appeals, and trust-
-signal publication are not yet available.
+private to authorized moderators. Upholding enforces participant-facing removal
+immediately; account sanctions, restoration, appeals, and trust-signal
+publication are not yet available.
 
 ## Review a trial outcome
 
@@ -626,7 +628,7 @@ The completion preview shows every factor used; there is no hidden score.
 
 These are candidates only. No feedback or signal is published. This preview is
 not synchronized with account-backed private participant reviews; public signal
-publication still requires moderation controls.
+publication is a separate future workflow.
 
 ### Save and close the outcome draft
 
@@ -833,11 +835,12 @@ configuration, and operating details live in `backend/README.md`.
   participants can report them for moderator review.
 - Trial participants can submit private safety reports, and authorized
   moderators can review captured evidence and uphold or dismiss them once in the
-  visible role-gated dashboard. Content enforcement, account sanctions, and
-  appeals are not available.
+  visible role-gated dashboard. Upheld items are removed from participant-facing
+  feedback and candidate responses. Account sanctions, restoration, and appeals
+  are not available.
 - Saved openings do not synchronize between browsers or devices.
 - Early-access email addresses are not transmitted or stored.
-- Notification and moderation-enforcement flows do not exist yet.
+- Notification, appeal, and account-sanction flows do not exist yet.
 
 ## Handbook maintenance rule
 

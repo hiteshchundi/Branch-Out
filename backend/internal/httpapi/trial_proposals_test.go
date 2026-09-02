@@ -142,7 +142,7 @@ func TestTrialParticipantsSubmitAndAcknowledgePrivateFeedback(t *testing.T) {
 		CollaborateAgain:     "yes",
 		ReviewSummary:        "A dependable collaborator who communicated tradeoffs clearly during the trial.",
 	}
-	feedback := trialproposals.Feedback{ID: "feedback-id", ProposalID: "proposal-id", Input: input}
+	feedback := trialproposals.Feedback{ID: "feedback-id", ProposalID: "proposal-id", Input: input, ModerationStatus: "visible"}
 	manager := fakeTrialProposalManager{calls: calls, feedbackResult: feedback, feedbackList: []trialproposals.Feedback{feedback}}
 	api := trialProposalTestAPI(manager, fakeAuthenticator{user: auth.User{ID: 7}})
 
@@ -163,6 +163,20 @@ func TestTrialParticipantsSubmitAndAcknowledgePrivateFeedback(t *testing.T) {
 	api.ServeHTTP(acknowledge, authenticatedApplicationRequest(http.MethodPost, "/v1/trial-proposals/proposal-id/feedback/feedback-id/acknowledge", nil))
 	if acknowledge.Code != http.StatusOK || calls.operation != "acknowledge-feedback" || calls.feedbackID != "feedback-id" {
 		t.Fatalf("acknowledge feedback = %d, calls %#v: %s", acknowledge.Code, calls, acknowledge.Body.String())
+	}
+}
+
+func TestUpheldFeedbackResponseRetainsLifecycleWithoutPrivateContent(t *testing.T) {
+	feedback := trialproposals.Feedback{
+		ID: "feedback-id", ProposalID: "proposal-id",
+		Input: trialproposals.FeedbackInput{ReviewSummary: "private content that must not leave the server"},
+		Author: trialproposals.CheckInAuthor{DisplayName: "Asha Rao"}, ModerationStatus: "removed",
+	}
+	api := trialProposalTestAPI(fakeTrialProposalManager{feedbackList: []trialproposals.Feedback{feedback}}, fakeAuthenticator{user: auth.User{ID: 7}})
+	response := httptest.NewRecorder()
+	api.ServeHTTP(response, authenticatedApplicationRequest(http.MethodGet, "/v1/trial-proposals/proposal-id/feedback", nil))
+	if response.Code != http.StatusOK || bytes.Contains(response.Body.Bytes(), []byte("private content")) || bytes.Contains(response.Body.Bytes(), []byte(`"input"`)) || !bytes.Contains(response.Body.Bytes(), []byte(`"moderationStatus":"removed"`)) {
+		t.Fatalf("removed feedback response = %d: %s", response.Code, response.Body.String())
 	}
 }
 

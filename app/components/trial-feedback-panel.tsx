@@ -147,11 +147,17 @@ export function TrialFeedbackPanel({ proposalId }: { proposalId: string }) {
       {status === 'error' && <p role="alert">Private feedback could not be loaded. Reopen this workspace to retry.</p>}
       {status === 'ready' && feedback.map((item) => (
         <article className="trial-feedback-record" key={item.id}>
-          <header><div><strong>{item.author.displayName}</strong><span>{item.authorRole === 'owner' ? 'Opening owner' : 'Applicant'}</span></div><small>{item.acknowledgedAt ? 'Acknowledged' : item.authoredByCurrentUser ? 'Awaiting acknowledgement' : 'New feedback'}</small></header>
-          <ul className="trial-feedback-behaviors">{item.input.observedBehaviors.map((behavior) => <li key={behavior}>{behaviorLabels[behavior]}</li>)}</ul>
-          <dl><div><dt>Observed example</dt><dd>{item.input.collaborationExample}</dd></div><div><dt>Collaborate again</dt><dd>{item.input.collaborateAgain === 'yes' ? 'Yes' : item.input.collaborateAgain === 'maybe' ? 'Maybe, with different scope' : 'No'}</dd></div><div><dt>Private review</dt><dd>{item.input.reviewSummary}</dd></div></dl>
-          {item.canAcknowledge && <div className="trial-feedback-acknowledgement"><button className="secondary-button" disabled={isSaving} onClick={() => acknowledge(item.id)} type="button">{pendingAcknowledgement === item.id ? 'Confirm acknowledgement' : 'Acknowledge receipt'}</button>{pendingAcknowledgement === item.id && <button className="text-button" disabled={isSaving} onClick={() => setPendingAcknowledgement(null)} type="button">Cancel</button>}</div>}
-          {!item.authoredByCurrentUser && <SafetyReportForm buttonLabel="Report this feedback" targetId={item.id} targetKind="trial_feedback" />}
+          <header><div><strong>{item.author.displayName}</strong><span>{item.authorRole === 'owner' ? 'Opening owner' : 'Applicant'}</span></div><small>{item.moderationStatus === 'removed' ? 'Removed after moderation' : item.acknowledgedAt ? 'Acknowledged' : item.authoredByCurrentUser ? 'Awaiting acknowledgement' : 'New feedback'}</small></header>
+          {item.moderationStatus === 'removed' ? (
+            <p className="trial-feedback-removed">This private review is no longer available because an authorized moderator upheld a safety report. Its captured evidence remains restricted to the moderator record.</p>
+          ) : (
+            <>
+              <ul className="trial-feedback-behaviors">{item.input.observedBehaviors.map((behavior) => <li key={behavior}>{behaviorLabels[behavior]}</li>)}</ul>
+              <dl><div><dt>Observed example</dt><dd>{item.input.collaborationExample}</dd></div><div><dt>Collaborate again</dt><dd>{item.input.collaborateAgain === 'yes' ? 'Yes' : item.input.collaborateAgain === 'maybe' ? 'Maybe, with different scope' : 'No'}</dd></div><div><dt>Private review</dt><dd>{item.input.reviewSummary}</dd></div></dl>
+              {item.canAcknowledge && <div className="trial-feedback-acknowledgement"><button className="secondary-button" disabled={isSaving} onClick={() => acknowledge(item.id)} type="button">{pendingAcknowledgement === item.id ? 'Confirm acknowledgement' : 'Acknowledge receipt'}</button>{pendingAcknowledgement === item.id && <button className="text-button" disabled={isSaving} onClick={() => setPendingAcknowledgement(null)} type="button">Cancel</button>}</div>}
+              {!item.authoredByCurrentUser && <SafetyReportForm buttonLabel="Report this feedback" targetId={item.id} targetKind="trial_feedback" />}
+            </>
+          )}
         </article>
       ))}
       {status === 'ready' && !currentUserSubmitted && (
@@ -170,8 +176,8 @@ export function TrialFeedbackPanel({ proposalId }: { proposalId: string }) {
           <h6>{candidate.title}</h6>
           <p>{candidate.explanation}</p>
           <div><strong>Why this appears</strong><ul>{candidate.factors.map((factor) => <li key={factor}>{factor}</li>)}</ul></div>
-          <p className="trial-check-in-boundary">This candidate is private, trial-level, and rule-based. It is not a profile score or badge and cannot be published until moderation controls exist.</p>
-          <SafetyReportForm buttonLabel="Report this trust review" targetId={proposalId} targetKind="trust_candidate" />
+          <p className="trial-check-in-boundary">This candidate is private, trial-level, and rule-based. It is not a profile score or badge, and public signal publication is not available.</p>
+          {candidate.kind !== 'suppressed' && <SafetyReportForm buttonLabel="Report this trust review" targetId={proposalId} targetKind="trust_candidate" />}
         </section>
       )}
       {message && <p aria-live="polite" className="save-message">{message}</p>}

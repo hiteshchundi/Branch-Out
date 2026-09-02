@@ -308,6 +308,27 @@ func TestManagerDerivesTransparentPrivateTrustCandidates(t *testing.T) {
 	}
 }
 
+func TestManagerSuppressesModeratedTrustEvidence(t *testing.T) {
+	now := time.Now()
+	store := &fakeStore{
+		outcome: Outcome{ProposalID: "proposal-id", ReviewStatus: "confirmed", Input: OutcomeInput{OutcomeStatus: "completed", DeliverableStatus: "met"}},
+		feedback: []Feedback{
+			{ModerationStatus: "removed", AcknowledgedAt: &now},
+			{Input: FeedbackInput{ObservedBehaviors: []string{"reliable_delivery", "clear_communication"}, CollaborateAgain: "yes"}, AcknowledgedAt: &now},
+		},
+	}
+	manager := NewManager(store)
+	result, err := manager.GetTrustCandidate(context.Background(), 7, "proposal-id")
+	if err != nil || result.Kind != "suppressed" || result.Ready {
+		t.Fatalf("feedback-suppressed candidate = %#v, %v", result, err)
+	}
+	store.candidateRemoved = true
+	result, err = manager.GetTrustCandidate(context.Background(), 7, "proposal-id")
+	if err != nil || result.Kind != "suppressed" || !strings.Contains(result.Title, "removed") {
+		t.Fatalf("candidate-suppressed result = %#v, %v", result, err)
+	}
+}
+
 type fakeStore struct {
 	record                    Record
 	userID                    int64
@@ -328,6 +349,7 @@ type fakeStore struct {
 	acknowledgedFeedback      Feedback
 	feedbackRecord            FeedbackRecord
 	feedbackID                string
+	candidateRemoved          bool
 	err                       error
 }
 
@@ -394,4 +416,9 @@ func (store *fakeStore) CreateFeedback(_ context.Context, record FeedbackRecord)
 func (store *fakeStore) AcknowledgeFeedback(_ context.Context, userID int64, proposalID, feedbackID string) (Feedback, error) {
 	store.userID, store.proposalID, store.feedbackID = userID, proposalID, feedbackID
 	return store.acknowledgedFeedback, store.err
+}
+
+func (store *fakeStore) TrustCandidateRemoved(_ context.Context, userID int64, proposalID string) (bool, error) {
+	store.userID, store.proposalID = userID, proposalID
+	return store.candidateRemoved, store.err
 }

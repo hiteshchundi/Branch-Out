@@ -34,7 +34,8 @@ func TestPostgresTrialProposalLifecycle(t *testing.T) {
 	profileService := profile.NewService(profile.NewPostgresStore(queries))
 	openingManager := openings.NewManager(openings.NewPostgresRepository(queries), profileService)
 	applicationManager := applications.NewManager(applications.NewPostgresStore(queries), profileService)
-	manager := NewManager(NewPostgresStore(queries))
+	trialStore := NewPostgresStore(queries)
+	manager := NewManager(trialStore)
 	safetyManager := safety.NewManager(safety.NewPostgresStore(queries))
 
 	identifier := time.Now().UnixNano()
@@ -254,6 +255,9 @@ func TestPostgresTrialProposalLifecycle(t *testing.T) {
 	if err != nil || candidateReport.Status != "pending" || len(candidateReport.TargetSnapshot) == 0 {
 		t.Fatalf("candidate safety report = %#v, %v", candidateReport, err)
 	}
+	if removed, err := trialStore.TrustCandidateRemoved(ctx, owner.ID, proposal.ID); err != nil || removed {
+		t.Fatalf("pending candidate moderation = %v, %v", removed, err)
+	}
 	if _, err := safetyManager.ListForModerator(ctx, owner.ID); !errors.Is(err, safety.ErrModeratorForbidden) {
 		t.Fatalf("member moderation list error = %v, want ErrModeratorForbidden", err)
 	}
@@ -269,6 +273,22 @@ func TestPostgresTrialProposalLifecycle(t *testing.T) {
 	})
 	if err != nil || decidedReport.Status != "upheld" || decidedReport.DecidedAt == nil {
 		t.Fatalf("moderation decision = %#v, %v", decidedReport, err)
+	}
+	enforcedFeedback, err := manager.ListFeedback(ctx, applicant.ID, proposal.ID)
+	if err != nil || len(enforcedFeedback) != 2 || enforcedFeedback[1].ModerationStatus != "removed" || len(enforcedFeedback[1].Input.ObservedBehaviors) != 0 || enforcedFeedback[1].CanAcknowledge {
+		t.Fatalf("enforced feedback = %#v, %v", enforcedFeedback, err)
+	}
+	enforcedCandidate, err := manager.GetTrustCandidate(ctx, applicant.ID, proposal.ID)
+	if err != nil || enforcedCandidate.Kind != "suppressed" || enforcedCandidate.Ready {
+		t.Fatalf("enforced trust candidate = %#v, %v", enforcedCandidate, err)
+	}
+	if _, err := safetyManager.Decide(ctx, otherApplicant.ID, candidateReport.ID, safety.DecisionInput{
+		Decision: "upheld", ModeratorNotes: "The captured candidate is misleading and must be removed from participant review.",
+	}); err != nil {
+		t.Fatalf("candidate moderation decision: %v", err)
+	}
+	if removed, err := trialStore.TrustCandidateRemoved(ctx, owner.ID, proposal.ID); err != nil || !removed {
+		t.Fatalf("upheld candidate moderation = %v, %v", removed, err)
 	}
 	if _, err := safetyManager.Decide(ctx, otherApplicant.ID, feedbackReport.ID, safety.DecisionInput{
 		Decision: "dismissed", ModeratorNotes: "A second decision must not replace the original immutable moderation outcome.",

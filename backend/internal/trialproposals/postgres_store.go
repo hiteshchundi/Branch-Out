@@ -261,6 +261,7 @@ func (store *PostgresStore) ListFeedback(ctx context.Context, userID int64, prop
 			row.ID, row.ProposalID, row.ObservedBehaviors, row.CollaborationExample,
 			row.CollaborateAgain, row.ReviewSummary, row.AuthorDisplayName, row.AuthorRole,
 			row.AuthoredByCurrentUser, canAcknowledge, row.SubmittedAt, row.AcknowledgedAt,
+			row.ModerationStatus,
 		))
 	}
 	return results, nil
@@ -283,6 +284,7 @@ func (store *PostgresStore) CreateFeedback(ctx context.Context, record FeedbackR
 		row.ID, row.ProposalID, row.ObservedBehaviors, row.CollaborationExample,
 		row.CollaborateAgain, row.ReviewSummary, row.AuthorDisplayName, row.AuthorRole,
 		row.AuthoredByCurrentUser, row.CanAcknowledge, row.SubmittedAt, row.AcknowledgedAt,
+		row.ModerationStatus,
 	), nil
 }
 
@@ -300,7 +302,18 @@ func (store *PostgresStore) AcknowledgeFeedback(ctx context.Context, userID int6
 		row.ID, row.ProposalID, row.ObservedBehaviors, row.CollaborationExample,
 		row.CollaborateAgain, row.ReviewSummary, row.AuthorDisplayName, row.AuthorRole,
 		row.AuthoredByCurrentUser, row.CanAcknowledge, row.SubmittedAt, row.AcknowledgedAt,
+		row.ModerationStatus,
 	), nil
+}
+
+func (store *PostgresStore) TrustCandidateRemoved(ctx context.Context, userID int64, proposalID string) (bool, error) {
+	removed, err := store.queries.GetTrustCandidateModerationForParticipant(ctx, database.GetTrustCandidateModerationForParticipantParams{
+		ProposalID: proposalID, ParticipantUserID: userID,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, ErrOutcomeNotFound
+	}
+	return removed, err
 }
 
 func feedbackFromValues(
@@ -308,6 +321,7 @@ func feedbackFromValues(
 	collaborationExample, collaborateAgain, reviewSummary, authorDisplayName, authorRole string,
 	authoredByCurrentUser, canAcknowledge bool, submittedAt time.Time,
 	acknowledgedAtValue pgtype.Timestamptz,
+	moderationStatus string,
 ) Feedback {
 	var acknowledgedAt *time.Time
 	if acknowledgedAtValue.Valid {
@@ -322,7 +336,7 @@ func feedbackFromValues(
 		},
 		Author: CheckInAuthor{DisplayName: authorDisplayName}, AuthorRole: authorRole,
 		AuthoredByCurrentUser: authoredByCurrentUser, CanAcknowledge: canAcknowledge,
-		SubmittedAt: submittedAt, AcknowledgedAt: acknowledgedAt,
+		SubmittedAt: submittedAt, AcknowledgedAt: acknowledgedAt, ModerationStatus: moderationStatus,
 	}
 }
 

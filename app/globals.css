@@ -3327,6 +3327,13 @@ main:focus {
 .trial-feedback-behaviors { display: flex; flex-wrap: wrap; gap: 7px; list-style: none; margin: 14px 0 0; padding: 0; }
 .trial-feedback-behaviors li { background: var(--accent-soft); border-radius: 999px; color: var(--accent); font-size: 0.72rem; padding: 6px 9px; }
 .trial-feedback-acknowledgement { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.trial-feedback-removed {
+  border-left: 3px solid var(--danger);
+  color: var(--muted);
+  line-height: 1.55;
+  margin: 16px 0 0;
+  padding: 4px 0 4px 12px;
+}
 
 .trial-trust-candidate {
   background: color-mix(in srgb, var(--surface-raised) 88%, var(--accent-soft));
@@ -3339,6 +3346,7 @@ main:focus {
 .trial-trust-candidate.collaboration_proven { border-color: color-mix(in srgb, var(--accent) 48%, var(--border)); }
 .trial-trust-candidate.work_demonstrated { border-color: color-mix(in srgb, var(--accent-strong) 38%, var(--border)); }
 .trial-trust-candidate.no_signal { border-color: color-mix(in srgb, var(--muted) 45%, var(--border)); }
+.trial-trust-candidate.suppressed { border-color: color-mix(in srgb, var(--danger) 42%, var(--border)); }
 .trial-trust-candidate h6 { font-size: 1.08rem; margin: 6px 0 8px; }
 .trial-trust-candidate > p { line-height: 1.55; }
 .trial-trust-candidate > div { border-top: 1px solid var(--border); margin-top: 15px; padding-top: 15px; }

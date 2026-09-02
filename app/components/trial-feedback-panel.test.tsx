@@ -13,6 +13,7 @@ const feedback = {
   id: '93939393-9393-4393-a393-939393939393', proposalId: proposalID, input,
   author: { displayName: 'Asha Rao' }, authorRole: 'applicant', authoredByCurrentUser: true,
   canAcknowledge: false, submittedAt: '2026-09-15T12:00:00Z', acknowledgedAt: null,
+  moderationStatus: 'visible',
 } as const;
 const notReadyCandidate = {
   proposalId: proposalID, ready: false, kind: 'not_ready', title: 'Trust candidate not ready',
@@ -77,5 +78,27 @@ describe('TrialFeedbackPanel', () => {
     expect(screen.getByText('Acknowledged')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /collaboration proven candidate/i })).toBeInTheDocument();
     expect(screen.getByText(/not a profile score or badge/i)).toBeInTheDocument();
+  });
+
+  it('redacts upheld feedback and suppresses the derived trust candidate', async () => {
+    const removedFeedback = {
+      id: feedback.id, proposalId: proposalID, author: feedback.author, authorRole: feedback.authorRole,
+      authoredByCurrentUser: true, canAcknowledge: false, submittedAt: feedback.submittedAt,
+      acknowledgedAt: feedback.acknowledgedAt, moderationStatus: 'removed',
+    };
+    const suppressedCandidate = {
+      proposalId: proposalID, ready: false, kind: 'suppressed', title: 'Trust candidate unavailable after moderation',
+      explanation: 'A contributing private review was removed after an upheld safety report, so no trust candidate can be derived.',
+      factors: ['Moderation status: contributing review removed'],
+    };
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [removedFeedback] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: suppressedCandidate }), { status: 200 })));
+    render(<TrialFeedbackPanel proposalId={proposalID} />);
+    expect(await screen.findByText(/no longer available because an authorized moderator upheld/i)).toBeInTheDocument();
+    expect(screen.queryByText(input.reviewSummary)).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /trust candidate unavailable after moderation/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /report this trust review/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /submit private feedback/i })).not.toBeInTheDocument();
   });
 });

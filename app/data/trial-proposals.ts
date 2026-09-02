@@ -77,10 +77,9 @@ export type TrialFeedbackInput = {
   reviewSummary: string;
 };
 
-export type TrialFeedback = {
+type TrialFeedbackBase = {
   id: string;
   proposalId: string;
-  input: TrialFeedbackInput;
   author: { displayName: string };
   authorRole: 'applicant' | 'owner';
   authoredByCurrentUser: boolean;
@@ -89,10 +88,15 @@ export type TrialFeedback = {
   acknowledgedAt: string | null;
 };
 
+export type TrialFeedback = TrialFeedbackBase & (
+  | { moderationStatus: 'visible'; input: TrialFeedbackInput }
+  | { moderationStatus: 'removed'; input?: never }
+);
+
 export type TrialTrustCandidate = {
   proposalId: string;
   ready: boolean;
-  kind: 'not_ready' | 'collaboration_proven' | 'work_demonstrated' | 'no_signal';
+  kind: 'not_ready' | 'collaboration_proven' | 'work_demonstrated' | 'no_signal' | 'suppressed';
   title: string;
   explanation: string;
   factors: string[];
@@ -240,7 +244,23 @@ function parseTrialFeedback(value: unknown): TrialFeedback {
   if (
     typeof feedback.id !== 'string'
     || typeof feedback.proposalId !== 'string'
-    || !input
+    || !author
+    || typeof author.displayName !== 'string'
+    || !['applicant', 'owner'].includes(feedback.authorRole as string)
+    || typeof feedback.authoredByCurrentUser !== 'boolean'
+    || typeof feedback.canAcknowledge !== 'boolean'
+    || typeof feedback.submittedAt !== 'string'
+    || (feedback.acknowledgedAt !== null && typeof feedback.acknowledgedAt !== 'string')
+    || !['visible', 'removed'].includes(feedback.moderationStatus as string)
+    || (feedback.authoredByCurrentUser === true && feedback.canAcknowledge === true)
+    || (feedback.acknowledgedAt !== null && feedback.canAcknowledge === true)
+  ) throw new Error('The API returned invalid private feedback.');
+  if (feedback.moderationStatus === 'removed') {
+    if (input || feedback.canAcknowledge === true) throw new Error('The API returned invalid removed feedback.');
+    return feedback as TrialFeedback;
+  }
+  if (
+    !input
     || !Array.isArray(behaviors)
     || behaviors.length < 2
     || behaviors.length > 4
@@ -249,15 +269,6 @@ function parseTrialFeedback(value: unknown): TrialFeedback {
     || typeof input.collaborationExample !== 'string'
     || !['yes', 'maybe', 'no'].includes(input.collaborateAgain as string)
     || typeof input.reviewSummary !== 'string'
-    || !author
-    || typeof author.displayName !== 'string'
-    || !['applicant', 'owner'].includes(feedback.authorRole as string)
-    || typeof feedback.authoredByCurrentUser !== 'boolean'
-    || typeof feedback.canAcknowledge !== 'boolean'
-    || typeof feedback.submittedAt !== 'string'
-    || (feedback.acknowledgedAt !== null && typeof feedback.acknowledgedAt !== 'string')
-    || (feedback.authoredByCurrentUser === true && feedback.canAcknowledge === true)
-    || (feedback.acknowledgedAt !== null && feedback.canAcknowledge === true)
   ) throw new Error('The API returned invalid private feedback.');
   return feedback as TrialFeedback;
 }
@@ -268,13 +279,13 @@ function parseTrialTrustCandidate(value: unknown): TrialTrustCandidate {
   if (
     typeof candidate.proposalId !== 'string'
     || typeof candidate.ready !== 'boolean'
-    || !['not_ready', 'collaboration_proven', 'work_demonstrated', 'no_signal'].includes(candidate.kind as string)
+    || !['not_ready', 'collaboration_proven', 'work_demonstrated', 'no_signal', 'suppressed'].includes(candidate.kind as string)
     || typeof candidate.title !== 'string'
     || typeof candidate.explanation !== 'string'
     || !Array.isArray(candidate.factors)
     || candidate.factors.some((factor) => typeof factor !== 'string')
-    || (candidate.ready === false && candidate.kind !== 'not_ready')
-    || (candidate.ready === true && candidate.kind === 'not_ready')
+    || (candidate.ready === false && !['not_ready', 'suppressed'].includes(candidate.kind as string))
+    || (candidate.ready === true && ['not_ready', 'suppressed'].includes(candidate.kind as string))
   ) throw new Error('The API returned an invalid private trust candidate.');
   return candidate as TrialTrustCandidate;
 }

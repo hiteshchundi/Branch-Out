@@ -299,8 +299,10 @@ snapshot will be shared with authorized moderators. One member can report a
 given item only once, and members cannot report their own feedback.
 
 Reports enter a role-gated moderator queue. Moderators can permanently uphold or
-dismiss a pending report with required notes. Reporting or upholding does not yet
-remove content, penalize an account, publish a signal, or provide an appeal flow.
+dismiss a pending report with required notes. Reporting alone changes nothing.
+An upheld finding replaces the targeted feedback with a content-free removal
+record and suppresses the affected trust candidate for both trial participants.
+It does not penalize an account, publish a signal, or provide an appeal flow.
 
 Authenticated moderator accounts see **Moderation** in the header. The dashboard
 separates pending, upheld, and dismissed reports, shows the reporter explanation
@@ -346,5 +348,6 @@ moderator role for every queue request and decision.
   for moderator review.
 - Participant safety reports, immutable evidence snapshots, and moderator
   decisions are account-backed and available through a role-gated dashboard.
-  Content enforcement, sanctions, and appeals are not implemented.
+  Upheld feedback and trust candidates are removed from participant-facing
+  responses. Account sanctions, restoration, and appeals are not implemented.
 - Saved openings stay only in the current browser and are not synchronized.

@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -145,6 +146,35 @@ type Feedback struct {
 	CanAcknowledge        bool          `json:"canAcknowledge"`
 	SubmittedAt           time.Time     `json:"submittedAt"`
 	AcknowledgedAt        *time.Time    `json:"acknowledgedAt"`
+	ModerationStatus      string        `json:"moderationStatus"`
+}
+
+// MarshalJSON removes upheld feedback content from participant responses while
+// retaining the minimum lifecycle record needed to prevent duplicate reviews.
+func (feedback Feedback) MarshalJSON() ([]byte, error) {
+	type feedbackAlias Feedback
+	if feedback.ModerationStatus == "" {
+		feedback.ModerationStatus = "visible"
+	}
+	if feedback.ModerationStatus != "removed" {
+		return json.Marshal(feedbackAlias(feedback))
+	}
+	return json.Marshal(struct {
+		ID                    string        `json:"id"`
+		ProposalID            string        `json:"proposalId"`
+		Author                CheckInAuthor `json:"author"`
+		AuthorRole            string        `json:"authorRole"`
+		AuthoredByCurrentUser bool          `json:"authoredByCurrentUser"`
+		CanAcknowledge        bool          `json:"canAcknowledge"`
+		SubmittedAt           time.Time     `json:"submittedAt"`
+		AcknowledgedAt        *time.Time    `json:"acknowledgedAt"`
+		ModerationStatus      string        `json:"moderationStatus"`
+	}{
+		ID: feedback.ID, ProposalID: feedback.ProposalID, Author: feedback.Author,
+		AuthorRole: feedback.AuthorRole, AuthoredByCurrentUser: feedback.AuthoredByCurrentUser,
+		CanAcknowledge: false, SubmittedAt: feedback.SubmittedAt,
+		AcknowledgedAt: feedback.AcknowledgedAt, ModerationStatus: "removed",
+	})
 }
 
 type FeedbackRecord struct {
@@ -182,6 +212,7 @@ type Store interface {
 	ListFeedback(context.Context, int64, string) ([]Feedback, error)
 	CreateFeedback(context.Context, FeedbackRecord) (Feedback, error)
 	AcknowledgeFeedback(context.Context, int64, string, string) (Feedback, error)
+	TrustCandidateRemoved(context.Context, int64, string) (bool, error)
 }
 
 func (manager *Manager) SendOwn(ctx context.Context, userID int64, openingID string) (Proposal, error) {
@@ -329,6 +360,17 @@ func (manager *Manager) GetTrustCandidate(ctx context.Context, userID int64, pro
 	if err != nil {
 		return TrustCandidate{}, err
 	}
+	removed, err := manager.store.TrustCandidateRemoved(ctx, userID, proposalID)
+	if err != nil {
+		return TrustCandidate{}, err
+	}
+	if removed {
+		return TrustCandidate{
+			ProposalID: proposalID, Kind: "suppressed", Title: "Trust candidate removed after moderation",
+			Explanation: "An authorized moderator upheld a safety report about this private trust candidate.",
+			Factors: []string{"Moderation status: removed"},
+		}, nil
+	}
 	feedback, err := manager.store.ListFeedback(ctx, userID, proposalID)
 	if err != nil {
 		return TrustCandidate{}, err
@@ -347,6 +389,15 @@ func deriveTrustCandidate(outcome Outcome, feedback []Feedback) TrustCandidate {
 	if outcome.ReviewStatus != "confirmed" {
 		result.Explanation = "Both participants must first confirm the factual trial outcome."
 		return result
+	}
+	for _, review := range feedback {
+		if review.ModerationStatus == "removed" {
+			result.Kind = "suppressed"
+			result.Title = "Trust candidate unavailable after moderation"
+			result.Explanation = "A contributing private review was removed after an upheld safety report, so no trust candidate can be derived."
+			result.Factors = append(result.Factors, "Moderation status: contributing review removed")
+			return result
+		}
 	}
 	if len(feedback) != 2 {
 		result.Explanation = "Both participants must submit one private review."

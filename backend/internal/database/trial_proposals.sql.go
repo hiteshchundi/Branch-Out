@@ -27,6 +27,12 @@ WITH acknowledged AS (
       AND outcome.review_status = 'confirmed'
       AND feedback.acknowledged_at IS NULL
       AND feedback.author_user_id <> $1
+      AND NOT EXISTS (
+          SELECT 1 FROM safety_reports AS report
+          WHERE report.target_kind = 'trial_feedback'
+            AND report.target_id = feedback.id
+            AND report.report_status = 'upheld'
+      )
       AND (
           proposal.applicant_user_id = $1
           OR opening.owner_user_id = $1
@@ -44,7 +50,8 @@ SELECT
         ELSE 'owner'
     END AS author_role,
     false AS authored_by_current_user,
-    false AS can_acknowledge
+    false AS can_acknowledge,
+    'visible'::text AS moderation_status
 FROM acknowledged
 JOIN trial_proposals AS proposal ON proposal.id = acknowledged.proposal_id
 JOIN profiles ON profiles.user_id = acknowledged.author_user_id
@@ -70,6 +77,7 @@ type AcknowledgeTrialFeedbackForParticipantRow struct {
 	AuthorRole            string             `db:"author_role" json:"author_role"`
 	AuthoredByCurrentUser bool               `db:"authored_by_current_user" json:"authored_by_current_user"`
 	CanAcknowledge        bool               `db:"can_acknowledge" json:"can_acknowledge"`
+	ModerationStatus      string             `db:"moderation_status" json:"moderation_status"`
 }
 
 func (q *Queries) AcknowledgeTrialFeedbackForParticipant(ctx context.Context, arg AcknowledgeTrialFeedbackForParticipantParams) (AcknowledgeTrialFeedbackForParticipantRow, error) {
@@ -89,6 +97,7 @@ func (q *Queries) AcknowledgeTrialFeedbackForParticipant(ctx context.Context, ar
 		&i.AuthorRole,
 		&i.AuthoredByCurrentUser,
 		&i.CanAcknowledge,
+		&i.ModerationStatus,
 	)
 	return i, err
 }
@@ -203,7 +212,8 @@ SELECT
         ELSE 'owner'
     END AS author_role,
     true AS authored_by_current_user,
-    false AS can_acknowledge
+    false AS can_acknowledge,
+    'visible'::text AS moderation_status
 FROM inserted
 JOIN trial_proposals AS proposal ON proposal.id = inserted.proposal_id
 JOIN profiles ON profiles.user_id = inserted.author_user_id
@@ -233,6 +243,7 @@ type CreateTrialFeedbackForParticipantRow struct {
 	AuthorRole            string             `db:"author_role" json:"author_role"`
 	AuthoredByCurrentUser bool               `db:"authored_by_current_user" json:"authored_by_current_user"`
 	CanAcknowledge        bool               `db:"can_acknowledge" json:"can_acknowledge"`
+	ModerationStatus      string             `db:"moderation_status" json:"moderation_status"`
 }
 
 func (q *Queries) CreateTrialFeedbackForParticipant(ctx context.Context, arg CreateTrialFeedbackForParticipantParams) (CreateTrialFeedbackForParticipantRow, error) {
@@ -260,6 +271,7 @@ func (q *Queries) CreateTrialFeedbackForParticipant(ctx context.Context, arg Cre
 		&i.AuthorRole,
 		&i.AuthoredByCurrentUser,
 		&i.CanAcknowledge,
+		&i.ModerationStatus,
 	)
 	return i, err
 }
@@ -661,6 +673,38 @@ func (q *Queries) GetTrialWorkspaceForParticipant(ctx context.Context, arg GetTr
 	return id, err
 }
 
+const getTrustCandidateModerationForParticipant = `-- name: GetTrustCandidateModerationForParticipant :one
+SELECT EXISTS (
+    SELECT 1
+    FROM safety_reports AS report
+    WHERE report.target_kind = 'trust_candidate'
+      AND report.target_id = proposal.id
+      AND report.report_status = 'upheld'
+) AS removed
+FROM trial_proposals AS proposal
+JOIN project_openings AS opening ON opening.id = proposal.opening_id
+JOIN trial_outcomes AS outcome ON outcome.proposal_id = proposal.id
+WHERE proposal.id = $1
+  AND proposal.proposal_status = 'accepted'
+  AND outcome.review_status = 'confirmed'
+  AND (
+      proposal.applicant_user_id = $2
+      OR opening.owner_user_id = $2
+  )
+`
+
+type GetTrustCandidateModerationForParticipantParams struct {
+	ProposalID        string `db:"proposal_id" json:"proposal_id"`
+	ParticipantUserID int64  `db:"participant_user_id" json:"participant_user_id"`
+}
+
+func (q *Queries) GetTrustCandidateModerationForParticipant(ctx context.Context, arg GetTrustCandidateModerationForParticipantParams) (bool, error) {
+	row := q.db.QueryRow(ctx, getTrustCandidateModerationForParticipant, arg.ProposalID, arg.ParticipantUserID)
+	var removed bool
+	err := row.Scan(&removed)
+	return removed, err
+}
+
 const listTrialCheckInsForParticipant = `-- name: ListTrialCheckInsForParticipant :many
 SELECT
     check_in.id, check_in.proposal_id, check_in.author_user_id,
@@ -733,8 +777,10 @@ func (q *Queries) ListTrialCheckInsForParticipant(ctx context.Context, arg ListT
 const listTrialFeedbackForParticipant = `-- name: ListTrialFeedbackForParticipant :many
 SELECT
     feedback.id, feedback.proposal_id, feedback.author_user_id,
-    feedback.observed_behaviors, feedback.collaboration_example,
-    feedback.collaborate_again, feedback.review_summary,
+    (CASE WHEN enforcement.removed IS TRUE THEN ARRAY[]::text[] ELSE feedback.observed_behaviors END)::text[] AS observed_behaviors,
+    (CASE WHEN enforcement.removed IS TRUE THEN '' ELSE feedback.collaboration_example END)::text AS collaboration_example,
+    (CASE WHEN enforcement.removed IS TRUE THEN '' ELSE feedback.collaborate_again END)::text AS collaborate_again,
+    (CASE WHEN enforcement.removed IS TRUE THEN '' ELSE feedback.review_summary END)::text AS review_summary,
     feedback.submitted_at, feedback.acknowledged_at,
     profiles.display_name AS author_display_name,
     CASE
@@ -745,12 +791,22 @@ SELECT
     (
         feedback.acknowledged_at IS NULL
         AND feedback.author_user_id <> $1
-    ) AS can_acknowledge
+        AND enforcement.removed IS NOT TRUE
+    ) AS can_acknowledge,
+    CASE WHEN enforcement.removed IS TRUE THEN 'removed' ELSE 'visible' END AS moderation_status
 FROM trial_feedback AS feedback
 JOIN trial_proposals AS proposal ON proposal.id = feedback.proposal_id
 JOIN project_openings AS opening ON opening.id = proposal.opening_id
 JOIN trial_outcomes AS outcome ON outcome.proposal_id = proposal.id
 JOIN profiles ON profiles.user_id = feedback.author_user_id
+LEFT JOIN LATERAL (
+    SELECT true AS removed
+    FROM safety_reports AS report
+    WHERE report.target_kind = 'trial_feedback'
+      AND report.target_id = feedback.id
+      AND report.report_status = 'upheld'
+    LIMIT 1
+) AS enforcement ON true
 WHERE feedback.proposal_id = $2
   AND proposal.proposal_status = 'accepted'
   AND outcome.review_status = 'confirmed'
@@ -780,6 +836,7 @@ type ListTrialFeedbackForParticipantRow struct {
 	AuthorRole            string             `db:"author_role" json:"author_role"`
 	AuthoredByCurrentUser bool               `db:"authored_by_current_user" json:"authored_by_current_user"`
 	CanAcknowledge        *bool              `db:"can_acknowledge" json:"can_acknowledge"`
+	ModerationStatus      string             `db:"moderation_status" json:"moderation_status"`
 }
 
 func (q *Queries) ListTrialFeedbackForParticipant(ctx context.Context, arg ListTrialFeedbackForParticipantParams) ([]ListTrialFeedbackForParticipantRow, error) {
@@ -805,6 +862,7 @@ func (q *Queries) ListTrialFeedbackForParticipant(ctx context.Context, arg ListT
 			&i.AuthorRole,
 			&i.AuthoredByCurrentUser,
 			&i.CanAcknowledge,
+			&i.ModerationStatus,
 		); err != nil {
 			return nil, err
 		}

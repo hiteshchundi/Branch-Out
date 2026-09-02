@@ -226,8 +226,10 @@ JOIN profiles ON profiles.user_id = decided.submitted_by_user_id;
 -- name: ListTrialFeedbackForParticipant :many
 SELECT
     feedback.id, feedback.proposal_id, feedback.author_user_id,
-    feedback.observed_behaviors, feedback.collaboration_example,
-    feedback.collaborate_again, feedback.review_summary,
+    (CASE WHEN enforcement.removed IS TRUE THEN ARRAY[]::text[] ELSE feedback.observed_behaviors END)::text[] AS observed_behaviors,
+    (CASE WHEN enforcement.removed IS TRUE THEN '' ELSE feedback.collaboration_example END)::text AS collaboration_example,
+    (CASE WHEN enforcement.removed IS TRUE THEN '' ELSE feedback.collaborate_again END)::text AS collaborate_again,
+    (CASE WHEN enforcement.removed IS TRUE THEN '' ELSE feedback.review_summary END)::text AS review_summary,
     feedback.submitted_at, feedback.acknowledged_at,
     profiles.display_name AS author_display_name,
     CASE
@@ -238,12 +240,22 @@ SELECT
     (
         feedback.acknowledged_at IS NULL
         AND feedback.author_user_id <> sqlc.arg(participant_user_id)
-    ) AS can_acknowledge
+        AND enforcement.removed IS NOT TRUE
+    ) AS can_acknowledge,
+    CASE WHEN enforcement.removed IS TRUE THEN 'removed' ELSE 'visible' END AS moderation_status
 FROM trial_feedback AS feedback
 JOIN trial_proposals AS proposal ON proposal.id = feedback.proposal_id
 JOIN project_openings AS opening ON opening.id = proposal.opening_id
 JOIN trial_outcomes AS outcome ON outcome.proposal_id = proposal.id
 JOIN profiles ON profiles.user_id = feedback.author_user_id
+LEFT JOIN LATERAL (
+    SELECT true AS removed
+    FROM safety_reports AS report
+    WHERE report.target_kind = 'trial_feedback'
+      AND report.target_id = feedback.id
+      AND report.report_status = 'upheld'
+    LIMIT 1
+) AS enforcement ON true
 WHERE feedback.proposal_id = sqlc.arg(proposal_id)
   AND proposal.proposal_status = 'accepted'
   AND outcome.review_status = 'confirmed'
@@ -287,7 +299,8 @@ SELECT
         ELSE 'owner'
     END AS author_role,
     true AS authored_by_current_user,
-    false AS can_acknowledge
+    false AS can_acknowledge,
+    'visible'::text AS moderation_status
 FROM inserted
 JOIN trial_proposals AS proposal ON proposal.id = inserted.proposal_id
 JOIN profiles ON profiles.user_id = inserted.author_user_id;
@@ -307,6 +320,12 @@ WITH acknowledged AS (
       AND outcome.review_status = 'confirmed'
       AND feedback.acknowledged_at IS NULL
       AND feedback.author_user_id <> sqlc.arg(participant_user_id)
+      AND NOT EXISTS (
+          SELECT 1 FROM safety_reports AS report
+          WHERE report.target_kind = 'trial_feedback'
+            AND report.target_id = feedback.id
+            AND report.report_status = 'upheld'
+      )
       AND (
           proposal.applicant_user_id = sqlc.arg(participant_user_id)
           OR opening.owner_user_id = sqlc.arg(participant_user_id)
@@ -324,10 +343,30 @@ SELECT
         ELSE 'owner'
     END AS author_role,
     false AS authored_by_current_user,
-    false AS can_acknowledge
+    false AS can_acknowledge,
+    'visible'::text AS moderation_status
 FROM acknowledged
 JOIN trial_proposals AS proposal ON proposal.id = acknowledged.proposal_id
 JOIN profiles ON profiles.user_id = acknowledged.author_user_id;
+
+-- name: GetTrustCandidateModerationForParticipant :one
+SELECT EXISTS (
+    SELECT 1
+    FROM safety_reports AS report
+    WHERE report.target_kind = 'trust_candidate'
+      AND report.target_id = proposal.id
+      AND report.report_status = 'upheld'
+) AS removed
+FROM trial_proposals AS proposal
+JOIN project_openings AS opening ON opening.id = proposal.opening_id
+JOIN trial_outcomes AS outcome ON outcome.proposal_id = proposal.id
+WHERE proposal.id = sqlc.arg(proposal_id)
+  AND proposal.proposal_status = 'accepted'
+  AND outcome.review_status = 'confirmed'
+  AND (
+      proposal.applicant_user_id = sqlc.arg(participant_user_id)
+      OR opening.owner_user_id = sqlc.arg(participant_user_id)
+  );
 
 -- name: GetOwnedOpeningTrialProposalReviewScope :one
 SELECT id

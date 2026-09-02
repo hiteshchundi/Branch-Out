@@ -156,6 +156,7 @@ describe('trial proposal API client', () => {
       id: '93939393-9393-4393-a393-939393939393', proposalId: proposal.id, input: feedbackInput,
       author: { displayName: 'Asha Rao' }, authorRole: 'applicant', authoredByCurrentUser: true,
       canAcknowledge: false, submittedAt: '2026-09-15T12:00:00Z', acknowledgedAt: null,
+      moderationStatus: 'visible',
     } as const;
     const acknowledged = { ...feedback, authoredByCurrentUser: false, acknowledgedAt: '2026-09-15T13:00:00Z' } as const;
     const fetcher = vi.fn()

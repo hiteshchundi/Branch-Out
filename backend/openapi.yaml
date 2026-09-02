@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: Branch-Out API
-  version: 0.16.0
-  description: PostgreSQL-backed discovery, GitHub authentication with server-held account roles, member profiles, owner-managed opening lifecycles, proof-led applications, private trial collaboration, safety reporting, and moderator review for Branch-Out.
+  version: 0.17.0
+  description: PostgreSQL-backed discovery, GitHub authentication with server-held account roles, member profiles, owner-managed opening lifecycles, proof-led applications, private trial collaboration, safety reporting, moderator review, and upheld-content enforcement for Branch-Out.
 servers:
   - url: http://localhost:8080
 paths:
@@ -928,7 +928,7 @@ paths:
     get:
       operationId: listTrialFeedback
       summary: List participant-private post-trial feedback
-      description: Returns feedback only to the applicant or opening owner after the factual outcome is mutually confirmed. Feedback is not public and has no score.
+      description: Returns feedback only to the applicant or opening owner after the factual outcome is mutually confirmed. An upheld report replaces the review content with a removed lifecycle record. Feedback is not public and has no score.
       security:
         - sessionCookie: []
       parameters:
@@ -1013,7 +1013,7 @@ paths:
     post:
       operationId: acknowledgeTrialFeedback
       summary: Acknowledge receipt of counterpart feedback
-      description: Records only that the counterpart received a private review. It does not indicate agreement, approval, or publication and can happen once.
+      description: Records only that the counterpart received a visible private review. Removed feedback cannot be acknowledged. It does not indicate agreement, approval, or publication and can happen once.
       security:
         - sessionCookie: []
       parameters:
@@ -1054,7 +1054,7 @@ paths:
     get:
       operationId: getTrialTrustCandidate
       summary: Derive a transparent private trust candidate
-      description: Derives a participant-only trial-level candidate from the confirmed factual outcome and immutable private feedback. It stores no score and cannot publish a profile signal or badge.
+      description: Derives a participant-only trial-level candidate from the confirmed factual outcome and immutable private feedback. An upheld report on the candidate or a contributing review returns a suppressed state. It stores no score and cannot publish a profile signal or badge.
       security:
         - sessionCookie: []
       parameters:
@@ -1162,7 +1162,7 @@ paths:
     post:
       operationId: decideModerationReport
       summary: Uphold or dismiss one pending safety report
-      description: Requires a moderator. The first decision and required notes are immutable; enforcement remains a separate manual or future workflow.
+      description: Requires a moderator. The first decision and required notes are immutable. An upheld decision removes the targeted private feedback or trust candidate from participant-facing responses; sanctions and appeals remain separate workflows.
       security:
         - sessionCookie: []
       parameters:
@@ -2029,11 +2029,13 @@ components:
           maxLength: 1000
     TrialFeedback:
       type: object
-      required: [id, proposalId, input, author, authorRole, authoredByCurrentUser, canAcknowledge, submittedAt, acknowledgedAt]
+      required: [id, proposalId, author, authorRole, authoredByCurrentUser, canAcknowledge, submittedAt, acknowledgedAt, moderationStatus]
       properties:
         id: {type: string, format: uuid}
         proposalId: {type: string, format: uuid}
-        input: {$ref: '#/components/schemas/TrialFeedbackInput'}
+        input:
+          description: Present only while moderationStatus is visible. Removed records never return the private review content.
+          $ref: '#/components/schemas/TrialFeedbackInput'
         author: {$ref: '#/components/schemas/TrialCheckInAuthor'}
         authorRole:
           type: string
@@ -2046,6 +2048,9 @@ components:
         acknowledgedAt:
           type: [string, 'null']
           format: date-time
+        moderationStatus:
+          type: string
+          enum: [visible, removed]
     TrialTrustCandidate:
       type: object
       required: [proposalId, ready, kind, title, explanation, factors]
@@ -2056,7 +2061,7 @@ components:
           description: False until the outcome is confirmed, both reviews exist, and each counterpart has acknowledged receipt.
         kind:
           type: string
-          enum: [not_ready, collaboration_proven, work_demonstrated, no_signal]
+          enum: [not_ready, collaboration_proven, work_demonstrated, no_signal, suppressed]
         title: {type: string}
         explanation: {type: string}
         factors:

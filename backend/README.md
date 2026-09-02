@@ -191,8 +191,10 @@ UPDATE users SET account_role = 'moderator' WHERE github_login = 'approved-login
 
 The queue returns pending reports first. A moderator can record one permanent
 `upheld` or `dismissed` decision with 20–1000 characters of notes. An upheld
-decision records a policy finding only; takedowns, member sanctions, appeals,
-and automated trust-signal publication remain separate future workflows.
+decision redacts the targeted feedback from participant responses and suppresses
+the affected trust candidate. The immutable moderation snapshot remains
+available in the moderator queue. Member sanctions, restoration, appeals, and
+automated trust-signal publication remain separate future workflows.
 The authenticated session response includes the server-held `accountRole`, so
 the frontend can show its moderator dashboard only to eligible accounts; the
 moderator endpoints remain the authoritative authorization boundary.
@@ -278,8 +280,8 @@ draft isolation from owners, immutable sending, owner-only review, irreversible
 decisions, participant-only execution logs, mutually reviewed outcomes, one
 private feedback record per participant, and counterpart acknowledgement.
 Safety coverage verifies participant scope, self-report and duplicate rejection,
-private snapshot capture, moderator role enforcement, queue ordering, and
-immutable decisions.
+private snapshot capture, moderator role enforcement, queue ordering, immutable
+decisions, participant-response redaction, and candidate suppression.
 
 ## Package boundaries
 
