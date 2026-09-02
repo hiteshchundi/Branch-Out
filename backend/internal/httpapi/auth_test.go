@@ -101,7 +101,7 @@ func TestGitHubAuthCallbackRejectsMismatchedStateBeforeExchange(t *testing.T) {
 
 func TestCurrentSessionAndLogout(t *testing.T) {
 	calls := &authCalls{}
-	user := auth.User{ID: 1, GitHubUserID: 42, GitHubLogin: "asha-rao", AvatarURL: "https://avatars.test/42", ProfileURL: "https://github.test/asha-rao"}
+	user := auth.User{ID: 1, GitHubUserID: 42, GitHubLogin: "asha-rao", AvatarURL: "https://avatars.test/42", ProfileURL: "https://github.test/asha-rao", AccountRole: "moderator"}
 	api := authTestAPI(fakeAuthenticator{calls: calls, user: user}, defaultOptions)
 
 	t.Run("current user", func(t *testing.T) {
@@ -117,7 +117,7 @@ func TestCurrentSessionAndLogout(t *testing.T) {
 		if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
 			t.Fatalf("decode response: %v", err)
 		}
-		if body.Data.GitHubLogin != "asha-rao" {
+		if body.Data.GitHubLogin != "asha-rao" || body.Data.AccountRole != "moderator" {
 			t.Fatalf("session user = %#v", body.Data)
 		}
 	})

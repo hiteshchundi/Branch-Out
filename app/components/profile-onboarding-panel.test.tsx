@@ -30,6 +30,7 @@ const authenticatedUser: AuthenticatedUser = {
   displayName: 'Asha Rao',
   avatarUrl: 'https://avatars.githubusercontent.com/u/42',
   profileUrl: 'https://github.com/asha-rao',
+  accountRole: 'member',
 };
 
 const savedProfile = {

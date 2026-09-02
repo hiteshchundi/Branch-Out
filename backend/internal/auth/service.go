@@ -36,6 +36,7 @@ type User struct {
 	DisplayName  *string `json:"displayName"`
 	AvatarURL    string  `json:"avatarUrl"`
 	ProfileURL   string  `json:"profileUrl"`
+	AccountRole  string  `json:"accountRole"`
 }
 
 type GitHubUser struct {

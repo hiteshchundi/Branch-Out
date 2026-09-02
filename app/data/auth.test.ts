@@ -8,6 +8,7 @@ const user = {
   displayName: 'Branch Builder',
   avatarUrl: 'https://avatars.githubusercontent.com/u/42',
   profileUrl: 'https://github.com/branch-builder',
+  accountRole: 'member',
 };
 
 afterEach(() => {

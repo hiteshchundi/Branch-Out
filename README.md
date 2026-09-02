@@ -302,6 +302,12 @@ Reports enter a role-gated moderator queue. Moderators can permanently uphold or
 dismiss a pending report with required notes. Reporting or upholding does not yet
 remove content, penalize an account, publish a signal, or provide an appeal flow.
 
+Authenticated moderator accounts see **Moderation** in the header. The dashboard
+separates pending, upheld, and dismissed reports, shows the reporter explanation
+and captured private evidence, and requires a 20–1000 character policy note plus
+an explicit permanent-action confirmation. The server still rechecks the
+moderator role for every queue request and decision.
+
 ## Current boundaries
 
 - Project discovery requires the Go API and PostgreSQL. The frontend does not
@@ -339,6 +345,6 @@ remove content, penalize an account, publish a signal, or provide an appeal flow
   converted to profile reputation, or published; participants can report them
   for moderator review.
 - Participant safety reports, immutable evidence snapshots, and moderator
-  decisions are account-backed. Content enforcement, sanctions, appeals, and a
-  visible moderator dashboard are not implemented.
+  decisions are account-backed and available through a role-gated dashboard.
+  Content enforcement, sanctions, and appeals are not implemented.
 - Saved openings stay only in the current browser and are not synchronized.

@@ -19,6 +19,7 @@ const authenticatedUser: AuthenticatedUser = {
   displayName: 'Accepted Builder',
   avatarUrl: 'https://avatars.githubusercontent.com/u/4242',
   profileUrl: 'https://github.com/accepted-builder',
+  accountRole: 'member',
 };
 const applicationInput = {
   message: 'I can build the comparison flow and document the decisions.',

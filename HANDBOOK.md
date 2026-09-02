@@ -550,8 +550,28 @@ Submitting shares the report and an immutable snapshot of the private item with
 authorized moderators. It does not automatically remove content or penalize a
 member. You cannot report your own feedback or submit the same report twice.
 Moderators can permanently uphold or dismiss a pending report with required
-notes. Enforcement, sanctions, appeals, and a moderator dashboard are not yet
-available.
+notes.
+
+### Review the moderator queue
+
+**What it is:** A private dashboard for authorized moderator accounts to inspect
+captured report evidence and record a policy finding.
+
+**Where to find it:** Sign in with an account whose server-held role is
+`moderator`, then select **Moderation** in the header. Ordinary members never see
+this control, and the API verifies the role again on every request.
+
+Use the status controls to switch between pending, upheld, and dismissed
+reports. Each report shows its category, reporter, private explanation, target
+identifier, and a collapsed captured-evidence section. For a pending report,
+select **Record decision**, choose uphold or dismiss, enter 20–1000 characters
+of policy notes, and confirm that the decision is permanent. The queue updates
+after the API records the decision. The dialog keeps keyboard focus contained,
+closes with `Escape`, and returns focus to its header control.
+
+The dashboard does not cache reports in browser storage. Captured evidence stays
+private to authorized moderators. Enforcement, sanctions, appeals, and trust-
+signal publication are not yet available.
 
 ## Review a trial outcome
 
@@ -811,12 +831,13 @@ configuration, and operating details live in `backend/README.md`.
   acknowledgement, and a transparent trial-level candidate. Feedback and the
   candidate cannot be edited, converted to profile reputation, or published;
   participants can report them for moderator review.
-- Trial participants can submit private safety reports, and role-gated moderator
-  APIs can uphold or dismiss them once. Content enforcement, account sanctions,
-  appeals, and a moderator dashboard are not available.
+- Trial participants can submit private safety reports, and authorized
+  moderators can review captured evidence and uphold or dismiss them once in the
+  visible role-gated dashboard. Content enforcement, account sanctions, and
+  appeals are not available.
 - Saved openings do not synchronize between browsers or devices.
 - Early-access email addresses are not transmitted or stored.
-- Notification and moderation flows do not exist yet.
+- Notification and moderation-enforcement flows do not exist yet.
 
 ## Handbook maintenance rule
 

@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: Branch-Out API
-  version: 0.15.0
-  description: PostgreSQL-backed discovery, GitHub authentication, member profiles, owner-managed opening lifecycles, proof-led applications, applicant withdrawal, and private trial proposal sending, owner review, and immutable mutual decisions for Branch-Out.
+  version: 0.16.0
+  description: PostgreSQL-backed discovery, GitHub authentication with server-held account roles, member profiles, owner-managed opening lifecycles, proof-led applications, private trial collaboration, safety reporting, and moderator review for Branch-Out.
 servers:
   - url: http://localhost:8080
 paths:
@@ -2227,6 +2227,7 @@ components:
         - githubLogin
         - avatarUrl
         - profileUrl
+        - accountRole
       properties:
         id:
           type: integer
@@ -2249,6 +2250,9 @@ components:
         profileUrl:
           type: string
           format: uri
+        accountRole:
+          type: string
+          enum: [member, moderator]
     ProfileInput:
       type: object
       additionalProperties: false

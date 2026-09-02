@@ -30,7 +30,7 @@ ON CONFLICT (github_user_id) DO UPDATE SET
     avatar_url = EXCLUDED.avatar_url,
     profile_url = EXCLUDED.profile_url,
     updated_at = now()
-RETURNING id, github_user_id, github_login, display_name, avatar_url, profile_url;
+RETURNING id, github_user_id, github_login, display_name, avatar_url, profile_url, account_role;
 
 -- name: DeleteExpiredSessions :exec
 DELETE FROM sessions WHERE expires_at <= now();
@@ -46,7 +46,8 @@ SELECT
     users.github_login,
     users.display_name,
     users.avatar_url,
-    users.profile_url
+    users.profile_url,
+    users.account_role
 FROM sessions
 JOIN users ON users.id = sessions.user_id
 WHERE sessions.token_hash = sqlc.arg(token_hash)

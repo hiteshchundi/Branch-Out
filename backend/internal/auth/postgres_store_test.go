@@ -60,8 +60,18 @@ func TestPostgresStoreOAuthAndSessionLifecycle(t *testing.T) {
 		AvatarURL:  "https://avatars.githubusercontent.com/u/42?v=2",
 		ProfileURL: "https://github.com/asha-rao",
 	})
-	if err != nil || updated.ID != user.ID || updated.DisplayName == nil || *updated.DisplayName != updatedName {
+	if err != nil || updated.ID != user.ID || updated.DisplayName == nil || *updated.DisplayName != updatedName || updated.AccountRole != "member" {
 		t.Fatalf("updated user = %#v, %v", updated, err)
+	}
+	if _, err := pool.Exec(ctx, "UPDATE users SET account_role = 'moderator' WHERE id = $1", user.ID); err != nil {
+		t.Fatalf("promote auth test user: %v", err)
+	}
+	promoted, err := store.UpsertGitHubUser(ctx, GitHubUser{
+		ID: githubUserID, Login: "asha-rao-auth-test", Name: &updatedName,
+		AvatarURL: "https://avatars.githubusercontent.com/u/42?v=3", ProfileURL: "https://github.com/asha-rao",
+	})
+	if err != nil || promoted.AccountRole != "moderator" {
+		t.Fatalf("promoted user = %#v, %v", promoted, err)
 	}
 
 	tokenHash := sha256.Sum256([]byte("session-token"))
@@ -69,7 +79,7 @@ func TestPostgresStoreOAuthAndSessionLifecycle(t *testing.T) {
 		t.Fatalf("CreateSession() error = %v", err)
 	}
 	current, err := store.GetSessionUser(ctx, tokenHash[:])
-	if err != nil || current.ID != user.ID || current.GitHubLogin != "asha-rao-auth-test" {
+	if err != nil || current.ID != user.ID || current.GitHubLogin != "asha-rao-auth-test" || current.AccountRole != "moderator" {
 		t.Fatalf("GetSessionUser() = %#v, %v", current, err)
 	}
 	if err := store.DeleteSession(ctx, tokenHash[:]); err != nil {

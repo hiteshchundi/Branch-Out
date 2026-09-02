@@ -258,6 +258,7 @@ main:focus {
 }
 
 .post-project-button,
+.moderation-button,
 .secondary-button,
 .text-button {
   background: transparent;
@@ -270,9 +271,20 @@ main:focus {
 }
 
 .post-project-button:hover,
+.moderation-button:hover,
 .secondary-button:hover {
   background: var(--surface-raised);
   border-color: color-mix(in srgb, var(--accent) 38%, var(--border));
+}
+
+.moderation-button {
+  background: var(--surface-raised);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+  border-radius: 10px;
+  color: var(--foreground);
+  cursor: pointer;
+  font-weight: 750;
+  padding: 10px 14px;
 }
 
 .post-label-short {
@@ -1090,6 +1102,235 @@ main:focus {
 .account-logout-button,
 .login-preview-button {
   width: 100%;
+}
+
+/* Moderator-only review keeps reports, captured evidence, and irreversible decisions together. */
+.moderation-panel {
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  max-height: calc(100vh - 40px);
+  max-width: 940px;
+  overflow-y: auto;
+  padding: 32px;
+  width: 100%;
+}
+
+.moderation-header,
+.moderation-report-heading {
+  align-items: flex-start;
+  display: flex;
+  gap: 24px;
+  justify-content: space-between;
+}
+
+.moderation-header h2 {
+  font-size: clamp(1.75rem, 4vw, 2.35rem);
+  letter-spacing: -0.04em;
+  margin: 6px 0 8px;
+}
+
+.moderation-header p,
+.moderation-state,
+.moderation-boundary {
+  color: var(--muted);
+  line-height: 1.55;
+  margin: 0;
+}
+
+.moderation-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 28px 0 20px;
+}
+
+.moderation-filters button {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  cursor: pointer;
+  font-weight: 700;
+  padding: 9px 13px;
+}
+
+.moderation-filters button[aria-pressed='true'] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--foreground);
+}
+
+.moderation-filters span {
+  margin-left: 4px;
+}
+
+.moderation-list {
+  display: grid;
+  gap: 18px;
+}
+
+.moderation-report {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 22px;
+}
+
+.moderation-report h3 {
+  font-size: 1.15rem;
+  margin: 8px 0 0;
+}
+
+.moderation-report h4 {
+  font-size: 0.82rem;
+  margin: 0 0 6px;
+}
+
+.moderation-report-heading time,
+.moderation-decision time {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.moderation-status {
+  border-radius: 999px;
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 800;
+  padding: 5px 8px;
+}
+
+.moderation-status-pending { background: var(--accent-soft); color: var(--accent-strong); }
+.moderation-status-upheld { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
+.moderation-status-dismissed { background: var(--surface-raised); color: var(--muted); }
+
+.moderation-report-facts,
+.moderation-snapshot {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 18px 0;
+}
+
+.moderation-report-facts div,
+.moderation-snapshot div {
+  min-width: 0;
+}
+
+.moderation-report-facts dt,
+.moderation-snapshot dt {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.moderation-report-facts dd,
+.moderation-snapshot dd {
+  line-height: 1.5;
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.moderation-reason,
+.moderation-decision {
+  background: var(--surface-raised);
+  border-radius: 10px;
+  margin: 14px 0;
+  padding: 14px;
+}
+
+.moderation-reason p,
+.moderation-decision p {
+  line-height: 1.6;
+  margin: 0;
+}
+
+.moderation-report details {
+  border-bottom: 1px solid var(--border);
+  border-top: 1px solid var(--border);
+  margin: 16px 0;
+  padding: 14px 0;
+}
+
+.moderation-report summary {
+  cursor: pointer;
+  font-weight: 750;
+}
+
+.moderation-snapshot {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.moderation-decision-form {
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 16px;
+  margin-top: 18px;
+  padding-top: 18px;
+}
+
+.moderation-decision-form fieldset {
+  border: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+}
+
+.moderation-decision-form legend {
+  font-weight: 800;
+  margin-bottom: 10px;
+}
+
+.moderation-decision-form > label:not(.confirmation-row) {
+  display: grid;
+  font-weight: 750;
+  gap: 7px;
+}
+
+.moderation-decision-form textarea {
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--foreground);
+  font: inherit;
+  padding: 12px;
+  resize: vertical;
+}
+
+.moderation-decision-form small,
+.moderation-boundary {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.moderation-decision-form > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.moderation-message {
+  background: var(--accent-soft);
+  border-radius: 10px;
+  margin: 0 0 16px;
+  padding: 12px 14px;
+}
+
+.moderation-state {
+  padding: 30px 0;
+  text-align: center;
+}
+
+.moderation-boundary {
+  border-top: 1px solid var(--border);
+  margin-top: 22px;
+  padding-top: 16px;
 }
 
 .login-state {
@@ -3526,6 +3767,20 @@ main:focus {
 
   .theme-label {
     display: none;
+  }
+
+  .moderation-button {
+    padding: 10px;
+  }
+
+  .moderation-panel {
+    max-height: calc(100vh - 20px);
+    padding: 22px;
+  }
+
+  .moderation-report-facts,
+  .moderation-snapshot {
+    grid-template-columns: 1fr;
   }
 
   .hero-section {

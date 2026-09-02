@@ -181,6 +181,7 @@ describe('HomeExperience', () => {
       displayName: 'Branch Builder',
       avatarUrl: 'https://avatars.githubusercontent.com/u/42',
       profileUrl: 'https://github.com/branch-builder',
+      accountRole: 'member',
     };
     const fetcher = vi.fn((input: string | URL | Request, init?: RequestInit) => {
       const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
@@ -213,6 +214,20 @@ describe('HomeExperience', () => {
       credentials: 'include',
       method: 'DELETE',
     });
+  });
+
+  it('shows the moderation workspace control only for a server-authorized moderator', async () => {
+    const moderator = {
+      id: 9, githubUserId: 99, githubLogin: 'reviewer', displayName: 'Safety Reviewer',
+      avatarUrl: 'https://avatars.githubusercontent.com/u/99', profileUrl: 'https://github.com/reviewer', accountRole: 'moderator',
+    };
+    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request, init?: RequestInit) => {
+      const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
+      if (url.pathname === '/v1/session') return Promise.resolve(new Response(JSON.stringify({ data: moderator }), { status: 200 }));
+      return defaultAPIFetch(input, init);
+    }));
+    render(<HomeExperience />);
+    expect(await screen.findByRole('button', { name: /moderation/i })).toBeInTheDocument();
   });
 
   it('reports and removes the OAuth callback result from the address', async () => {

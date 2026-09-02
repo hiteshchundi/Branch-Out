@@ -5,6 +5,7 @@ export type AuthenticatedUser = {
   displayName: string | null;
   avatarUrl: string;
   profileUrl: string;
+  accountRole: 'member' | 'moderator';
 };
 
 type SessionEnvelope = {
@@ -45,6 +46,7 @@ function parseUser(value: unknown): AuthenticatedUser {
     || (user.displayName !== null && typeof user.displayName !== 'string')
     || !isHTTPSURL(user.avatarUrl)
     || !isHTTPSURL(user.profileUrl)
+    || !['member', 'moderator'].includes(user.accountRole as string)
   ) {
     throw new Error('The API returned an invalid user.');
   }

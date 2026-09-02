@@ -30,6 +30,7 @@ import {
 import { CreateOpeningPanel } from './create-opening-panel';
 import { BrandLogo } from './brand-logo';
 import { OutcomeFeedbackPanel } from './outcome-feedback-panel';
+import { ModerationQueuePanel } from './moderation-queue-panel';
 import { ProofApplicationPanel } from './proof-application-panel';
 import { ProfileOnboardingPanel } from './profile-onboarding-panel';
 import { SavedProjectComparisonPanel } from './saved-project-comparison-panel';
@@ -230,6 +231,7 @@ export function HomeExperience() {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isProfileOnboardingOpen, setIsProfileOnboardingOpen] = useState(false);
   const [isCreateOpeningOpen, setIsCreateOpeningOpen] = useState(false);
+  const [isModerationOpen, setIsModerationOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<ProjectOpening | null>(null);
   const [applicationProject, setApplicationProject] = useState<ProjectOpening | null>(null);
   const [trialProject, setTrialProject] = useState<ProjectOpening | null>(null);
@@ -250,6 +252,7 @@ export function HomeExperience() {
   const projectTriggerRef = useRef<HTMLButtonElement | null>(null);
   const createOpeningTriggerRef = useRef<HTMLButtonElement>(null);
   const loginTriggerRef = useRef<HTMLButtonElement>(null);
+  const moderationTriggerRef = useRef<HTMLButtonElement>(null);
   const comparisonTriggerRef = useRef<HTMLButtonElement>(null);
   const savedProjectsSnapshot = useSyncExternalStore(
     subscribeToSavedProjects,
@@ -434,6 +437,11 @@ export function HomeExperience() {
     window.setTimeout(() => loginTriggerRef.current?.focus(), 0);
   };
 
+  const closeModeration = () => {
+    setIsModerationOpen(false);
+    window.setTimeout(() => moderationTriggerRef.current?.focus(), 0);
+  };
+
   const logout = async () => {
     setIsLoggingOut(true);
     try {
@@ -489,6 +497,11 @@ export function HomeExperience() {
 
         <div className="header-actions">
           <ThemeToggle />
+          {authenticatedUser?.accountRole === 'moderator' && (
+            <button className="moderation-button" onClick={() => setIsModerationOpen(true)} ref={moderationTriggerRef} type="button">
+              Moderation
+            </button>
+          )}
           <button
             className="post-project-button"
             onClick={() => setIsCreateOpeningOpen(true)}
@@ -796,6 +809,7 @@ export function HomeExperience() {
           user={authenticatedUser}
         />
       )}
+      {isModerationOpen && authenticatedUser?.accountRole === 'moderator' && <ModerationQueuePanel onClose={closeModeration} />}
       {isProfileOnboardingOpen && <ProfileOnboardingPanel authenticatedUser={authenticatedUser} key={authenticatedUser?.id ?? 'anonymous'} onClose={closeProfileOnboarding} />}
       {isCreateOpeningOpen && (
         <CreateOpeningPanel

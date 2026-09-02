@@ -31,6 +31,7 @@ const authenticatedUser: AuthenticatedUser = {
   displayName: 'Branch Builder',
   avatarUrl: 'https://avatars.githubusercontent.com/u/42',
   profileUrl: 'https://github.com/branch-builder',
+  accountRole: 'member',
 };
 
 function managedDraft(

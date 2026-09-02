@@ -193,6 +193,9 @@ The queue returns pending reports first. A moderator can record one permanent
 `upheld` or `dismissed` decision with 20–1000 characters of notes. An upheld
 decision records a policy finding only; takedowns, member sanctions, appeals,
 and automated trust-signal publication remain separate future workflows.
+The authenticated session response includes the server-held `accountRole`, so
+the frontend can show its moderator dashboard only to eligible accounts; the
+moderator endpoints remain the authoritative authorization boundary.
 
 The complete contract is in [`openapi.yaml`](openapi.yaml).
 

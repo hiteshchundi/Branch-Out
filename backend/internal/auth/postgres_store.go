@@ -48,6 +48,7 @@ func (store *PostgresStore) UpsertGitHubUser(ctx context.Context, githubUser Git
 	return User{
 		ID: row.ID, GitHubUserID: row.GithubUserID, GitHubLogin: row.GithubLogin,
 		DisplayName: row.DisplayName, AvatarURL: row.AvatarUrl, ProfileURL: row.ProfileUrl,
+		AccountRole: row.AccountRole,
 	}, nil
 }
 
@@ -71,6 +72,7 @@ func (store *PostgresStore) GetSessionUser(ctx context.Context, tokenHash []byte
 	return User{
 		ID: row.ID, GitHubUserID: row.GithubUserID, GitHubLogin: row.GithubLogin,
 		DisplayName: row.DisplayName, AvatarURL: row.AvatarUrl, ProfileURL: row.ProfileUrl,
+		AccountRole: row.AccountRole,
 	}, nil
 }
 

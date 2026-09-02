@@ -89,7 +89,8 @@ SELECT
     users.github_login,
     users.display_name,
     users.avatar_url,
-    users.profile_url
+    users.profile_url,
+    users.account_role
 FROM sessions
 JOIN users ON users.id = sessions.user_id
 WHERE sessions.token_hash = $1
@@ -103,6 +104,7 @@ type GetSessionUserRow struct {
 	DisplayName  *string `db:"display_name" json:"display_name"`
 	AvatarUrl    string  `db:"avatar_url" json:"avatar_url"`
 	ProfileUrl   string  `db:"profile_url" json:"profile_url"`
+	AccountRole  string  `db:"account_role" json:"account_role"`
 }
 
 func (q *Queries) GetSessionUser(ctx context.Context, tokenHash []byte) (GetSessionUserRow, error) {
@@ -115,6 +117,7 @@ func (q *Queries) GetSessionUser(ctx context.Context, tokenHash []byte) (GetSess
 		&i.DisplayName,
 		&i.AvatarUrl,
 		&i.ProfileUrl,
+		&i.AccountRole,
 	)
 	return i, err
 }
@@ -139,7 +142,7 @@ ON CONFLICT (github_user_id) DO UPDATE SET
     avatar_url = EXCLUDED.avatar_url,
     profile_url = EXCLUDED.profile_url,
     updated_at = now()
-RETURNING id, github_user_id, github_login, display_name, avatar_url, profile_url
+RETURNING id, github_user_id, github_login, display_name, avatar_url, profile_url, account_role
 `
 
 type UpsertGitHubUserParams struct {
@@ -157,6 +160,7 @@ type UpsertGitHubUserRow struct {
 	DisplayName  *string `db:"display_name" json:"display_name"`
 	AvatarUrl    string  `db:"avatar_url" json:"avatar_url"`
 	ProfileUrl   string  `db:"profile_url" json:"profile_url"`
+	AccountRole  string  `db:"account_role" json:"account_role"`
 }
 
 func (q *Queries) UpsertGitHubUser(ctx context.Context, arg UpsertGitHubUserParams) (UpsertGitHubUserRow, error) {
@@ -175,6 +179,7 @@ func (q *Queries) UpsertGitHubUser(ctx context.Context, arg UpsertGitHubUserPara
 		&i.DisplayName,
 		&i.AvatarUrl,
 		&i.ProfileUrl,
+		&i.AccountRole,
 	)
 	return i, err
 }
