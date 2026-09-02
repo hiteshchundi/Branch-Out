@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Branch-Out API
-  version: 0.12.0
+  version: 0.13.0
   description: PostgreSQL-backed discovery, GitHub authentication, member profiles, owner-managed opening lifecycles, proof-led applications, applicant withdrawal, and private trial proposal sending, owner review, and immutable mutual decisions for Branch-Out.
 servers:
   - url: http://localhost:8080
@@ -924,6 +924,132 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /v1/trial-proposals/{proposalId}/feedback:
+    get:
+      operationId: listTrialFeedback
+      summary: List participant-private post-trial feedback
+      description: Returns feedback only to the applicant or opening owner after the factual outcome is mutually confirmed. Feedback is not public and has no score.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: proposalId
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        '200':
+          description: Private feedback ordered by submission time.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items: {$ref: '#/components/schemas/TrialFeedback'}
+                  meta:
+                    type: object
+                    required: [count]
+                    properties:
+                      count: {type: integer, minimum: 0}
+        '401':
+          description: No valid session is present.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+        '500':
+          description: Private feedback could not be loaded.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+    post:
+      operationId: createTrialFeedback
+      summary: Submit one immutable private participant review
+      description: Each participant may submit one review after the factual outcome is confirmed. The review remains private and cannot be edited or published by this endpoint.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: proposalId
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/TrialFeedbackInput'}
+      responses:
+        '201':
+          description: The immutable private review was submitted.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: {$ref: '#/components/schemas/TrialFeedback'}
+        '400':
+          description: The feedback is malformed or fails validation.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+        '401':
+          description: No valid session is present.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+        '409':
+          description: The outcome is not confirmed, the member is not a participant, or that member already submitted feedback.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+        '500':
+          description: Private feedback could not be submitted.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+  /v1/trial-proposals/{proposalId}/feedback/{feedbackId}/acknowledge:
+    post:
+      operationId: acknowledgeTrialFeedback
+      summary: Acknowledge receipt of counterpart feedback
+      description: Records only that the counterpart received a private review. It does not indicate agreement, approval, or publication and can happen once.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: proposalId
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+        - name: feedbackId
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        '200':
+          description: Receipt was acknowledged permanently.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: {$ref: '#/components/schemas/TrialFeedback'}
+        '401':
+          description: No valid session is present.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+        '409':
+          description: The feedback is missing, authored by the member, already acknowledged, or outside the member's trial.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+        '500':
+          description: The acknowledgement could not be recorded.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorEnvelope'}
   /v1/openings/{id}/application/submit:
     post:
       operationId: submitOwnApplication
@@ -1721,6 +1847,49 @@ components:
           type:
             - string
             - 'null'
+          format: date-time
+    TrialFeedbackInput:
+      type: object
+      additionalProperties: false
+      required: [observedBehaviors, collaborationExample, collaborateAgain, reviewSummary]
+      properties:
+        observedBehaviors:
+          type: array
+          minItems: 2
+          maxItems: 4
+          uniqueItems: true
+          items:
+            type: string
+            enum: [reliable_delivery, clear_communication, sound_scope_judgment, constructive_feedback]
+        collaborationExample:
+          type: string
+          minLength: 30
+          maxLength: 1000
+        collaborateAgain:
+          type: string
+          enum: [yes, maybe, no]
+        reviewSummary:
+          type: string
+          minLength: 30
+          maxLength: 1000
+    TrialFeedback:
+      type: object
+      required: [id, proposalId, input, author, authorRole, authoredByCurrentUser, canAcknowledge, submittedAt, acknowledgedAt]
+      properties:
+        id: {type: string, format: uuid}
+        proposalId: {type: string, format: uuid}
+        input: {$ref: '#/components/schemas/TrialFeedbackInput'}
+        author: {$ref: '#/components/schemas/TrialCheckInAuthor'}
+        authorRole:
+          type: string
+          enum: [applicant, owner]
+        authoredByCurrentUser: {type: boolean}
+        canAcknowledge:
+          type: boolean
+          description: True only for the counterpart before acknowledgement.
+        submittedAt: {type: string, format: date-time}
+        acknowledgedAt:
+          type: [string, 'null']
           format: date-time
     Application:
       type: object

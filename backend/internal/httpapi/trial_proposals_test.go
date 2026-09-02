@@ -134,6 +134,38 @@ func TestTrialParticipantsSubmitAndReviewOutcome(t *testing.T) {
 	}
 }
 
+func TestTrialParticipantsSubmitAndAcknowledgePrivateFeedback(t *testing.T) {
+	calls := &trialProposalCalls{}
+	input := trialproposals.FeedbackInput{
+		ObservedBehaviors:    []string{"reliable_delivery", "clear_communication"},
+		CollaborationExample: "They surfaced a blocker early and delivered the revised milestone on time.",
+		CollaborateAgain:     "yes",
+		ReviewSummary:        "A dependable collaborator who communicated tradeoffs clearly during the trial.",
+	}
+	feedback := trialproposals.Feedback{ID: "feedback-id", ProposalID: "proposal-id", Input: input}
+	manager := fakeTrialProposalManager{calls: calls, feedbackResult: feedback, feedbackList: []trialproposals.Feedback{feedback}}
+	api := trialProposalTestAPI(manager, fakeAuthenticator{user: auth.User{ID: 7}})
+
+	list := httptest.NewRecorder()
+	api.ServeHTTP(list, authenticatedApplicationRequest(http.MethodGet, "/v1/trial-proposals/proposal-id/feedback", nil))
+	if list.Code != http.StatusOK || calls.operation != "list-feedback" || !bytes.Contains(list.Body.Bytes(), []byte("feedback-id")) {
+		t.Fatalf("list feedback = %d, calls %#v: %s", list.Code, calls, list.Body.String())
+	}
+
+	body, _ := json.Marshal(input)
+	create := httptest.NewRecorder()
+	api.ServeHTTP(create, authenticatedApplicationRequest(http.MethodPost, "/v1/trial-proposals/proposal-id/feedback", bytes.NewReader(body)))
+	if create.Code != http.StatusCreated || calls.operation != "create-feedback" || len(calls.feedbackInput.ObservedBehaviors) != 2 {
+		t.Fatalf("create feedback = %d, calls %#v: %s", create.Code, calls, create.Body.String())
+	}
+
+	acknowledge := httptest.NewRecorder()
+	api.ServeHTTP(acknowledge, authenticatedApplicationRequest(http.MethodPost, "/v1/trial-proposals/proposal-id/feedback/feedback-id/acknowledge", nil))
+	if acknowledge.Code != http.StatusOK || calls.operation != "acknowledge-feedback" || calls.feedbackID != "feedback-id" {
+		t.Fatalf("acknowledge feedback = %d, calls %#v: %s", acknowledge.Code, calls, acknowledge.Body.String())
+	}
+}
+
 func TestTrialOutcomeMapsLifecycleErrors(t *testing.T) {
 	for _, test := range []struct {
 		method string
@@ -211,24 +243,28 @@ func trialProposalTestAPI(manager fakeTrialProposalManager, authentication fakeA
 }
 
 type trialProposalCalls struct {
-	operation    string
-	userID       int64
-	openingID    string
-	input        trialproposals.Input
-	proposalID   string
-	decision     string
-	checkInInput trialproposals.CheckInInput
-	outcomeInput trialproposals.OutcomeInput
+	operation     string
+	userID        int64
+	openingID     string
+	input         trialproposals.Input
+	proposalID    string
+	decision      string
+	checkInInput  trialproposals.CheckInInput
+	outcomeInput  trialproposals.OutcomeInput
+	feedbackInput trialproposals.FeedbackInput
+	feedbackID    string
 }
 
 type fakeTrialProposalManager struct {
-	calls         *trialProposalCalls
-	result        trialproposals.Proposal
-	listResult    []trialproposals.OwnerProposal
-	checkInResult trialproposals.CheckIn
-	checkInList   []trialproposals.CheckIn
-	outcomeResult trialproposals.Outcome
-	err           error
+	calls          *trialProposalCalls
+	result         trialproposals.Proposal
+	listResult     []trialproposals.OwnerProposal
+	checkInResult  trialproposals.CheckIn
+	checkInList    []trialproposals.CheckIn
+	outcomeResult  trialproposals.Outcome
+	feedbackResult trialproposals.Feedback
+	feedbackList   []trialproposals.Feedback
+	err            error
 }
 
 func (fake fakeTrialProposalManager) GetOwn(_ context.Context, userID int64, openingID string) (trialproposals.Proposal, error) {
@@ -300,4 +336,25 @@ func (fake fakeTrialProposalManager) DecideOutcome(_ context.Context, userID int
 		fake.calls.operation, fake.calls.userID, fake.calls.proposalID, fake.calls.decision = "decide-outcome", userID, proposalID, decision
 	}
 	return fake.outcomeResult, fake.err
+}
+
+func (fake fakeTrialProposalManager) ListFeedback(_ context.Context, userID int64, proposalID string) ([]trialproposals.Feedback, error) {
+	if fake.calls != nil {
+		fake.calls.operation, fake.calls.userID, fake.calls.proposalID = "list-feedback", userID, proposalID
+	}
+	return fake.feedbackList, fake.err
+}
+
+func (fake fakeTrialProposalManager) CreateFeedback(_ context.Context, userID int64, proposalID string, input trialproposals.FeedbackInput) (trialproposals.Feedback, error) {
+	if fake.calls != nil {
+		fake.calls.operation, fake.calls.userID, fake.calls.proposalID, fake.calls.feedbackInput = "create-feedback", userID, proposalID, input
+	}
+	return fake.feedbackResult, fake.err
+}
+
+func (fake fakeTrialProposalManager) AcknowledgeFeedback(_ context.Context, userID int64, proposalID, feedbackID string) (trialproposals.Feedback, error) {
+	if fake.calls != nil {
+		fake.calls.operation, fake.calls.userID, fake.calls.proposalID, fake.calls.feedbackID = "acknowledge-feedback", userID, proposalID, feedbackID
+	}
+	return fake.feedbackResult, fake.err
 }

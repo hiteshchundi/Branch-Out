@@ -255,6 +255,12 @@ or remaining work. The other participant—not the submitter—can permanently
 confirm or dispute it. A confirmed closeout still remains private and does not
 publish feedback or create a trust signal.
 
+After confirmation, the same private workspace unlocks one account-backed review
+for each participant. Reviews require at least two directly observed behaviors,
+a concrete example, a collaborate-again choice, and a private summary. The other
+participant can acknowledge receipt, but acknowledgement is explicitly not
+agreement or approval. Reviews remain private and do not create a score or badge.
+
 ## Outcome feedback and trust candidates
 
 **Preview outcome review** inside a project's trial milestone opens a three-step
@@ -272,10 +278,10 @@ and “Yes” to collaborating again. Completed or partial work can instead beco
 **Work Demonstrated candidate**. A stopped outcome creates no signal candidate.
 The interface displays every factor and never calculates a hidden score.
 
-Each project stores a separate feedback draft locally. The mutually reviewed
-factual closeout in the private trial workspace does not publish this richer
-feedback draft or any trust signal; moderation and publication remain future
-work.
+Each project stores a separate preview draft locally. Confirmed account-backed
+trials now support private participant feedback in the accepted-trial workspace,
+but do not publish it or derive a trust signal. Moderation and publication remain
+future work.
 
 ## Current boundaries
 
@@ -305,8 +311,10 @@ work.
   proposals provide a participant-only immutable execution log. Check-in edits,
   deletions, and file uploads are unavailable. One participant can submit a
   read-only factual outcome and the counterpart can confirm or dispute it once.
+  Once confirmed, both participants can submit one immutable private review and
+  acknowledge receipt of the other's review without implying agreement.
   Outcome revisions, dispute resolution, counterproposals, signatures, and
   replacement proposals are not implemented.
-- Outcome-review drafts and trust candidates stay local and are not confirmed or
-  published.
+- Outcome-review previews and trust candidates stay local. Account-backed
+  participant reviews remain private and are not scored, moderated, or published.
 - Saved openings stay only in the current browser and are not synchronized.

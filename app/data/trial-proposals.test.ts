@@ -10,6 +10,9 @@ import {
   createTrialOutcome,
   decideTrialOutcome,
   loadTrialOutcome,
+  acknowledgeTrialFeedback,
+  createTrialFeedback,
+  loadTrialFeedback,
   TrialProposalAPIError,
   type TrialProposalInput,
 } from './trial-proposals';
@@ -138,6 +141,33 @@ describe('trial proposal API client', () => {
     expect(fetcher).toHaveBeenLastCalledWith(
       `http://localhost:8080/v1/trial-proposals/${proposal.id}/outcome/decision`,
       expect.objectContaining({ method: 'POST', body: JSON.stringify({ decision: 'confirmed' }) }),
+    );
+  });
+
+  it('lists, submits, and acknowledges participant-private feedback', async () => {
+    const feedbackInput = {
+      observedBehaviors: ['reliable_delivery', 'clear_communication'] as const,
+      collaborationExample: 'They surfaced a blocker early and delivered the revised milestone on the agreed date.',
+      collaborateAgain: 'yes' as const,
+      reviewSummary: 'A dependable collaborator who communicated tradeoffs clearly throughout the bounded trial.',
+    };
+    const feedback = {
+      id: '93939393-9393-4393-a393-939393939393', proposalId: proposal.id, input: feedbackInput,
+      author: { displayName: 'Asha Rao' }, authorRole: 'applicant', authoredByCurrentUser: true,
+      canAcknowledge: false, submittedAt: '2026-09-15T12:00:00Z', acknowledgedAt: null,
+    } as const;
+    const acknowledged = { ...feedback, authoredByCurrentUser: false, acknowledgedAt: '2026-09-15T13:00:00Z' } as const;
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [feedback] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: feedback }), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: acknowledged }), { status: 200 }));
+    vi.stubGlobal('fetch', fetcher);
+    await expect(loadTrialFeedback(proposal.id)).resolves.toEqual([feedback]);
+    await expect(createTrialFeedback(proposal.id, feedbackInput)).resolves.toEqual(feedback);
+    await expect(acknowledgeTrialFeedback(proposal.id, feedback.id)).resolves.toEqual(acknowledged);
+    expect(fetcher).toHaveBeenLastCalledWith(
+      `http://localhost:8080/v1/trial-proposals/${proposal.id}/feedback/${feedback.id}/acknowledge`,
+      expect.objectContaining({ method: 'POST', credentials: 'include' }),
     );
   });
 });

@@ -97,6 +97,19 @@ type TrialCheckIn struct {
 	CreatedAt    time.Time `db:"created_at" json:"created_at"`
 }
 
+type TrialFeedback struct {
+	ID                   string             `db:"id" json:"id"`
+	ProposalID           string             `db:"proposal_id" json:"proposal_id"`
+	AuthorUserID         int64              `db:"author_user_id" json:"author_user_id"`
+	ObservedBehaviors    []string           `db:"observed_behaviors" json:"observed_behaviors"`
+	CollaborationExample string             `db:"collaboration_example" json:"collaboration_example"`
+	CollaborateAgain     string             `db:"collaborate_again" json:"collaborate_again"`
+	ReviewSummary        string             `db:"review_summary" json:"review_summary"`
+	AcknowledgedByUserID *int64             `db:"acknowledged_by_user_id" json:"acknowledged_by_user_id"`
+	SubmittedAt          time.Time          `db:"submitted_at" json:"submitted_at"`
+	AcknowledgedAt       pgtype.Timestamptz `db:"acknowledged_at" json:"acknowledged_at"`
+}
+
 type TrialOutcome struct {
 	ID                string             `db:"id" json:"id"`
 	ProposalID        string             `db:"proposal_id" json:"proposal_id"`

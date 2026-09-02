@@ -45,6 +45,17 @@ type trialOutcomeDecisionRequest struct {
 	Decision string `json:"decision"`
 }
 
+type trialFeedbackResponse struct {
+	Data trialproposals.Feedback `json:"data"`
+}
+
+type trialFeedbackListResponse struct {
+	Data []trialproposals.Feedback `json:"data"`
+	Meta struct {
+		Count int `json:"count"`
+	} `json:"meta"`
+}
+
 func (api *API) getOwnTrialProposal(writer http.ResponseWriter, request *http.Request) {
 	writer.Header().Set("Cache-Control", "no-store")
 	user, ok := api.requireUser(writer, request)
@@ -253,6 +264,79 @@ func (api *API) writeTrialOutcomeError(writer http.ResponseWriter, err error) bo
 	default:
 		api.logger.Error("manage trial outcome failed", "error", err)
 		writeError(writer, http.StatusInternalServerError, apiError{Code: "internal_error", Message: "The trial outcome request could not be completed."})
+	}
+	return true
+}
+
+func (api *API) listTrialFeedback(writer http.ResponseWriter, request *http.Request) {
+	writer.Header().Set("Cache-Control", "no-store")
+	user, ok := api.requireUser(writer, request)
+	if !ok {
+		return
+	}
+	results, err := api.trialProposals.ListFeedback(request.Context(), user.ID, request.PathValue("proposalId"))
+	if api.writeTrialFeedbackError(writer, err) {
+		return
+	}
+	response := trialFeedbackListResponse{Data: results}
+	response.Meta.Count = len(results)
+	writeJSON(writer, http.StatusOK, response)
+}
+
+func (api *API) createTrialFeedback(writer http.ResponseWriter, request *http.Request) {
+	writer.Header().Set("Cache-Control", "no-store")
+	user, ok := api.requireUser(writer, request)
+	if !ok {
+		return
+	}
+	var input trialproposals.FeedbackInput
+	decoder := json.NewDecoder(http.MaxBytesReader(writer, request.Body, maximumTrialProposalBody))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil {
+		writeError(writer, http.StatusBadRequest, apiError{Code: "invalid_request", Message: "Provide valid private trial feedback."})
+		return
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		writeError(writer, http.StatusBadRequest, apiError{Code: "invalid_request", Message: "Provide exactly one private trial feedback record."})
+		return
+	}
+	result, err := api.trialProposals.CreateFeedback(request.Context(), user.ID, request.PathValue("proposalId"), input)
+	if api.writeTrialFeedbackError(writer, err) {
+		return
+	}
+	writeJSON(writer, http.StatusCreated, trialFeedbackResponse{Data: result})
+}
+
+func (api *API) acknowledgeTrialFeedback(writer http.ResponseWriter, request *http.Request) {
+	writer.Header().Set("Cache-Control", "no-store")
+	user, ok := api.requireUser(writer, request)
+	if !ok {
+		return
+	}
+	result, err := api.trialProposals.AcknowledgeFeedback(
+		request.Context(), user.ID, request.PathValue("proposalId"), request.PathValue("feedbackId"),
+	)
+	if api.writeTrialFeedbackError(writer, err) {
+		return
+	}
+	writeJSON(writer, http.StatusOK, trialFeedbackResponse{Data: result})
+}
+
+func (api *API) writeTrialFeedbackError(writer http.ResponseWriter, err error) bool {
+	if err == nil {
+		return false
+	}
+	var fieldError *trialproposals.FieldError
+	switch {
+	case errors.As(err, &fieldError):
+		writeError(writer, http.StatusBadRequest, apiError{Code: "invalid_trial_feedback", Message: fieldError.Message, Field: fieldError.Field})
+	case errors.Is(err, trialproposals.ErrFeedbackUnavailable):
+		writeError(writer, http.StatusConflict, apiError{Code: "trial_feedback_unavailable", Message: "Private feedback is unavailable until the outcome is confirmed, or you already submitted feedback."})
+	case errors.Is(err, trialproposals.ErrFeedbackAcknowledgeUnavailable):
+		writeError(writer, http.StatusConflict, apiError{Code: "trial_feedback_acknowledgement_unavailable", Message: "This private feedback cannot be acknowledged."})
+	default:
+		api.logger.Error("manage trial feedback failed", "error", err)
+		writeError(writer, http.StatusInternalServerError, apiError{Code: "internal_error", Message: "The private feedback request could not be completed."})
 	}
 	return true
 }

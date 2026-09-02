@@ -223,6 +223,112 @@ FROM decided
 JOIN trial_proposals AS proposal ON proposal.id = decided.proposal_id
 JOIN profiles ON profiles.user_id = decided.submitted_by_user_id;
 
+-- name: ListTrialFeedbackForParticipant :many
+SELECT
+    feedback.id, feedback.proposal_id, feedback.author_user_id,
+    feedback.observed_behaviors, feedback.collaboration_example,
+    feedback.collaborate_again, feedback.review_summary,
+    feedback.submitted_at, feedback.acknowledged_at,
+    profiles.display_name AS author_display_name,
+    CASE
+        WHEN feedback.author_user_id = proposal.applicant_user_id THEN 'applicant'
+        ELSE 'owner'
+    END AS author_role,
+    feedback.author_user_id = sqlc.arg(participant_user_id) AS authored_by_current_user,
+    (
+        feedback.acknowledged_at IS NULL
+        AND feedback.author_user_id <> sqlc.arg(participant_user_id)
+    ) AS can_acknowledge
+FROM trial_feedback AS feedback
+JOIN trial_proposals AS proposal ON proposal.id = feedback.proposal_id
+JOIN project_openings AS opening ON opening.id = proposal.opening_id
+JOIN trial_outcomes AS outcome ON outcome.proposal_id = proposal.id
+JOIN profiles ON profiles.user_id = feedback.author_user_id
+WHERE feedback.proposal_id = sqlc.arg(proposal_id)
+  AND proposal.proposal_status = 'accepted'
+  AND outcome.review_status = 'confirmed'
+  AND (
+      proposal.applicant_user_id = sqlc.arg(participant_user_id)
+      OR opening.owner_user_id = sqlc.arg(participant_user_id)
+  )
+ORDER BY feedback.submitted_at ASC, feedback.id ASC;
+
+-- name: CreateTrialFeedbackForParticipant :one
+WITH inserted AS (
+    INSERT INTO trial_feedback (
+        id, proposal_id, author_user_id, observed_behaviors,
+        collaboration_example, collaborate_again, review_summary
+    )
+    SELECT
+        sqlc.arg(id), proposal.id, sqlc.arg(author_user_id),
+        sqlc.arg(observed_behaviors), sqlc.arg(collaboration_example),
+        sqlc.arg(collaborate_again), sqlc.arg(review_summary)
+    FROM trial_proposals AS proposal
+    JOIN project_openings AS opening ON opening.id = proposal.opening_id
+    JOIN trial_outcomes AS outcome ON outcome.proposal_id = proposal.id
+    WHERE proposal.id = sqlc.arg(proposal_id)
+      AND proposal.proposal_status = 'accepted'
+      AND outcome.review_status = 'confirmed'
+      AND (
+          proposal.applicant_user_id = sqlc.arg(author_user_id)
+          OR opening.owner_user_id = sqlc.arg(author_user_id)
+      )
+    ON CONFLICT (proposal_id, author_user_id) DO NOTHING
+    RETURNING *
+)
+SELECT
+    inserted.id, inserted.proposal_id, inserted.author_user_id,
+    inserted.observed_behaviors, inserted.collaboration_example,
+    inserted.collaborate_again, inserted.review_summary,
+    inserted.submitted_at, inserted.acknowledged_at,
+    profiles.display_name AS author_display_name,
+    CASE
+        WHEN inserted.author_user_id = proposal.applicant_user_id THEN 'applicant'
+        ELSE 'owner'
+    END AS author_role,
+    true AS authored_by_current_user,
+    false AS can_acknowledge
+FROM inserted
+JOIN trial_proposals AS proposal ON proposal.id = inserted.proposal_id
+JOIN profiles ON profiles.user_id = inserted.author_user_id;
+
+-- name: AcknowledgeTrialFeedbackForParticipant :one
+WITH acknowledged AS (
+    UPDATE trial_feedback AS feedback SET
+        acknowledged_by_user_id = sqlc.arg(participant_user_id),
+        acknowledged_at = now()
+    FROM trial_proposals AS proposal
+    JOIN project_openings AS opening ON opening.id = proposal.opening_id
+    JOIN trial_outcomes AS outcome ON outcome.proposal_id = proposal.id
+    WHERE feedback.id = sqlc.arg(feedback_id)
+      AND feedback.proposal_id = sqlc.arg(proposal_id)
+      AND proposal.id = feedback.proposal_id
+      AND proposal.proposal_status = 'accepted'
+      AND outcome.review_status = 'confirmed'
+      AND feedback.acknowledged_at IS NULL
+      AND feedback.author_user_id <> sqlc.arg(participant_user_id)
+      AND (
+          proposal.applicant_user_id = sqlc.arg(participant_user_id)
+          OR opening.owner_user_id = sqlc.arg(participant_user_id)
+      )
+    RETURNING feedback.*
+)
+SELECT
+    acknowledged.id, acknowledged.proposal_id, acknowledged.author_user_id,
+    acknowledged.observed_behaviors, acknowledged.collaboration_example,
+    acknowledged.collaborate_again, acknowledged.review_summary,
+    acknowledged.submitted_at, acknowledged.acknowledged_at,
+    profiles.display_name AS author_display_name,
+    CASE
+        WHEN acknowledged.author_user_id = proposal.applicant_user_id THEN 'applicant'
+        ELSE 'owner'
+    END AS author_role,
+    false AS authored_by_current_user,
+    false AS can_acknowledge
+FROM acknowledged
+JOIN trial_proposals AS proposal ON proposal.id = acknowledged.proposal_id
+JOIN profiles ON profiles.user_id = acknowledged.author_user_id;
+
 -- name: GetOwnedOpeningTrialProposalReviewScope :one
 SELECT id
 FROM project_openings

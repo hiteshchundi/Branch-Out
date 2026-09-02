@@ -179,6 +179,49 @@ func TestPostgresTrialProposalLifecycle(t *testing.T) {
 	if _, err := manager.DecideOutcome(ctx, owner.ID, proposal.ID, "disputed"); !errors.Is(err, ErrOutcomeDecisionUnavailable) {
 		t.Fatalf("repeated DecideOutcome() error = %v, want ErrOutcomeDecisionUnavailable", err)
 	}
+	if _, err := manager.CreateFeedback(ctx, otherApplicant.ID, proposal.ID, validPostgresFeedbackInput()); !errors.Is(err, ErrFeedbackUnavailable) {
+		t.Fatalf("non-participant CreateFeedback() error = %v, want ErrFeedbackUnavailable", err)
+	}
+	applicantFeedback, err := manager.CreateFeedback(ctx, applicant.ID, proposal.ID, validPostgresFeedbackInput())
+	if err != nil || !applicantFeedback.AuthoredByCurrentUser || applicantFeedback.CanAcknowledge || applicantFeedback.AuthorRole != "applicant" {
+		t.Fatalf("applicant CreateFeedback() = %#v, %v", applicantFeedback, err)
+	}
+	if _, err := manager.CreateFeedback(ctx, applicant.ID, proposal.ID, validPostgresFeedbackInput()); !errors.Is(err, ErrFeedbackUnavailable) {
+		t.Fatalf("duplicate CreateFeedback() error = %v, want ErrFeedbackUnavailable", err)
+	}
+	ownerFeedbackView, err := manager.ListFeedback(ctx, owner.ID, proposal.ID)
+	if err != nil || len(ownerFeedbackView) != 1 || !ownerFeedbackView[0].CanAcknowledge || ownerFeedbackView[0].AuthoredByCurrentUser {
+		t.Fatalf("owner ListFeedback() = %#v, %v", ownerFeedbackView, err)
+	}
+	acknowledged, err := manager.AcknowledgeFeedback(ctx, owner.ID, proposal.ID, applicantFeedback.ID)
+	if err != nil || acknowledged.AcknowledgedAt == nil || acknowledged.CanAcknowledge {
+		t.Fatalf("owner AcknowledgeFeedback() = %#v, %v", acknowledged, err)
+	}
+	if _, err := manager.AcknowledgeFeedback(ctx, owner.ID, proposal.ID, applicantFeedback.ID); !errors.Is(err, ErrFeedbackAcknowledgeUnavailable) {
+		t.Fatalf("repeated AcknowledgeFeedback() error = %v, want ErrFeedbackAcknowledgeUnavailable", err)
+	}
+	ownerFeedback, err := manager.CreateFeedback(ctx, owner.ID, proposal.ID, FeedbackInput{
+		ObservedBehaviors:    []string{"sound_scope_judgment", "constructive_feedback"},
+		CollaborationExample: "They narrowed the milestone thoughtfully and explained every review suggestion clearly.",
+		CollaborateAgain:     "yes",
+		ReviewSummary:        "A focused collaborator who handled scope and review feedback constructively.",
+	})
+	if err != nil || ownerFeedback.AuthorRole != "owner" {
+		t.Fatalf("owner CreateFeedback() = %#v, %v", ownerFeedback, err)
+	}
+	applicantFeedbackView, err := manager.ListFeedback(ctx, applicant.ID, proposal.ID)
+	if err != nil || len(applicantFeedbackView) != 2 || !applicantFeedbackView[1].CanAcknowledge {
+		t.Fatalf("applicant ListFeedback() = %#v, %v", applicantFeedbackView, err)
+	}
+}
+
+func validPostgresFeedbackInput() FeedbackInput {
+	return FeedbackInput{
+		ObservedBehaviors:    []string{"reliable_delivery", "clear_communication"},
+		CollaborationExample: "They surfaced a blocker early and delivered the revised milestone on time.",
+		CollaborateAgain:     "yes",
+		ReviewSummary:        "A dependable collaborator who communicated tradeoffs clearly during the trial.",
+	}
 }
 
 func validTrialInput() Input {

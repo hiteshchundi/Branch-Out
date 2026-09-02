@@ -3030,6 +3030,63 @@ main:focus {
 .trial-outcome-decision { border-top: 1px solid var(--border); margin-top: 12px; padding-top: 18px; }
 .trial-outcome-decision > div:first-child { display: flex; flex-wrap: wrap; gap: 10px; }
 
+.trial-feedback-panel {
+  border-top: 1px solid var(--border);
+  margin-top: 28px;
+  padding-top: 26px;
+}
+
+.trial-feedback-panel > header,
+.trial-feedback-record > header {
+  align-items: flex-start;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.trial-feedback-panel h5 { font-size: 1.15rem; margin: 4px 0 0; }
+.trial-feedback-panel > header > strong { color: var(--muted); font-size: 0.78rem; }
+
+.trial-feedback-form {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1fr 1fr;
+  margin-top: 20px;
+}
+
+.trial-feedback-form > label { display: grid; gap: 8px; }
+
+.trial-feedback-form select,
+.trial-feedback-form textarea {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font: inherit;
+  padding: 12px;
+}
+
+.trial-feedback-form [aria-invalid='true'] { border-color: var(--danger); }
+
+.trial-feedback-record {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-top: 16px;
+  padding: 18px;
+}
+
+.trial-feedback-record > header span,
+.trial-feedback-record > header small { color: var(--muted); display: block; font-size: 0.76rem; margin-top: 3px; }
+.trial-feedback-record dl { display: grid; gap: 12px; margin: 16px 0 0; }
+.trial-feedback-record dl > div { border-top: 1px solid var(--border); padding-top: 11px; }
+.trial-feedback-record dt { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; }
+.trial-feedback-record dd { line-height: 1.55; margin: 4px 0 0; }
+
+.trial-feedback-behaviors { display: flex; flex-wrap: wrap; gap: 7px; list-style: none; margin: 14px 0 0; padding: 0; }
+.trial-feedback-behaviors li { background: var(--accent-soft); border-radius: 999px; color: var(--accent); font-size: 0.72rem; padding: 6px 9px; }
+.trial-feedback-acknowledgement { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+
 .trial-complete dl > div {
   background: var(--surface);
   padding: 15px;
@@ -3565,6 +3622,7 @@ main:focus {
   }
 
   .trial-outcome-form,
+  .trial-feedback-form,
   .trial-outcome-record dl {
     grid-template-columns: 1fr;
   }

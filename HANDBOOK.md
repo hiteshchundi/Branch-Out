@@ -503,6 +503,26 @@ people agreed to this factual private record. A disputed result preserves the
 disagreement and cannot support a trust signal. Neither state publishes
 feedback, evidence, or a badge.
 
+## Share private post-trial feedback
+
+**What it is:** One immutable, account-backed reflection from each participant
+after both people confirm the factual trial outcome. It stays visible only to
+the accepted applicant and opening owner.
+
+**Where to find it:** Open the accepted trial workspace. The feedback section
+appears below a mutually confirmed outcome.
+
+Each review requires at least two directly observed behaviors, one concrete
+example of 30–1000 characters, a collaborate-again choice, and a private summary
+of 30–1000 characters. Submission also requires confirming that secrets,
+personal data, and confidential material were excluded. A participant can submit
+only once and cannot edit or delete the result.
+
+The counterpart may use **Acknowledge receipt** and confirm that action once.
+Acknowledgement records delivery only: it does not approve, endorse, or alter
+the review. Neither review is published, scored, or turned into a badge. Public
+trust signals remain unavailable until moderation and publication controls exist.
+
 ## Review a trial outcome
 
 **What it is:** A project-specific post-trial review that connects observable
@@ -554,9 +574,9 @@ The completion preview shows every factor used; there is no hidden score.
   does not satisfy every Collaboration Proven rule
 - **No trust signal candidate:** a stopped-early outcome
 
-These are candidates only. No feedback or signal is published. Counterpart
-confirmation and moderation will be required after accounts and the backend
-exist.
+These are candidates only. No feedback or signal is published. This preview is
+not synchronized with account-backed private participant reviews; public signal
+publication still requires moderation controls.
 
 ### Save and close the outcome draft
 
@@ -757,8 +777,9 @@ configuration, and operating details live in `backend/README.md`.
   submit one factual closeout and only the counterpart can confirm or dispute it
   once. Outcome revisions, dispute resolution, counterproposals, replacements,
   and electronic signatures are not available.
-- Outcome feedback and trust-signal candidates cannot be mutually confirmed,
-  moderated, or published.
+- Confirmed trials support private account-backed participant reviews and
+  receipt acknowledgement. Feedback cannot be edited, moderated, scored, or
+  published, and trust-signal candidates remain preview-only.
 - Saved openings do not synchronize between browsers or devices.
 - Early-access email addresses are not transmitted or stored.
 - Notification and moderation flows do not exist yet.

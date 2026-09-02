@@ -12,6 +12,87 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const acknowledgeTrialFeedbackForParticipant = `-- name: AcknowledgeTrialFeedbackForParticipant :one
+WITH acknowledged AS (
+    UPDATE trial_feedback AS feedback SET
+        acknowledged_by_user_id = $1,
+        acknowledged_at = now()
+    FROM trial_proposals AS proposal
+    JOIN project_openings AS opening ON opening.id = proposal.opening_id
+    JOIN trial_outcomes AS outcome ON outcome.proposal_id = proposal.id
+    WHERE feedback.id = $2
+      AND feedback.proposal_id = $3
+      AND proposal.id = feedback.proposal_id
+      AND proposal.proposal_status = 'accepted'
+      AND outcome.review_status = 'confirmed'
+      AND feedback.acknowledged_at IS NULL
+      AND feedback.author_user_id <> $1
+      AND (
+          proposal.applicant_user_id = $1
+          OR opening.owner_user_id = $1
+      )
+    RETURNING feedback.id, feedback.proposal_id, feedback.author_user_id, feedback.observed_behaviors, feedback.collaboration_example, feedback.collaborate_again, feedback.review_summary, feedback.acknowledged_by_user_id, feedback.submitted_at, feedback.acknowledged_at
+)
+SELECT
+    acknowledged.id, acknowledged.proposal_id, acknowledged.author_user_id,
+    acknowledged.observed_behaviors, acknowledged.collaboration_example,
+    acknowledged.collaborate_again, acknowledged.review_summary,
+    acknowledged.submitted_at, acknowledged.acknowledged_at,
+    profiles.display_name AS author_display_name,
+    CASE
+        WHEN acknowledged.author_user_id = proposal.applicant_user_id THEN 'applicant'
+        ELSE 'owner'
+    END AS author_role,
+    false AS authored_by_current_user,
+    false AS can_acknowledge
+FROM acknowledged
+JOIN trial_proposals AS proposal ON proposal.id = acknowledged.proposal_id
+JOIN profiles ON profiles.user_id = acknowledged.author_user_id
+`
+
+type AcknowledgeTrialFeedbackForParticipantParams struct {
+	ParticipantUserID *int64 `db:"participant_user_id" json:"participant_user_id"`
+	FeedbackID        string `db:"feedback_id" json:"feedback_id"`
+	ProposalID        string `db:"proposal_id" json:"proposal_id"`
+}
+
+type AcknowledgeTrialFeedbackForParticipantRow struct {
+	ID                    string             `db:"id" json:"id"`
+	ProposalID            string             `db:"proposal_id" json:"proposal_id"`
+	AuthorUserID          int64              `db:"author_user_id" json:"author_user_id"`
+	ObservedBehaviors     []string           `db:"observed_behaviors" json:"observed_behaviors"`
+	CollaborationExample  string             `db:"collaboration_example" json:"collaboration_example"`
+	CollaborateAgain      string             `db:"collaborate_again" json:"collaborate_again"`
+	ReviewSummary         string             `db:"review_summary" json:"review_summary"`
+	SubmittedAt           time.Time          `db:"submitted_at" json:"submitted_at"`
+	AcknowledgedAt        pgtype.Timestamptz `db:"acknowledged_at" json:"acknowledged_at"`
+	AuthorDisplayName     string             `db:"author_display_name" json:"author_display_name"`
+	AuthorRole            string             `db:"author_role" json:"author_role"`
+	AuthoredByCurrentUser bool               `db:"authored_by_current_user" json:"authored_by_current_user"`
+	CanAcknowledge        bool               `db:"can_acknowledge" json:"can_acknowledge"`
+}
+
+func (q *Queries) AcknowledgeTrialFeedbackForParticipant(ctx context.Context, arg AcknowledgeTrialFeedbackForParticipantParams) (AcknowledgeTrialFeedbackForParticipantRow, error) {
+	row := q.db.QueryRow(ctx, acknowledgeTrialFeedbackForParticipant, arg.ParticipantUserID, arg.FeedbackID, arg.ProposalID)
+	var i AcknowledgeTrialFeedbackForParticipantRow
+	err := row.Scan(
+		&i.ID,
+		&i.ProposalID,
+		&i.AuthorUserID,
+		&i.ObservedBehaviors,
+		&i.CollaborationExample,
+		&i.CollaborateAgain,
+		&i.ReviewSummary,
+		&i.SubmittedAt,
+		&i.AcknowledgedAt,
+		&i.AuthorDisplayName,
+		&i.AuthorRole,
+		&i.AuthoredByCurrentUser,
+		&i.CanAcknowledge,
+	)
+	return i, err
+}
+
 const createTrialCheckInForParticipant = `-- name: CreateTrialCheckInForParticipant :one
 WITH inserted AS (
     INSERT INTO trial_check_ins (
@@ -84,6 +165,101 @@ func (q *Queries) CreateTrialCheckInForParticipant(ctx context.Context, arg Crea
 		&i.CreatedAt,
 		&i.AuthorDisplayName,
 		&i.AuthorRole,
+	)
+	return i, err
+}
+
+const createTrialFeedbackForParticipant = `-- name: CreateTrialFeedbackForParticipant :one
+WITH inserted AS (
+    INSERT INTO trial_feedback (
+        id, proposal_id, author_user_id, observed_behaviors,
+        collaboration_example, collaborate_again, review_summary
+    )
+    SELECT
+        $1, proposal.id, $2,
+        $3, $4,
+        $5, $6
+    FROM trial_proposals AS proposal
+    JOIN project_openings AS opening ON opening.id = proposal.opening_id
+    JOIN trial_outcomes AS outcome ON outcome.proposal_id = proposal.id
+    WHERE proposal.id = $7
+      AND proposal.proposal_status = 'accepted'
+      AND outcome.review_status = 'confirmed'
+      AND (
+          proposal.applicant_user_id = $2
+          OR opening.owner_user_id = $2
+      )
+    ON CONFLICT (proposal_id, author_user_id) DO NOTHING
+    RETURNING id, proposal_id, author_user_id, observed_behaviors, collaboration_example, collaborate_again, review_summary, acknowledged_by_user_id, submitted_at, acknowledged_at
+)
+SELECT
+    inserted.id, inserted.proposal_id, inserted.author_user_id,
+    inserted.observed_behaviors, inserted.collaboration_example,
+    inserted.collaborate_again, inserted.review_summary,
+    inserted.submitted_at, inserted.acknowledged_at,
+    profiles.display_name AS author_display_name,
+    CASE
+        WHEN inserted.author_user_id = proposal.applicant_user_id THEN 'applicant'
+        ELSE 'owner'
+    END AS author_role,
+    true AS authored_by_current_user,
+    false AS can_acknowledge
+FROM inserted
+JOIN trial_proposals AS proposal ON proposal.id = inserted.proposal_id
+JOIN profiles ON profiles.user_id = inserted.author_user_id
+`
+
+type CreateTrialFeedbackForParticipantParams struct {
+	ID                   string   `db:"id" json:"id"`
+	AuthorUserID         int64    `db:"author_user_id" json:"author_user_id"`
+	ObservedBehaviors    []string `db:"observed_behaviors" json:"observed_behaviors"`
+	CollaborationExample string   `db:"collaboration_example" json:"collaboration_example"`
+	CollaborateAgain     string   `db:"collaborate_again" json:"collaborate_again"`
+	ReviewSummary        string   `db:"review_summary" json:"review_summary"`
+	ProposalID           string   `db:"proposal_id" json:"proposal_id"`
+}
+
+type CreateTrialFeedbackForParticipantRow struct {
+	ID                    string             `db:"id" json:"id"`
+	ProposalID            string             `db:"proposal_id" json:"proposal_id"`
+	AuthorUserID          int64              `db:"author_user_id" json:"author_user_id"`
+	ObservedBehaviors     []string           `db:"observed_behaviors" json:"observed_behaviors"`
+	CollaborationExample  string             `db:"collaboration_example" json:"collaboration_example"`
+	CollaborateAgain      string             `db:"collaborate_again" json:"collaborate_again"`
+	ReviewSummary         string             `db:"review_summary" json:"review_summary"`
+	SubmittedAt           time.Time          `db:"submitted_at" json:"submitted_at"`
+	AcknowledgedAt        pgtype.Timestamptz `db:"acknowledged_at" json:"acknowledged_at"`
+	AuthorDisplayName     string             `db:"author_display_name" json:"author_display_name"`
+	AuthorRole            string             `db:"author_role" json:"author_role"`
+	AuthoredByCurrentUser bool               `db:"authored_by_current_user" json:"authored_by_current_user"`
+	CanAcknowledge        bool               `db:"can_acknowledge" json:"can_acknowledge"`
+}
+
+func (q *Queries) CreateTrialFeedbackForParticipant(ctx context.Context, arg CreateTrialFeedbackForParticipantParams) (CreateTrialFeedbackForParticipantRow, error) {
+	row := q.db.QueryRow(ctx, createTrialFeedbackForParticipant,
+		arg.ID,
+		arg.AuthorUserID,
+		arg.ObservedBehaviors,
+		arg.CollaborationExample,
+		arg.CollaborateAgain,
+		arg.ReviewSummary,
+		arg.ProposalID,
+	)
+	var i CreateTrialFeedbackForParticipantRow
+	err := row.Scan(
+		&i.ID,
+		&i.ProposalID,
+		&i.AuthorUserID,
+		&i.ObservedBehaviors,
+		&i.CollaborationExample,
+		&i.CollaborateAgain,
+		&i.ReviewSummary,
+		&i.SubmittedAt,
+		&i.AcknowledgedAt,
+		&i.AuthorDisplayName,
+		&i.AuthorRole,
+		&i.AuthoredByCurrentUser,
+		&i.CanAcknowledge,
 	)
 	return i, err
 }
@@ -543,6 +719,92 @@ func (q *Queries) ListTrialCheckInsForParticipant(ctx context.Context, arg ListT
 			&i.CreatedAt,
 			&i.AuthorDisplayName,
 			&i.AuthorRole,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTrialFeedbackForParticipant = `-- name: ListTrialFeedbackForParticipant :many
+SELECT
+    feedback.id, feedback.proposal_id, feedback.author_user_id,
+    feedback.observed_behaviors, feedback.collaboration_example,
+    feedback.collaborate_again, feedback.review_summary,
+    feedback.submitted_at, feedback.acknowledged_at,
+    profiles.display_name AS author_display_name,
+    CASE
+        WHEN feedback.author_user_id = proposal.applicant_user_id THEN 'applicant'
+        ELSE 'owner'
+    END AS author_role,
+    feedback.author_user_id = $1 AS authored_by_current_user,
+    (
+        feedback.acknowledged_at IS NULL
+        AND feedback.author_user_id <> $1
+    ) AS can_acknowledge
+FROM trial_feedback AS feedback
+JOIN trial_proposals AS proposal ON proposal.id = feedback.proposal_id
+JOIN project_openings AS opening ON opening.id = proposal.opening_id
+JOIN trial_outcomes AS outcome ON outcome.proposal_id = proposal.id
+JOIN profiles ON profiles.user_id = feedback.author_user_id
+WHERE feedback.proposal_id = $2
+  AND proposal.proposal_status = 'accepted'
+  AND outcome.review_status = 'confirmed'
+  AND (
+      proposal.applicant_user_id = $1
+      OR opening.owner_user_id = $1
+  )
+ORDER BY feedback.submitted_at ASC, feedback.id ASC
+`
+
+type ListTrialFeedbackForParticipantParams struct {
+	ParticipantUserID int64  `db:"participant_user_id" json:"participant_user_id"`
+	ProposalID        string `db:"proposal_id" json:"proposal_id"`
+}
+
+type ListTrialFeedbackForParticipantRow struct {
+	ID                    string             `db:"id" json:"id"`
+	ProposalID            string             `db:"proposal_id" json:"proposal_id"`
+	AuthorUserID          int64              `db:"author_user_id" json:"author_user_id"`
+	ObservedBehaviors     []string           `db:"observed_behaviors" json:"observed_behaviors"`
+	CollaborationExample  string             `db:"collaboration_example" json:"collaboration_example"`
+	CollaborateAgain      string             `db:"collaborate_again" json:"collaborate_again"`
+	ReviewSummary         string             `db:"review_summary" json:"review_summary"`
+	SubmittedAt           time.Time          `db:"submitted_at" json:"submitted_at"`
+	AcknowledgedAt        pgtype.Timestamptz `db:"acknowledged_at" json:"acknowledged_at"`
+	AuthorDisplayName     string             `db:"author_display_name" json:"author_display_name"`
+	AuthorRole            string             `db:"author_role" json:"author_role"`
+	AuthoredByCurrentUser bool               `db:"authored_by_current_user" json:"authored_by_current_user"`
+	CanAcknowledge        *bool              `db:"can_acknowledge" json:"can_acknowledge"`
+}
+
+func (q *Queries) ListTrialFeedbackForParticipant(ctx context.Context, arg ListTrialFeedbackForParticipantParams) ([]ListTrialFeedbackForParticipantRow, error) {
+	rows, err := q.db.Query(ctx, listTrialFeedbackForParticipant, arg.ParticipantUserID, arg.ProposalID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListTrialFeedbackForParticipantRow{}
+	for rows.Next() {
+		var i ListTrialFeedbackForParticipantRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProposalID,
+			&i.AuthorUserID,
+			&i.ObservedBehaviors,
+			&i.CollaborationExample,
+			&i.CollaborateAgain,
+			&i.ReviewSummary,
+			&i.SubmittedAt,
+			&i.AcknowledgedAt,
+			&i.AuthorDisplayName,
+			&i.AuthorRole,
+			&i.AuthoredByCurrentUser,
+			&i.CanAcknowledge,
 		); err != nil {
 			return nil, err
 		}

@@ -9,6 +9,7 @@ import {
   type TrialOutcome,
   type TrialOutcomeInput,
 } from '../data/trial-proposals';
+import { TrialFeedbackPanel } from './trial-feedback-panel';
 
 type OutcomeDraft = Omit<TrialOutcomeInput, 'outcomeStatus' | 'deliverableStatus'> & {
   outcomeStatus: TrialOutcomeInput['outcomeStatus'] | '';
@@ -154,6 +155,7 @@ export function TrialOutcomeCloseout({ proposalId }: { proposalId: string }) {
         </div>
       )}
       {message && <p aria-live="polite" className="save-message">{message}</p>}
+      {outcome?.reviewStatus === 'confirmed' && <TrialFeedbackPanel proposalId={proposalId} />}
     </section>
   );
 }

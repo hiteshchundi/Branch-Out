@@ -247,6 +247,85 @@ func outcomeFromValues(
 	}
 }
 
+func (store *PostgresStore) ListFeedback(ctx context.Context, userID int64, proposalID string) ([]Feedback, error) {
+	rows, err := store.queries.ListTrialFeedbackForParticipant(ctx, database.ListTrialFeedbackForParticipantParams{
+		ParticipantUserID: userID, ProposalID: proposalID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	results := make([]Feedback, 0, len(rows))
+	for _, row := range rows {
+		canAcknowledge := row.CanAcknowledge != nil && *row.CanAcknowledge
+		results = append(results, feedbackFromValues(
+			row.ID, row.ProposalID, row.ObservedBehaviors, row.CollaborationExample,
+			row.CollaborateAgain, row.ReviewSummary, row.AuthorDisplayName, row.AuthorRole,
+			row.AuthoredByCurrentUser, canAcknowledge, row.SubmittedAt, row.AcknowledgedAt,
+		))
+	}
+	return results, nil
+}
+
+func (store *PostgresStore) CreateFeedback(ctx context.Context, record FeedbackRecord) (Feedback, error) {
+	row, err := store.queries.CreateTrialFeedbackForParticipant(ctx, database.CreateTrialFeedbackForParticipantParams{
+		ID: record.ID, ProposalID: record.ProposalID, AuthorUserID: record.AuthorUserID,
+		ObservedBehaviors:    record.Input.ObservedBehaviors,
+		CollaborationExample: record.Input.CollaborationExample,
+		CollaborateAgain:     record.Input.CollaborateAgain, ReviewSummary: record.Input.ReviewSummary,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Feedback{}, ErrFeedbackUnavailable
+	}
+	if err != nil {
+		return Feedback{}, err
+	}
+	return feedbackFromValues(
+		row.ID, row.ProposalID, row.ObservedBehaviors, row.CollaborationExample,
+		row.CollaborateAgain, row.ReviewSummary, row.AuthorDisplayName, row.AuthorRole,
+		row.AuthoredByCurrentUser, row.CanAcknowledge, row.SubmittedAt, row.AcknowledgedAt,
+	), nil
+}
+
+func (store *PostgresStore) AcknowledgeFeedback(ctx context.Context, userID int64, proposalID, feedbackID string) (Feedback, error) {
+	row, err := store.queries.AcknowledgeTrialFeedbackForParticipant(ctx, database.AcknowledgeTrialFeedbackForParticipantParams{
+		ParticipantUserID: &userID, ProposalID: proposalID, FeedbackID: feedbackID,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Feedback{}, ErrFeedbackAcknowledgeUnavailable
+	}
+	if err != nil {
+		return Feedback{}, err
+	}
+	return feedbackFromValues(
+		row.ID, row.ProposalID, row.ObservedBehaviors, row.CollaborationExample,
+		row.CollaborateAgain, row.ReviewSummary, row.AuthorDisplayName, row.AuthorRole,
+		row.AuthoredByCurrentUser, row.CanAcknowledge, row.SubmittedAt, row.AcknowledgedAt,
+	), nil
+}
+
+func feedbackFromValues(
+	id, proposalID string, observedBehaviors []string,
+	collaborationExample, collaborateAgain, reviewSummary, authorDisplayName, authorRole string,
+	authoredByCurrentUser, canAcknowledge bool, submittedAt time.Time,
+	acknowledgedAtValue pgtype.Timestamptz,
+) Feedback {
+	var acknowledgedAt *time.Time
+	if acknowledgedAtValue.Valid {
+		value := acknowledgedAtValue.Time
+		acknowledgedAt = &value
+	}
+	return Feedback{
+		ID: id, ProposalID: proposalID,
+		Input: FeedbackInput{
+			ObservedBehaviors: observedBehaviors, CollaborationExample: collaborationExample,
+			CollaborateAgain: collaborateAgain, ReviewSummary: reviewSummary,
+		},
+		Author: CheckInAuthor{DisplayName: authorDisplayName}, AuthorRole: authorRole,
+		AuthoredByCurrentUser: authoredByCurrentUser, CanAcknowledge: canAcknowledge,
+		SubmittedAt: submittedAt, AcknowledgedAt: acknowledgedAt,
+	}
+}
+
 func fromDatabase(row database.TrialProposal) Proposal {
 	var sentAt *time.Time
 	if row.SentAt.Valid {

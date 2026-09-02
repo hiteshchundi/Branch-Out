@@ -208,7 +208,7 @@ export function OutcomeFeedbackPanel({ onClose, project }: { onClose: () => void
           <span aria-hidden="true" className="complete-mark">✓</span><span className="eyebrow">Outcome draft complete</span><h3>{preview.title}</h3><p>{preview.explanation}</p>
           <div className="trust-preview-card"><strong>Why this preview appears</strong><ul>{preview.factors.map((factor) => <li key={factor}>{factor}</li>)}</ul></div>
           <blockquote>“{draft.publicSummary}”</blockquote>
-          <p className="outcome-boundary">No trust signal or feedback has been published. The other collaborator must confirm the record after accounts and moderation exist.</p>
+          <p className="outcome-boundary">No trust signal or feedback has been published. This preview stays on this device; account-backed private reviews unlock only after a mutually confirmed trial outcome, and public signals still require moderation.</p>
           <button className="primary-button" onClick={onClose} type="button">Return to opening</button>
         </div> : <>
           <ol aria-label={`Step ${step + 1} of 3`} className="outcome-steps">{['Outcome', 'Collaboration', 'Mutual review'].map((label, index) => <li className={index === step ? 'active' : index < step ? 'complete' : ''} key={label}><span>{index + 1}</span>{label}</li>)}</ol>

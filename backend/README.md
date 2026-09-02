@@ -81,6 +81,9 @@ checks PostgreSQL on every request and returns HTTP 503 with
 - `GET /v1/trial-proposals/{proposalId}/outcome` — load the participant-only factual closeout
 - `POST /v1/trial-proposals/{proposalId}/outcome` — submit the accepted trial's one immutable outcome
 - `POST /v1/trial-proposals/{proposalId}/outcome/decision` — let only the counterpart confirm or dispute once
+- `GET /v1/trial-proposals/{proposalId}/feedback` — privately list feedback after a confirmed outcome
+- `POST /v1/trial-proposals/{proposalId}/feedback` — submit each participant's one immutable private review
+- `POST /v1/trial-proposals/{proposalId}/feedback/{feedbackId}/acknowledge` — acknowledge receipt without implying agreement
 
 Discovery accepts optional filters. Structured values use the labels already
 shown by the frontend.
@@ -237,7 +240,8 @@ single-transition behavior, owner visibility, and decision exclusion.
 Trial-proposal integration coverage verifies pre-acceptance rejection, accepted
 application linkage, private applicant reads, replacement with a stable ID,
 draft isolation from owners, immutable sending, owner-only review, irreversible
-decisions, and applicant-visible outcomes.
+decisions, participant-only execution logs, mutually reviewed outcomes, one
+private feedback record per participant, and counterpart acknowledgement.
 
 ## Package boundaries
 
@@ -248,7 +252,7 @@ decisions, and applicant-visible outcomes.
 - `internal/applications` owns proof-led application validation, persistence,
   and the draft-to-submitted lifecycle.
 - `internal/trialproposals` owns accepted-applicant proposal validation,
-  persistence, and private applicant scoping.
+  persistence, participant scoping, factual closeout, and private feedback.
 - `internal/openings` owns project-opening types, validation, ownership,
   filtering, and the repository contract, including memory and PostgreSQL
   implementations.
@@ -280,4 +284,6 @@ append progress, blocker, or milestone check-ins with an optional safe evidence
 URL. Either participant can submit one factual closeout and only the counterpart
 can confirm or dispute it once. Editing or deleting check-ins, outcome revisions,
 dispute resolution, counterproposals, and signatures remain outside this
-milestone.
+milestone. After confirmation, each participant can submit one immutable private
+review and acknowledge receipt of the counterpart's review. Acknowledgement is
+not agreement; no review is public and no trust score or badge is created.

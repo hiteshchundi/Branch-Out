@@ -215,6 +215,64 @@ func TestManagerLoadsAndDecidesTrialOutcome(t *testing.T) {
 	}
 }
 
+func validFeedbackInput() FeedbackInput {
+	return FeedbackInput{
+		ObservedBehaviors:    []string{"reliable_delivery", "clear_communication"},
+		CollaborationExample: "They surfaced a blocker early and delivered the revised milestone on time.",
+		CollaborateAgain:     "yes",
+		ReviewSummary:        "A dependable collaborator who communicated tradeoffs clearly during the trial.",
+	}
+}
+
+func TestManagerCreatesAndAcknowledgesPrivateFeedback(t *testing.T) {
+	store := &fakeStore{
+		createdFeedback:      Feedback{ID: "feedback-id", Input: validFeedbackInput()},
+		acknowledgedFeedback: Feedback{ID: "feedback-id"},
+	}
+	manager := NewManager(store)
+	manager.random = strings.NewReader(strings.Repeat("d", 16))
+	input := validFeedbackInput()
+	input.ReviewSummary = "  " + input.ReviewSummary + "  "
+
+	result, err := manager.CreateFeedback(context.Background(), 7, " proposal-id ", input)
+	if err != nil || result.ID != "feedback-id" || store.feedbackRecord.ProposalID != "proposal-id" || store.feedbackRecord.AuthorUserID != 7 {
+		t.Fatalf("CreateFeedback() = %#v, %v; record %#v", result, err, store.feedbackRecord)
+	}
+	if store.feedbackRecord.Input.ReviewSummary != strings.TrimSpace(input.ReviewSummary) {
+		t.Fatalf("review summary = %q", store.feedbackRecord.Input.ReviewSummary)
+	}
+	if _, err := manager.AcknowledgeFeedback(context.Background(), 8, " proposal-id ", " feedback-id "); err != nil || store.feedbackID != "feedback-id" {
+		t.Fatalf("AcknowledgeFeedback() error = %v; feedbackID = %q", err, store.feedbackID)
+	}
+	if _, err := manager.ListFeedback(context.Background(), 8, " proposal-id "); err != nil || store.proposalID != "proposal-id" {
+		t.Fatalf("ListFeedback() error = %v; proposalID = %q", err, store.proposalID)
+	}
+}
+
+func TestManagerRejectsInvalidPrivateFeedback(t *testing.T) {
+	manager := NewManager(&fakeStore{})
+	for _, test := range []struct {
+		field string
+		edit  func(*FeedbackInput)
+	}{
+		{"observedBehaviors", func(input *FeedbackInput) { input.ObservedBehaviors = []string{"reliable_delivery"} }},
+		{"observedBehaviors", func(input *FeedbackInput) {
+			input.ObservedBehaviors = []string{"reliable_delivery", "reliable_delivery"}
+		}},
+		{"collaborationExample", func(input *FeedbackInput) { input.CollaborationExample = "short" }},
+		{"collaborateAgain", func(input *FeedbackInput) { input.CollaborateAgain = "always" }},
+		{"reviewSummary", func(input *FeedbackInput) { input.ReviewSummary = "short" }},
+	} {
+		input := validFeedbackInput()
+		test.edit(&input)
+		_, err := manager.CreateFeedback(context.Background(), 7, "proposal-id", input)
+		var fieldError *FieldError
+		if !errors.As(err, &fieldError) || fieldError.Field != test.field {
+			t.Fatalf("CreateFeedback() error = %v, want field %q", err, test.field)
+		}
+	}
+}
+
 type fakeStore struct {
 	record                    Record
 	userID                    int64
@@ -230,6 +288,11 @@ type fakeStore struct {
 	createdOutcome            Outcome
 	decidedOutcome            Outcome
 	outcomeRecord             OutcomeRecord
+	feedback                  []Feedback
+	createdFeedback           Feedback
+	acknowledgedFeedback      Feedback
+	feedbackRecord            FeedbackRecord
+	feedbackID                string
 	err                       error
 }
 
@@ -281,4 +344,19 @@ func (store *fakeStore) CreateOutcome(_ context.Context, record OutcomeRecord) (
 func (store *fakeStore) DecideOutcome(_ context.Context, userID int64, proposalID, decision string) (Outcome, error) {
 	store.userID, store.proposalID, store.decision = userID, proposalID, decision
 	return store.decidedOutcome, store.err
+}
+
+func (store *fakeStore) ListFeedback(_ context.Context, userID int64, proposalID string) ([]Feedback, error) {
+	store.userID, store.proposalID = userID, proposalID
+	return store.feedback, store.err
+}
+
+func (store *fakeStore) CreateFeedback(_ context.Context, record FeedbackRecord) (Feedback, error) {
+	store.feedbackRecord = record
+	return store.createdFeedback, store.err
+}
+
+func (store *fakeStore) AcknowledgeFeedback(_ context.Context, userID int64, proposalID, feedbackID string) (Feedback, error) {
+	store.userID, store.proposalID, store.feedbackID = userID, proposalID, feedbackID
+	return store.acknowledgedFeedback, store.err
 }

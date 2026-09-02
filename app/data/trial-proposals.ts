@@ -64,6 +64,31 @@ export type TrialOutcome = {
   decidedAt: string | null;
 };
 
+export const trialFeedbackBehaviors = [
+  'reliable_delivery', 'clear_communication', 'sound_scope_judgment', 'constructive_feedback',
+] as const;
+
+export type TrialFeedbackBehavior = typeof trialFeedbackBehaviors[number];
+
+export type TrialFeedbackInput = {
+  observedBehaviors: TrialFeedbackBehavior[];
+  collaborationExample: string;
+  collaborateAgain: 'yes' | 'maybe' | 'no';
+  reviewSummary: string;
+};
+
+export type TrialFeedback = {
+  id: string;
+  proposalId: string;
+  input: TrialFeedbackInput;
+  author: { displayName: string };
+  authorRole: 'applicant' | 'owner';
+  authoredByCurrentUser: boolean;
+  canAcknowledge: boolean;
+  submittedAt: string;
+  acknowledgedAt: string | null;
+};
+
 type APIEnvelope = { data?: unknown };
 type APIErrorEnvelope = { error?: { code?: unknown; field?: unknown } };
 
@@ -195,6 +220,37 @@ function parseTrialOutcome(value: unknown): TrialOutcome {
     || (reviewStatus !== 'pending' && outcome.canDecide === true)
   ) throw new Error('The API returned an invalid trial outcome lifecycle.');
   return outcome as TrialOutcome;
+}
+
+function parseTrialFeedback(value: unknown): TrialFeedback {
+  if (!value || typeof value !== 'object') throw new Error('The API returned invalid private feedback.');
+  const feedback = value as Record<string, unknown>;
+  const input = feedback.input as Record<string, unknown> | undefined;
+  const author = feedback.author as Record<string, unknown> | undefined;
+  const behaviors = input?.observedBehaviors;
+  if (
+    typeof feedback.id !== 'string'
+    || typeof feedback.proposalId !== 'string'
+    || !input
+    || !Array.isArray(behaviors)
+    || behaviors.length < 2
+    || behaviors.length > 4
+    || new Set(behaviors).size !== behaviors.length
+    || behaviors.some((behavior) => !trialFeedbackBehaviors.includes(behavior as TrialFeedbackBehavior))
+    || typeof input.collaborationExample !== 'string'
+    || !['yes', 'maybe', 'no'].includes(input.collaborateAgain as string)
+    || typeof input.reviewSummary !== 'string'
+    || !author
+    || typeof author.displayName !== 'string'
+    || !['applicant', 'owner'].includes(feedback.authorRole as string)
+    || typeof feedback.authoredByCurrentUser !== 'boolean'
+    || typeof feedback.canAcknowledge !== 'boolean'
+    || typeof feedback.submittedAt !== 'string'
+    || (feedback.acknowledgedAt !== null && typeof feedback.acknowledgedAt !== 'string')
+    || (feedback.authoredByCurrentUser === true && feedback.canAcknowledge === true)
+    || (feedback.acknowledgedAt !== null && feedback.canAcknowledge === true)
+  ) throw new Error('The API returned invalid private feedback.');
+  return feedback as TrialFeedback;
 }
 
 async function parseError(response: Response) {
@@ -334,4 +390,40 @@ export async function decideTrialOutcome(proposalId: string, decision: 'confirme
   if (!response.ok) throw await parseError(response);
   const body = await response.json() as APIEnvelope;
   return parseTrialOutcome(body.data);
+}
+
+export async function loadTrialFeedback(proposalId: string, signal?: AbortSignal) {
+  const response = await fetch(
+    `${getAPIBaseURL()}/v1/trial-proposals/${encodeURIComponent(proposalId)}/feedback`,
+    { credentials: 'include', headers: { Accept: 'application/json' }, signal },
+  );
+  if (!response.ok) throw await parseError(response);
+  const body = await response.json() as APIEnvelope;
+  if (!Array.isArray(body.data)) throw new Error('The API returned an invalid private feedback list.');
+  return body.data.map(parseTrialFeedback);
+}
+
+export async function createTrialFeedback(proposalId: string, input: TrialFeedbackInput) {
+  const response = await fetch(
+    `${getAPIBaseURL()}/v1/trial-proposals/${encodeURIComponent(proposalId)}/feedback`,
+    {
+      body: JSON.stringify(input), credentials: 'include',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, method: 'POST',
+    },
+  );
+  if (!response.ok) throw await parseError(response);
+  const body = await response.json() as APIEnvelope;
+  return parseTrialFeedback(body.data);
+}
+
+export async function acknowledgeTrialFeedback(proposalId: string, feedbackId: string) {
+  const response = await fetch(
+    `${getAPIBaseURL()}/v1/trial-proposals/${encodeURIComponent(proposalId)}/feedback/${encodeURIComponent(feedbackId)}/acknowledge`,
+    {
+      credentials: 'include', headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, method: 'POST',
+    },
+  );
+  if (!response.ok) throw await parseError(response);
+  const body = await response.json() as APIEnvelope;
+  return parseTrialFeedback(body.data);
 }

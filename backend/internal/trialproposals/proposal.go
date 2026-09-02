@@ -14,15 +14,17 @@ import (
 )
 
 var (
-	ErrNotFound                   = errors.New("trial proposal not found")
-	ErrUnavailable                = errors.New("trial proposal unavailable")
-	ErrSendUnavailable            = errors.New("trial proposal send unavailable")
-	ErrReviewNotFound             = errors.New("trial proposal review opening not found")
-	ErrDecisionUnavailable        = errors.New("trial proposal decision unavailable")
-	ErrWorkspaceNotFound          = errors.New("trial workspace not found")
-	ErrOutcomeNotFound            = errors.New("trial outcome not found")
-	ErrOutcomeUnavailable         = errors.New("trial outcome unavailable")
-	ErrOutcomeDecisionUnavailable = errors.New("trial outcome decision unavailable")
+	ErrNotFound                       = errors.New("trial proposal not found")
+	ErrUnavailable                    = errors.New("trial proposal unavailable")
+	ErrSendUnavailable                = errors.New("trial proposal send unavailable")
+	ErrReviewNotFound                 = errors.New("trial proposal review opening not found")
+	ErrDecisionUnavailable            = errors.New("trial proposal decision unavailable")
+	ErrWorkspaceNotFound              = errors.New("trial workspace not found")
+	ErrOutcomeNotFound                = errors.New("trial outcome not found")
+	ErrOutcomeUnavailable             = errors.New("trial outcome unavailable")
+	ErrOutcomeDecisionUnavailable     = errors.New("trial outcome decision unavailable")
+	ErrFeedbackUnavailable            = errors.New("trial feedback unavailable")
+	ErrFeedbackAcknowledgeUnavailable = errors.New("trial feedback acknowledgement unavailable")
 )
 
 type FieldError struct {
@@ -126,6 +128,32 @@ type OutcomeRecord struct {
 	Input             OutcomeInput
 }
 
+type FeedbackInput struct {
+	ObservedBehaviors    []string `json:"observedBehaviors"`
+	CollaborationExample string   `json:"collaborationExample"`
+	CollaborateAgain     string   `json:"collaborateAgain"`
+	ReviewSummary        string   `json:"reviewSummary"`
+}
+
+type Feedback struct {
+	ID                    string        `json:"id"`
+	ProposalID            string        `json:"proposalId"`
+	Input                 FeedbackInput `json:"input"`
+	Author                CheckInAuthor `json:"author"`
+	AuthorRole            string        `json:"authorRole"`
+	AuthoredByCurrentUser bool          `json:"authoredByCurrentUser"`
+	CanAcknowledge        bool          `json:"canAcknowledge"`
+	SubmittedAt           time.Time     `json:"submittedAt"`
+	AcknowledgedAt        *time.Time    `json:"acknowledgedAt"`
+}
+
+type FeedbackRecord struct {
+	ID           string
+	ProposalID   string
+	AuthorUserID int64
+	Input        FeedbackInput
+}
+
 type Record struct {
 	Proposal
 	ApplicantUserID int64
@@ -142,6 +170,9 @@ type Store interface {
 	GetOutcome(context.Context, int64, string) (Outcome, error)
 	CreateOutcome(context.Context, OutcomeRecord) (Outcome, error)
 	DecideOutcome(context.Context, int64, string, string) (Outcome, error)
+	ListFeedback(context.Context, int64, string) ([]Feedback, error)
+	CreateFeedback(context.Context, FeedbackRecord) (Feedback, error)
+	AcknowledgeFeedback(context.Context, int64, string, string) (Feedback, error)
 }
 
 func (manager *Manager) SendOwn(ctx context.Context, userID int64, openingID string) (Proposal, error) {
@@ -243,6 +274,75 @@ func (manager *Manager) DecideOutcome(ctx context.Context, userID int64, proposa
 		return Outcome{}, ErrOutcomeDecisionUnavailable
 	}
 	return manager.store.DecideOutcome(ctx, userID, proposalID, decision)
+}
+
+func (manager *Manager) ListFeedback(ctx context.Context, userID int64, proposalID string) ([]Feedback, error) {
+	proposalID = strings.TrimSpace(proposalID)
+	if proposalID == "" {
+		return nil, ErrFeedbackUnavailable
+	}
+	return manager.store.ListFeedback(ctx, userID, proposalID)
+}
+
+func (manager *Manager) CreateFeedback(ctx context.Context, userID int64, proposalID string, input FeedbackInput) (Feedback, error) {
+	proposalID = strings.TrimSpace(proposalID)
+	if proposalID == "" {
+		return Feedback{}, ErrFeedbackUnavailable
+	}
+	normalized, err := normalizeFeedbackInput(input)
+	if err != nil {
+		return Feedback{}, err
+	}
+	id, err := randomID(manager.random)
+	if err != nil {
+		return Feedback{}, fmt.Errorf("generate trial feedback ID: %w", err)
+	}
+	return manager.store.CreateFeedback(ctx, FeedbackRecord{
+		ID: id, ProposalID: proposalID, AuthorUserID: userID, Input: normalized,
+	})
+}
+
+func (manager *Manager) AcknowledgeFeedback(ctx context.Context, userID int64, proposalID, feedbackID string) (Feedback, error) {
+	proposalID = strings.TrimSpace(proposalID)
+	feedbackID = strings.TrimSpace(feedbackID)
+	if proposalID == "" || feedbackID == "" {
+		return Feedback{}, ErrFeedbackAcknowledgeUnavailable
+	}
+	return manager.store.AcknowledgeFeedback(ctx, userID, proposalID, feedbackID)
+}
+
+func normalizeFeedbackInput(input FeedbackInput) (FeedbackInput, error) {
+	input.CollaborationExample = strings.TrimSpace(input.CollaborationExample)
+	input.CollaborateAgain = strings.TrimSpace(input.CollaborateAgain)
+	input.ReviewSummary = strings.TrimSpace(input.ReviewSummary)
+	allowed := map[string]bool{
+		"reliable_delivery": true, "clear_communication": true,
+		"sound_scope_judgment": true, "constructive_feedback": true,
+	}
+	seen := make(map[string]bool, len(input.ObservedBehaviors))
+	behaviors := make([]string, 0, len(input.ObservedBehaviors))
+	for _, behavior := range input.ObservedBehaviors {
+		behavior = strings.TrimSpace(behavior)
+		if !allowed[behavior] || seen[behavior] {
+			return FeedbackInput{}, &FieldError{Field: "observedBehaviors", Message: "observedBehaviors contains an unsupported or duplicate value"}
+		}
+		seen[behavior] = true
+		behaviors = append(behaviors, behavior)
+	}
+	input.ObservedBehaviors = behaviors
+	if len(behaviors) < 2 || len(behaviors) > 4 {
+		return FeedbackInput{}, &FieldError{Field: "observedBehaviors", Message: "observedBehaviors must contain two to four values"}
+	}
+	if length := len([]rune(input.CollaborationExample)); length < 30 || length > 1000 {
+		return FeedbackInput{}, &FieldError{Field: "collaborationExample", Message: "collaborationExample has an invalid length"}
+	}
+	if input.CollaborateAgain != "yes" && input.CollaborateAgain != "maybe" && input.CollaborateAgain != "no" {
+		return FeedbackInput{}, &FieldError{Field: "collaborateAgain", Message: "collaborateAgain is unsupported"}
+	}
+	if length := len([]rune(input.ReviewSummary)); length < 30 || length > 1000 {
+		return FeedbackInput{}, &FieldError{Field: "reviewSummary", Message: "reviewSummary has an invalid length"}
+	}
+	return input, nil
 }
 
 func normalizeOutcomeInput(input OutcomeInput) (OutcomeInput, error) {
