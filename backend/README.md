@@ -85,6 +85,9 @@ checks PostgreSQL on every request and returns HTTP 503 with
 - `POST /v1/trial-proposals/{proposalId}/feedback` — submit each participant's one immutable private review
 - `POST /v1/trial-proposals/{proposalId}/feedback/{feedbackId}/acknowledge` — acknowledge receipt without implying agreement
 - `GET /v1/trial-proposals/{proposalId}/trust-candidate` — derive a private, transparent trial-level candidate
+- `POST /v1/safety-reports` — submit a participant-scoped report with a private moderation snapshot
+- `GET /v1/moderation/reports` — list the role-gated moderator queue
+- `POST /v1/moderation/reports/{reportId}/decision` — irreversibly uphold or dismiss a pending report
 
 Discovery accepts optional filters. Structured values use the labels already
 shown by the frontend.
@@ -170,6 +173,27 @@ rules to the immutable data. It returns readiness, a candidate kind, and every
 factor used. It persists no score and cannot publish feedback, a profile signal,
 or a badge.
 
+## Safety reports and moderation
+
+Authenticated trial participants can report counterpart feedback or their own
+trial's derived trust candidate. Each reporter can create only one report per
+target. The database verifies participant scope, prevents self-reporting private
+feedback, and captures the relevant private content as immutable JSON for
+moderator review. Submission never removes content or applies a penalty.
+
+Moderator APIs are additionally authorized by `users.account_role`. New users
+default to `member`; closed-beta operators must promote moderators directly in
+the database through a controlled operational process:
+
+```sql
+UPDATE users SET account_role = 'moderator' WHERE github_login = 'approved-login';
+```
+
+The queue returns pending reports first. A moderator can record one permanent
+`upheld` or `dismissed` decision with 20–1000 characters of notes. An upheld
+decision records a policy finding only; takedowns, member sanctions, appeals,
+and automated trust-signal publication remain separate future workflows.
+
 The complete contract is in [`openapi.yaml`](openapi.yaml).
 
 ## GitHub authentication
@@ -250,6 +274,9 @@ application linkage, private applicant reads, replacement with a stable ID,
 draft isolation from owners, immutable sending, owner-only review, irreversible
 decisions, participant-only execution logs, mutually reviewed outcomes, one
 private feedback record per participant, and counterpart acknowledgement.
+Safety coverage verifies participant scope, self-report and duplicate rejection,
+private snapshot capture, moderator role enforcement, queue ordering, and
+immutable decisions.
 
 ## Package boundaries
 
@@ -265,6 +292,8 @@ private feedback record per participant, and counterpart acknowledgement.
   filtering, and the repository contract, including memory and PostgreSQL
   implementations.
 - `internal/profile` owns collaboration-profile validation and persistence.
+- `internal/safety` owns participant reports, captured moderation snapshots,
+  moderator authorization, and immutable review decisions.
 - `internal/httpapi` owns REST routing, JSON responses, CORS, and server errors.
 
 The memory repository remains as a fast domain-test double. Runtime traffic uses

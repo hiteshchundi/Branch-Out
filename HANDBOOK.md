@@ -540,6 +540,19 @@ Every factor appears beside the result. Branch-Out stores no numeric or hidden
 score. This candidate is not a profile badge and cannot be published; moderation
 and publication controls remain a separate future phase.
 
+### Report a safety concern
+
+Use **Report this feedback** on counterpart feedback or **Report this trust
+review** below the private candidate. Choose harassment, privacy, fraud, spam,
+or another concern; explain it in 30–1000 characters; and confirm the disclosure.
+
+Submitting shares the report and an immutable snapshot of the private item with
+authorized moderators. It does not automatically remove content or penalize a
+member. You cannot report your own feedback or submit the same report twice.
+Moderators can permanently uphold or dismiss a pending report with required
+notes. Enforcement, sanctions, appeals, and a moderator dashboard are not yet
+available.
+
 ## Review a trial outcome
 
 **What it is:** A project-specific post-trial review that connects observable
@@ -796,8 +809,11 @@ configuration, and operating details live in `backend/README.md`.
   and electronic signatures are not available.
 - Confirmed trials support private account-backed participant reviews, receipt
   acknowledgement, and a transparent trial-level candidate. Feedback and the
-  candidate cannot be edited, moderated, converted to profile reputation, or
-  published.
+  candidate cannot be edited, converted to profile reputation, or published;
+  participants can report them for moderator review.
+- Trial participants can submit private safety reports, and role-gated moderator
+  APIs can uphold or dismiss them once. Content enforcement, account sanctions,
+  appeals, and a moderator dashboard are not available.
 - Saved openings do not synchronize between browsers or devices.
 - Early-access email addresses are not transmitted or stored.
 - Notification and moderation flows do not exist yet.

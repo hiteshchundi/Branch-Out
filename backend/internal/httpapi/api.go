@@ -12,6 +12,7 @@ import (
 	"github.com/hiteshchundi/branch-out/backend/internal/applications"
 	"github.com/hiteshchundi/branch-out/backend/internal/openings"
 	"github.com/hiteshchundi/branch-out/backend/internal/profile"
+	"github.com/hiteshchundi/branch-out/backend/internal/safety"
 	"github.com/hiteshchundi/branch-out/backend/internal/trialproposals"
 )
 
@@ -20,6 +21,7 @@ type API struct {
 	openingManager OpeningManager
 	applications   ApplicationManager
 	trialProposals TrialProposalManager
+	safety         SafetyManager
 	readiness      ReadinessChecker
 	authentication Authenticator
 	profiles       ProfileManager
@@ -71,6 +73,12 @@ type TrialProposalManager interface {
 	GetTrustCandidate(context.Context, int64, string) (trialproposals.TrustCandidate, error)
 }
 
+type SafetyManager interface {
+	Create(context.Context, int64, safety.Input) (safety.Report, error)
+	ListForModerator(context.Context, int64) ([]safety.Report, error)
+	Decide(context.Context, int64, string, safety.DecisionInput) (safety.Report, error)
+}
+
 type listResponse struct {
 	Data []openings.Opening `json:"data"`
 	Meta struct {
@@ -92,8 +100,8 @@ type apiError struct {
 	Field   string `json:"field,omitempty"`
 }
 
-func New(repository openings.Repository, openingManager OpeningManager, applicationManager ApplicationManager, trialProposalManager TrialProposalManager, readiness ReadinessChecker, authentication Authenticator, profiles ProfileManager, options Options, logger *slog.Logger) http.Handler {
-	api := &API{repository: repository, openingManager: openingManager, applications: applicationManager, trialProposals: trialProposalManager, readiness: readiness, authentication: authentication, profiles: profiles, options: options, allowedOrigin: options.AllowedOrigin, logger: logger}
+func New(repository openings.Repository, openingManager OpeningManager, applicationManager ApplicationManager, trialProposalManager TrialProposalManager, safetyManager SafetyManager, readiness ReadinessChecker, authentication Authenticator, profiles ProfileManager, options Options, logger *slog.Logger) http.Handler {
+	api := &API{repository: repository, openingManager: openingManager, applications: applicationManager, trialProposals: trialProposalManager, safety: safetyManager, readiness: readiness, authentication: authentication, profiles: profiles, options: options, allowedOrigin: options.AllowedOrigin, logger: logger}
 	routes := http.NewServeMux()
 	routes.HandleFunc("GET /healthz", api.health)
 	routes.HandleFunc("GET /readyz", api.ready)
@@ -123,6 +131,9 @@ func New(repository openings.Repository, openingManager OpeningManager, applicat
 	routes.HandleFunc("POST /v1/trial-proposals/{proposalId}/feedback", api.createTrialFeedback)
 	routes.HandleFunc("POST /v1/trial-proposals/{proposalId}/feedback/{feedbackId}/acknowledge", api.acknowledgeTrialFeedback)
 	routes.HandleFunc("GET /v1/trial-proposals/{proposalId}/trust-candidate", api.getTrialTrustCandidate)
+	routes.HandleFunc("POST /v1/safety-reports", api.createSafetyReport)
+	routes.HandleFunc("GET /v1/moderation/reports", api.listModerationReports)
+	routes.HandleFunc("POST /v1/moderation/reports/{reportId}/decision", api.decideModerationReport)
 	routes.HandleFunc("GET /v1/auth/github/start", api.startGitHubAuth)
 	routes.HandleFunc("GET /v1/auth/github/callback", api.finishGitHubAuth)
 	routes.HandleFunc("GET /v1/session", api.currentSession)
@@ -151,6 +162,9 @@ func New(repository openings.Repository, openingManager OpeningManager, applicat
 	routes.HandleFunc("OPTIONS /v1/trial-proposals/{proposalId}/feedback", api.preflight)
 	routes.HandleFunc("OPTIONS /v1/trial-proposals/{proposalId}/feedback/{feedbackId}/acknowledge", api.preflight)
 	routes.HandleFunc("OPTIONS /v1/trial-proposals/{proposalId}/trust-candidate", api.preflight)
+	routes.HandleFunc("OPTIONS /v1/safety-reports", api.preflight)
+	routes.HandleFunc("OPTIONS /v1/moderation/reports", api.preflight)
+	routes.HandleFunc("OPTIONS /v1/moderation/reports/{reportId}/decision", api.preflight)
 	routes.HandleFunc("/", api.notFound)
 
 	return api.recoverPanics(api.logRequests(api.cors(routes)))

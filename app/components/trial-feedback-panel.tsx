@@ -12,6 +12,7 @@ import {
   type TrialFeedbackInput,
   type TrialTrustCandidate,
 } from '../data/trial-proposals';
+import { SafetyReportForm } from './safety-report-form';
 
 type FeedbackDraft = Omit<TrialFeedbackInput, 'collaborateAgain'> & { collaborateAgain: TrialFeedbackInput['collaborateAgain'] | '' };
 type FeedbackField = keyof FeedbackDraft;
@@ -150,6 +151,7 @@ export function TrialFeedbackPanel({ proposalId }: { proposalId: string }) {
           <ul className="trial-feedback-behaviors">{item.input.observedBehaviors.map((behavior) => <li key={behavior}>{behaviorLabels[behavior]}</li>)}</ul>
           <dl><div><dt>Observed example</dt><dd>{item.input.collaborationExample}</dd></div><div><dt>Collaborate again</dt><dd>{item.input.collaborateAgain === 'yes' ? 'Yes' : item.input.collaborateAgain === 'maybe' ? 'Maybe, with different scope' : 'No'}</dd></div><div><dt>Private review</dt><dd>{item.input.reviewSummary}</dd></div></dl>
           {item.canAcknowledge && <div className="trial-feedback-acknowledgement"><button className="secondary-button" disabled={isSaving} onClick={() => acknowledge(item.id)} type="button">{pendingAcknowledgement === item.id ? 'Confirm acknowledgement' : 'Acknowledge receipt'}</button>{pendingAcknowledgement === item.id && <button className="text-button" disabled={isSaving} onClick={() => setPendingAcknowledgement(null)} type="button">Cancel</button>}</div>}
+          {!item.authoredByCurrentUser && <SafetyReportForm buttonLabel="Report this feedback" targetId={item.id} targetKind="trial_feedback" />}
         </article>
       ))}
       {status === 'ready' && !currentUserSubmitted && (
@@ -169,6 +171,7 @@ export function TrialFeedbackPanel({ proposalId }: { proposalId: string }) {
           <p>{candidate.explanation}</p>
           <div><strong>Why this appears</strong><ul>{candidate.factors.map((factor) => <li key={factor}>{factor}</li>)}</ul></div>
           <p className="trial-check-in-boundary">This candidate is private, trial-level, and rule-based. It is not a profile score or badge and cannot be published until moderation controls exist.</p>
+          <SafetyReportForm buttonLabel="Report this trust review" targetId={proposalId} targetKind="trust_candidate" />
         </section>
       )}
       {message && <p aria-live="polite" className="save-message">{message}</p>}

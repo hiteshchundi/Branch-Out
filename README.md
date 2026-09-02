@@ -290,6 +290,18 @@ trials support private participant feedback and a transparent trial-level
 candidate in the accepted-trial workspace. Neither feedback nor the candidate
 can be published; moderation and publication remain future work.
 
+## Safety reporting
+
+The accepted-trial workspace lets a participant report counterpart feedback or
+the private trust review. The report form requires a category, a 30–1000
+character explanation, and explicit confirmation that the item and a private
+snapshot will be shared with authorized moderators. One member can report a
+given item only once, and members cannot report their own feedback.
+
+Reports enter a role-gated moderator queue. Moderators can permanently uphold or
+dismiss a pending report with required notes. Reporting or upholding does not yet
+remove content, penalize an account, publish a signal, or provide an appeal flow.
+
 ## Current boundaries
 
 - Project discovery requires the Go API and PostgreSQL. The frontend does not
@@ -324,5 +336,9 @@ can be published; moderation and publication remain future work.
   replacement proposals are not implemented.
 - Outcome-review previews stay local. Account-backed participant reviews and
   their transparent trial-level candidate remain private and cannot be edited,
-  moderated, converted to profile reputation, or published.
+  converted to profile reputation, or published; participants can report them
+  for moderator review.
+- Participant safety reports, immutable evidence snapshots, and moderator
+  decisions are account-backed. Content enforcement, sanctions, appeals, and a
+  visible moderator dashboard are not implemented.
 - Saved openings stay only in the current browser and are not synchronized.

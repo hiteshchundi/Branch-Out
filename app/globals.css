@@ -3103,6 +3103,24 @@ main:focus {
 .trial-trust-candidate > div { border-top: 1px solid var(--border); margin-top: 15px; padding-top: 15px; }
 .trial-trust-candidate ul { display: grid; gap: 7px; margin: 10px 0 0; padding-left: 20px; }
 
+.safety-report-trigger { color: var(--danger); margin-top: 14px; }
+.safety-report-receipt { color: var(--muted); font-size: 0.78rem; margin: 14px 0 0; }
+.safety-report-form {
+  background: color-mix(in srgb, var(--surface) 88%, var(--danger) 4%);
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, var(--border));
+  border-radius: 10px;
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 16px;
+}
+.safety-report-form > p { color: var(--muted); line-height: 1.5; margin: 0; }
+.safety-report-form > label:not(.trial-outcome-confirmation) { display: grid; gap: 7px; }
+.safety-report-form select,
+.safety-report-form textarea { background: var(--surface-raised); border: 1px solid var(--border); border-radius: 9px; color: var(--text); font: inherit; padding: 11px; }
+.safety-report-form [aria-invalid='true'] { border-color: var(--danger); }
+.safety-report-form > div { display: flex; flex-wrap: wrap; gap: 10px; }
+
 .trial-complete dl > div {
   background: var(--surface);
   padding: 15px;

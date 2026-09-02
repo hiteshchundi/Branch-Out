@@ -165,7 +165,7 @@ func validOpeningDraftRequest() openings.DraftInput {
 }
 
 func openingManagementTestAPI(manager fakeOpeningManager, authentication fakeAuthenticator) http.Handler {
-	return New(nil, manager, fakeApplicationManager{}, fakeTrialProposalManager{}, readyChecker{}, authentication, fakeProfileManager{}, defaultOptions, testLogger())
+	return New(nil, manager, fakeApplicationManager{}, fakeTrialProposalManager{}, fakeSafetyManager{}, readyChecker{}, authentication, fakeProfileManager{}, defaultOptions, testLogger())
 }
 
 type openingManagerCalls struct {

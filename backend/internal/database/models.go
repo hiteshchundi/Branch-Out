@@ -80,6 +80,21 @@ type ProjectOpening struct {
 	ClosedAt          pgtype.Timestamptz `db:"closed_at" json:"closed_at"`
 }
 
+type SafetyReport struct {
+	ID               string             `db:"id" json:"id"`
+	ReporterUserID   int64              `db:"reporter_user_id" json:"reporter_user_id"`
+	TargetKind       string             `db:"target_kind" json:"target_kind"`
+	TargetID         string             `db:"target_id" json:"target_id"`
+	Category         string             `db:"category" json:"category"`
+	Details          string             `db:"details" json:"details"`
+	TargetSnapshot   []byte             `db:"target_snapshot" json:"target_snapshot"`
+	ReportStatus     string             `db:"report_status" json:"report_status"`
+	ReviewedByUserID *int64             `db:"reviewed_by_user_id" json:"reviewed_by_user_id"`
+	ModeratorNotes   *string            `db:"moderator_notes" json:"moderator_notes"`
+	CreatedAt        time.Time          `db:"created_at" json:"created_at"`
+	DecidedAt        pgtype.Timestamptz `db:"decided_at" json:"decided_at"`
+}
+
 type Session struct {
 	TokenHash []byte    `db:"token_hash" json:"token_hash"`
 	UserID    int64     `db:"user_id" json:"user_id"`
@@ -158,4 +173,5 @@ type User struct {
 	ProfileUrl   string    `db:"profile_url" json:"profile_url"`
 	CreatedAt    time.Time `db:"created_at" json:"created_at"`
 	UpdatedAt    time.Time `db:"updated_at" json:"updated_at"`
+	AccountRole  string    `db:"account_role" json:"account_role"`
 }

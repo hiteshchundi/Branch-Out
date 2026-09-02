@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Branch-Out API
-  version: 0.14.0
+  version: 0.15.0
   description: PostgreSQL-backed discovery, GitHub authentication, member profiles, owner-managed opening lifecycles, proof-led applications, applicant withdrawal, and private trial proposal sending, owner review, and immutable mutual decisions for Branch-Out.
 servers:
   - url: http://localhost:8080
@@ -1087,6 +1087,124 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+  /v1/safety-reports:
+    post:
+      operationId: createSafetyReport
+      summary: Submit one participant-scoped safety report
+      description: Captures an immutable private snapshot for authorized moderators. Reporting does not automatically remove content or penalize a member.
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SafetyReportInput'}
+      responses:
+        '201':
+          description: The pending safety report was created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: {$ref: '#/components/schemas/SafetyReportReceipt'}
+        '400':
+          description: The report is malformed or fails validation.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+        '401':
+          description: No valid session is present.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+        '409':
+          description: The target is outside the member's participant scope, authored by that member, missing, or already reported by that member.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+  /v1/moderation/reports:
+    get:
+      operationId: listModerationReports
+      summary: List the moderator safety queue
+      description: Requires an authenticated user whose database account role is moderator. Pending reports are ordered first and each includes the captured review snapshot.
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: The moderator-visible safety queue.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items: {$ref: '#/components/schemas/SafetyReport'}
+                  meta:
+                    type: object
+                    required: [count]
+                    properties:
+                      count: {type: integer, minimum: 0}
+        '401':
+          description: No valid session is present.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+        '403':
+          description: The authenticated member is not a moderator.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+  /v1/moderation/reports/{reportId}/decision:
+    post:
+      operationId: decideModerationReport
+      summary: Uphold or dismiss one pending safety report
+      description: Requires a moderator. The first decision and required notes are immutable; enforcement remains a separate manual or future workflow.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SafetyReportDecisionInput'}
+      responses:
+        '200':
+          description: The immutable moderation decision was recorded.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: {$ref: '#/components/schemas/SafetyReport'}
+        '400':
+          description: The decision is malformed or fails validation.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+        '401':
+          description: No valid session is present.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+        '403':
+          description: The authenticated member is not a moderator.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+        '409':
+          description: The report is missing or already decided.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorEnvelope'}
   /v1/openings/{id}/application/submit:
     post:
       operationId: submitOwnApplication
@@ -1945,6 +2063,83 @@ components:
           type: array
           items: {type: string}
           description: Every human-readable factor used by the deterministic derivation.
+    SafetyReportInput:
+      type: object
+      additionalProperties: false
+      required: [targetKind, targetId, category, details]
+      properties:
+        targetKind:
+          type: string
+          enum: [trial_feedback, trust_candidate]
+        targetId:
+          type: string
+          minLength: 1
+          maxLength: 100
+        category:
+          type: string
+          enum: [harassment, privacy, fraud, spam, other]
+        details:
+          type: string
+          minLength: 30
+          maxLength: 1000
+    SafetyReportDecisionInput:
+      type: object
+      additionalProperties: false
+      required: [decision, moderatorNotes]
+      properties:
+        decision:
+          type: string
+          enum: [upheld, dismissed]
+        moderatorNotes:
+          type: string
+          minLength: 20
+          maxLength: 1000
+    SafetyReportReceipt:
+      type: object
+      required: [id, targetKind, targetId, category, status, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        targetKind:
+          type: string
+          enum: [trial_feedback, trust_candidate]
+        targetId: {type: string}
+        category:
+          type: string
+          enum: [harassment, privacy, fraud, spam, other]
+        status:
+          type: string
+          enum: [pending]
+        createdAt: {type: string, format: date-time}
+    SafetyReport:
+      type: object
+      required: [id, targetKind, targetId, category, details, targetSnapshot, status, reporter, moderatorNotes, createdAt, decidedAt]
+      properties:
+        id: {type: string, format: uuid}
+        targetKind:
+          type: string
+          enum: [trial_feedback, trust_candidate]
+        targetId: {type: string}
+        category:
+          type: string
+          enum: [harassment, privacy, fraud, spam, other]
+        details: {type: string}
+        targetSnapshot:
+          type: object
+          additionalProperties: true
+        status:
+          type: string
+          enum: [pending, upheld, dismissed]
+        reporter:
+          type: object
+          required: [githubLogin]
+          properties:
+            githubLogin: {type: string}
+        moderatorNotes:
+          type: [string, 'null']
+        createdAt: {type: string, format: date-time}
+        decidedAt:
+          type: [string, 'null']
+          format: date-time
     Application:
       type: object
       required: [id, openingId, input, status, submittedAt, decidedAt, withdrawnAt, createdAt, updatedAt]

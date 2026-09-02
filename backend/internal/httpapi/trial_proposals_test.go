@@ -256,7 +256,7 @@ func validTrialProposalRequest() trialproposals.Input {
 }
 
 func trialProposalTestAPI(manager fakeTrialProposalManager, authentication fakeAuthenticator) http.Handler {
-	return New(nil, fakeOpeningManager{}, fakeApplicationManager{}, manager, readyChecker{}, authentication, fakeProfileManager{}, defaultOptions, testLogger())
+	return New(nil, fakeOpeningManager{}, fakeApplicationManager{}, manager, fakeSafetyManager{}, readyChecker{}, authentication, fakeProfileManager{}, defaultOptions, testLogger())
 }
 
 type trialProposalCalls struct {

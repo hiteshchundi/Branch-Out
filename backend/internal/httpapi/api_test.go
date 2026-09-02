@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/hiteshchundi/branch-out/backend/internal/openings"
+	"github.com/hiteshchundi/branch-out/backend/internal/safety"
 )
 
 const allowedOrigin = "http://localhost:3000"
@@ -21,7 +22,7 @@ var defaultOptions = Options{
 }
 
 func testAPI(repository openings.Repository) http.Handler {
-	return New(repository, fakeOpeningManager{}, fakeApplicationManager{}, fakeTrialProposalManager{}, readyChecker{}, fakeAuthenticator{}, fakeProfileManager{}, defaultOptions, slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)))
+	return New(repository, fakeOpeningManager{}, fakeApplicationManager{}, fakeTrialProposalManager{}, fakeSafetyManager{}, readyChecker{}, fakeAuthenticator{}, fakeProfileManager{}, defaultOptions, slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)))
 }
 
 func TestStatusRoutes(t *testing.T) {
@@ -51,6 +52,7 @@ func TestReadinessReturnsUnavailableWhenDependencyFails(t *testing.T) {
 		fakeOpeningManager{},
 		fakeApplicationManager{},
 		fakeTrialProposalManager{},
+		fakeSafetyManager{},
 		readyChecker{err: errors.New("database unavailable")},
 		fakeAuthenticator{}, fakeProfileManager{}, defaultOptions,
 		slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)),
@@ -68,6 +70,39 @@ func TestReadinessReturnsUnavailableWhenDependencyFails(t *testing.T) {
 	if body.Status != "unavailable" {
 		t.Errorf("status body = %q, want unavailable", body.Status)
 	}
+}
+
+type safetyCalls struct {
+	operation string
+	userID    int64
+	reportID  string
+	input     safety.Input
+	decision  safety.DecisionInput
+}
+type fakeSafetyManager struct {
+	calls  *safetyCalls
+	result safety.Report
+	listed []safety.Report
+	err    error
+}
+
+func (fake fakeSafetyManager) Create(_ context.Context, userID int64, input safety.Input) (safety.Report, error) {
+	if fake.calls != nil {
+		fake.calls.operation, fake.calls.userID, fake.calls.input = "create", userID, input
+	}
+	return fake.result, fake.err
+}
+func (fake fakeSafetyManager) ListForModerator(_ context.Context, userID int64) ([]safety.Report, error) {
+	if fake.calls != nil {
+		fake.calls.operation, fake.calls.userID = "list", userID
+	}
+	return fake.listed, fake.err
+}
+func (fake fakeSafetyManager) Decide(_ context.Context, userID int64, reportID string, input safety.DecisionInput) (safety.Report, error) {
+	if fake.calls != nil {
+		fake.calls.operation, fake.calls.userID, fake.calls.reportID, fake.calls.decision = "decide", userID, reportID, input
+	}
+	return fake.result, fake.err
 }
 
 func TestListOpeningsReturnsFilteredEnvelope(t *testing.T) {

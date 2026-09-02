@@ -13,6 +13,7 @@ import (
 	"github.com/hiteshchundi/branch-out/backend/internal/database"
 	"github.com/hiteshchundi/branch-out/backend/internal/openings"
 	"github.com/hiteshchundi/branch-out/backend/internal/profile"
+	"github.com/hiteshchundi/branch-out/backend/internal/safety"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -34,12 +35,15 @@ func TestPostgresTrialProposalLifecycle(t *testing.T) {
 	openingManager := openings.NewManager(openings.NewPostgresRepository(queries), profileService)
 	applicationManager := applications.NewManager(applications.NewPostgresStore(queries), profileService)
 	manager := NewManager(NewPostgresStore(queries))
+	safetyManager := safety.NewManager(safety.NewPostgresStore(queries))
 
 	identifier := time.Now().UnixNano()
 	owner := createTrialTestUser(t, ctx, authStore, profileService, identifier, "Trial Owner")
 	applicant := createTrialTestUser(t, ctx, authStore, profileService, identifier+1, "Accepted Applicant")
 	otherApplicant := createTrialTestUser(t, ctx, authStore, profileService, identifier+2, "Other Applicant")
 	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), "DELETE FROM safety_reports WHERE reporter_user_id = ANY($1)", []int64{owner.ID, applicant.ID, otherApplicant.ID})
+		_, _ = pool.Exec(context.Background(), "DELETE FROM trial_feedback WHERE author_user_id = ANY($1)", []int64{owner.ID, applicant.ID, otherApplicant.ID})
 		_, _ = pool.Exec(context.Background(), "DELETE FROM trial_outcomes WHERE submitted_by_user_id = ANY($1)", []int64{owner.ID, applicant.ID, otherApplicant.ID})
 		_, _ = pool.Exec(context.Background(), "DELETE FROM trial_check_ins WHERE author_user_id = ANY($1)", []int64{owner.ID, applicant.ID, otherApplicant.ID})
 		_, _ = pool.Exec(context.Background(), "DELETE FROM trial_proposals WHERE applicant_user_id = ANY($1)", []int64{applicant.ID, otherApplicant.ID})
@@ -223,6 +227,53 @@ func TestPostgresTrialProposalLifecycle(t *testing.T) {
 	readyCandidate, err := manager.GetTrustCandidate(ctx, owner.ID, proposal.ID)
 	if err != nil || !readyCandidate.Ready || readyCandidate.Kind != "work_demonstrated" {
 		t.Fatalf("ready GetTrustCandidate() = %#v, %v", readyCandidate, err)
+	}
+	if _, err := safetyManager.Create(ctx, applicant.ID, safety.Input{
+		TargetKind: "trial_feedback", TargetID: applicantFeedback.ID, Category: "other",
+		Details: "A participant must not be able to report their own private feedback record.",
+	}); !errors.Is(err, safety.ErrReportUnavailable) {
+		t.Fatalf("self safety report error = %v, want ErrReportUnavailable", err)
+	}
+	feedbackReport, err := safetyManager.Create(ctx, applicant.ID, safety.Input{
+		TargetKind: "trial_feedback", TargetID: ownerFeedback.ID, Category: "privacy",
+		Details: "The counterpart feedback includes information that should receive a private moderator review.",
+	})
+	if err != nil || feedbackReport.Status != "pending" || len(feedbackReport.TargetSnapshot) == 0 {
+		t.Fatalf("feedback safety report = %#v, %v", feedbackReport, err)
+	}
+	if _, err := safetyManager.Create(ctx, applicant.ID, safety.Input{
+		TargetKind: "trial_feedback", TargetID: ownerFeedback.ID, Category: "privacy",
+		Details: "A duplicate report for the same target should not create another moderation record.",
+	}); !errors.Is(err, safety.ErrReportUnavailable) {
+		t.Fatalf("duplicate safety report error = %v, want ErrReportUnavailable", err)
+	}
+	candidateReport, err := safetyManager.Create(ctx, owner.ID, safety.Input{
+		TargetKind: "trust_candidate", TargetID: proposal.ID, Category: "fraud",
+		Details: "The private trust candidate appears to rely on evidence that should be reviewed by moderation.",
+	})
+	if err != nil || candidateReport.Status != "pending" || len(candidateReport.TargetSnapshot) == 0 {
+		t.Fatalf("candidate safety report = %#v, %v", candidateReport, err)
+	}
+	if _, err := safetyManager.ListForModerator(ctx, owner.ID); !errors.Is(err, safety.ErrModeratorForbidden) {
+		t.Fatalf("member moderation list error = %v, want ErrModeratorForbidden", err)
+	}
+	if _, err := pool.Exec(ctx, "UPDATE users SET account_role = 'moderator' WHERE id = $1", otherApplicant.ID); err != nil {
+		t.Fatalf("promote test moderator: %v", err)
+	}
+	reports, err := safetyManager.ListForModerator(ctx, otherApplicant.ID)
+	if err != nil || len(reports) != 2 || reports[0].Status != "pending" {
+		t.Fatalf("moderation list = %#v, %v", reports, err)
+	}
+	decidedReport, err := safetyManager.Decide(ctx, otherApplicant.ID, feedbackReport.ID, safety.DecisionInput{
+		Decision: "upheld", ModeratorNotes: "The captured snapshot contains private information requiring a manual follow-up.",
+	})
+	if err != nil || decidedReport.Status != "upheld" || decidedReport.DecidedAt == nil {
+		t.Fatalf("moderation decision = %#v, %v", decidedReport, err)
+	}
+	if _, err := safetyManager.Decide(ctx, otherApplicant.ID, feedbackReport.ID, safety.DecisionInput{
+		Decision: "dismissed", ModeratorNotes: "A second decision must not replace the original immutable moderation outcome.",
+	}); !errors.Is(err, safety.ErrDecisionUnavailable) {
+		t.Fatalf("repeated moderation decision error = %v, want ErrDecisionUnavailable", err)
 	}
 }
 
