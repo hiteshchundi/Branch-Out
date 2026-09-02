@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Branch-Out API
-  version: 0.11.0
+  version: 0.12.0
   description: PostgreSQL-backed discovery, GitHub authentication, member profiles, owner-managed opening lifecycles, proof-led applications, applicant withdrawal, and private trial proposal sending, owner review, and immutable mutual decisions for Branch-Out.
 servers:
   - url: http://localhost:8080
@@ -772,6 +772,158 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /v1/trial-proposals/{proposalId}/outcome:
+    get:
+      operationId: getTrialOutcome
+      summary: Load the mutually accepted trial's private closeout
+      description: Returns the one private outcome record only to the proposal applicant or opening owner. A missing outcome and an unavailable participant scope both return 404.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: proposalId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The participant-scoped trial outcome.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/TrialOutcome'
+        '401':
+          description: No valid session is present.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: No trial outcome is available to the current member.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: The trial outcome could not be loaded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    post:
+      operationId: createTrialOutcome
+      summary: Submit one immutable private trial outcome
+      description: Allows either participant in a mutually accepted proposal to create the single factual closeout. Submission is read-only and awaits the other participant's decision.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: proposalId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TrialOutcomeInput'
+      responses:
+        '201':
+          description: The private outcome was submitted for counterpart review.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/TrialOutcome'
+        '400':
+          description: The outcome is malformed or fails validation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: No valid session is present.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: The proposal is unavailable, the member is not a participant, or an outcome already exists.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: The private outcome could not be submitted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /v1/trial-proposals/{proposalId}/outcome/decision:
+    post:
+      operationId: decideTrialOutcome
+      summary: Confirm or dispute a private trial outcome
+      description: Only the other participant can make the first decision on a pending outcome. The decision is immutable and does not publish feedback or a trust signal.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: proposalId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TrialOutcomeDecisionInput'
+      responses:
+        '200':
+          description: The permanent counterpart decision was recorded.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/TrialOutcome'
+        '400':
+          description: The decision request is malformed or unsupported.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: No valid session is present.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: The member submitted the outcome, the outcome is missing, or a decision already exists.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: The outcome decision could not be recorded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /v1/openings/{id}/application/submit:
     post:
       operationId: submitOwnApplication
@@ -1506,6 +1658,70 @@ components:
             createdAt:
               type: string
               format: date-time
+    TrialOutcomeInput:
+      type: object
+      additionalProperties: false
+      required: [outcomeStatus, deliverableStatus, workSummary, evidenceUrl, closeoutNotes]
+      properties:
+        outcomeStatus:
+          type: string
+          enum: [completed, partially_completed, stopped_early]
+        deliverableStatus:
+          type: string
+          enum: [met, partially_met, not_met]
+        workSummary:
+          type: string
+          minLength: 30
+          maxLength: 1000
+        evidenceUrl:
+          type: string
+          maxLength: 2048
+          description: An optional complete HTTP or HTTPS evidence link; use an empty string when absent.
+        closeoutNotes:
+          type: string
+          minLength: 20
+          maxLength: 1000
+    TrialOutcomeDecisionInput:
+      type: object
+      additionalProperties: false
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [confirmed, disputed]
+    TrialOutcome:
+      type: object
+      required: [id, proposalId, input, reviewStatus, submittedBy, submittedByRole, submittedByCurrentUser, canDecide, submittedAt, decidedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        proposalId:
+          type: string
+          format: uuid
+        input:
+          $ref: '#/components/schemas/TrialOutcomeInput'
+        reviewStatus:
+          type: string
+          enum: [pending, confirmed, disputed]
+        submittedBy:
+          $ref: '#/components/schemas/TrialCheckInAuthor'
+        submittedByRole:
+          type: string
+          enum: [applicant, owner]
+        submittedByCurrentUser:
+          type: boolean
+        canDecide:
+          type: boolean
+          description: True only for the non-submitting participant while the outcome is pending.
+        submittedAt:
+          type: string
+          format: date-time
+        decidedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
     Application:
       type: object
       required: [id, openingId, input, status, submittedAt, decidedAt, withdrawnAt, createdAt, updatedAt]

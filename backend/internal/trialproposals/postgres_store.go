@@ -163,6 +163,90 @@ func (store *PostgresStore) CreateCheckIn(ctx context.Context, record CheckInRec
 	}, nil
 }
 
+func (store *PostgresStore) GetOutcome(ctx context.Context, userID int64, proposalID string) (Outcome, error) {
+	row, err := store.queries.GetTrialOutcomeForParticipant(ctx, database.GetTrialOutcomeForParticipantParams{
+		ParticipantUserID: userID, ProposalID: proposalID,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Outcome{}, ErrOutcomeNotFound
+	}
+	if err != nil {
+		return Outcome{}, err
+	}
+	canDecide := row.CanDecide != nil && *row.CanDecide
+	return outcomeFromValues(
+		row.ID, row.ProposalID, row.OutcomeStatus,
+		row.DeliverableStatus, row.WorkSummary, row.EvidenceUrl, row.CloseoutNotes,
+		row.ReviewStatus, row.SubmittedAt, row.DecidedAt, row.SubmittedByDisplayName,
+		row.SubmittedByRole, row.SubmittedByUserID == userID, canDecide,
+	), nil
+}
+
+func (store *PostgresStore) CreateOutcome(ctx context.Context, record OutcomeRecord) (Outcome, error) {
+	row, err := store.queries.CreateTrialOutcomeForParticipant(ctx, database.CreateTrialOutcomeForParticipantParams{
+		ID: record.ID, ProposalID: record.ProposalID, SubmittedByUserID: record.SubmittedByUserID,
+		OutcomeStatus: record.Input.OutcomeStatus, DeliverableStatus: record.Input.DeliverableStatus,
+		WorkSummary: record.Input.WorkSummary, EvidenceUrl: record.Input.EvidenceURL,
+		CloseoutNotes: record.Input.CloseoutNotes,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Outcome{}, ErrOutcomeUnavailable
+	}
+	if err != nil {
+		return Outcome{}, err
+	}
+	return outcomeFromValues(
+		row.ID, row.ProposalID, row.OutcomeStatus,
+		row.DeliverableStatus, row.WorkSummary, row.EvidenceUrl, row.CloseoutNotes,
+		row.ReviewStatus, row.SubmittedAt, row.DecidedAt, row.SubmittedByDisplayName,
+		row.SubmittedByRole, true, row.CanDecide,
+	), nil
+}
+
+func (store *PostgresStore) DecideOutcome(ctx context.Context, userID int64, proposalID, decision string) (Outcome, error) {
+	row, err := store.queries.DecideTrialOutcomeForParticipant(ctx, database.DecideTrialOutcomeForParticipantParams{
+		Decision: decision, ParticipantUserID: &userID, ProposalID: proposalID,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Outcome{}, ErrOutcomeDecisionUnavailable
+	}
+	if err != nil {
+		return Outcome{}, err
+	}
+	return outcomeFromValues(
+		row.ID, row.ProposalID, row.OutcomeStatus,
+		row.DeliverableStatus, row.WorkSummary, row.EvidenceUrl, row.CloseoutNotes,
+		row.ReviewStatus, row.SubmittedAt, row.DecidedAt, row.SubmittedByDisplayName,
+		row.SubmittedByRole, false, row.CanDecide,
+	), nil
+}
+
+func outcomeFromValues(
+	id, proposalID string,
+	outcomeStatus, deliverableStatus, workSummary, evidenceURL, closeoutNotes, reviewStatus string,
+	submittedAt time.Time,
+	decidedAtValue pgtype.Timestamptz,
+	submittedByDisplayName, submittedByRole string,
+	submittedByCurrentUser, canDecide bool,
+) Outcome {
+	var decidedAt *time.Time
+	if decidedAtValue.Valid {
+		value := decidedAtValue.Time
+		decidedAt = &value
+	}
+	return Outcome{
+		ID: id, ProposalID: proposalID,
+		Input: OutcomeInput{
+			OutcomeStatus: outcomeStatus, DeliverableStatus: deliverableStatus,
+			WorkSummary: workSummary, EvidenceURL: evidenceURL, CloseoutNotes: closeoutNotes,
+		},
+		ReviewStatus:    reviewStatus,
+		SubmittedBy:     CheckInAuthor{DisplayName: submittedByDisplayName},
+		SubmittedByRole: submittedByRole, SubmittedByCurrentUser: submittedByCurrentUser,
+		CanDecide: canDecide, SubmittedAt: submittedAt, DecidedAt: decidedAt,
+	}
+}
+
 func fromDatabase(row database.TrialProposal) Proposal {
 	var sentAt *time.Time
 	if row.SentAt.Valid {

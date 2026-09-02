@@ -150,6 +150,71 @@ func TestManagerListsOnlyParticipantWorkspace(t *testing.T) {
 	}
 }
 
+func validOutcomeInput() OutcomeInput {
+	return OutcomeInput{
+		OutcomeStatus: "completed", DeliverableStatus: "met",
+		WorkSummary:   "Delivered the agreed comparison flow with focused tests and review notes.",
+		EvidenceURL:   "https://github.com/example/repo/pull/14",
+		CloseoutNotes: "Repository access can be removed after the documented handoff is acknowledged.",
+	}
+}
+
+func TestManagerCreatesNormalizedTrialOutcome(t *testing.T) {
+	store := &fakeStore{createdOutcome: Outcome{ID: "outcome-id", ReviewStatus: "pending"}}
+	manager := NewManager(store)
+	manager.random = strings.NewReader(strings.Repeat("c", 16))
+	input := validOutcomeInput()
+	input.WorkSummary = "  " + input.WorkSummary + "  "
+	result, err := manager.CreateOutcome(context.Background(), 7, " proposal-id ", input)
+	if err != nil || result.ID != "outcome-id" {
+		t.Fatalf("CreateOutcome() = %#v, %v", result, err)
+	}
+	if store.outcomeRecord.ID != "63636363-6363-4363-a363-636363636363" || store.outcomeRecord.ProposalID != "proposal-id" || store.outcomeRecord.SubmittedByUserID != 7 {
+		t.Fatalf("record = %#v", store.outcomeRecord)
+	}
+	if store.outcomeRecord.Input.WorkSummary != strings.TrimSpace(input.WorkSummary) {
+		t.Fatalf("summary = %q", store.outcomeRecord.Input.WorkSummary)
+	}
+}
+
+func TestManagerValidatesTrialOutcome(t *testing.T) {
+	manager := NewManager(&fakeStore{})
+	for _, test := range []struct {
+		field string
+		edit  func(*OutcomeInput)
+	}{
+		{"outcomeStatus", func(input *OutcomeInput) { input.OutcomeStatus = "unknown" }},
+		{"deliverableStatus", func(input *OutcomeInput) { input.DeliverableStatus = "almost" }},
+		{"workSummary", func(input *OutcomeInput) { input.WorkSummary = "short" }},
+		{"evidenceUrl", func(input *OutcomeInput) { input.EvidenceURL = "javascript:alert(1)" }},
+		{"closeoutNotes", func(input *OutcomeInput) { input.CloseoutNotes = "short" }},
+	} {
+		t.Run(test.field, func(t *testing.T) {
+			input := validOutcomeInput()
+			test.edit(&input)
+			_, err := manager.CreateOutcome(context.Background(), 7, "proposal-id", input)
+			var fieldError *FieldError
+			if !errors.As(err, &fieldError) || fieldError.Field != test.field {
+				t.Fatalf("error = %#v, want %s", err, test.field)
+			}
+		})
+	}
+}
+
+func TestManagerLoadsAndDecidesTrialOutcome(t *testing.T) {
+	store := &fakeStore{outcome: Outcome{ID: "outcome-id"}, decidedOutcome: Outcome{ID: "outcome-id", ReviewStatus: "confirmed"}}
+	manager := NewManager(store)
+	if result, err := manager.GetOutcome(context.Background(), 7, " proposal-id "); err != nil || result.ID != "outcome-id" || store.userID != 7 {
+		t.Fatalf("GetOutcome() = %#v, %v", result, err)
+	}
+	if result, err := manager.DecideOutcome(context.Background(), 8, " proposal-id ", "confirmed"); err != nil || result.ReviewStatus != "confirmed" || store.decision != "confirmed" {
+		t.Fatalf("DecideOutcome() = %#v, %v", result, err)
+	}
+	if _, err := manager.DecideOutcome(context.Background(), 8, "proposal-id", "edited"); !errors.Is(err, ErrOutcomeDecisionUnavailable) {
+		t.Fatalf("invalid DecideOutcome() error = %v", err)
+	}
+}
+
 type fakeStore struct {
 	record                    Record
 	userID                    int64
@@ -161,6 +226,10 @@ type fakeStore struct {
 	checkIns                  []CheckIn
 	createdCheckIn            CheckIn
 	checkInRecord             CheckInRecord
+	outcome                   Outcome
+	createdOutcome            Outcome
+	decidedOutcome            Outcome
+	outcomeRecord             OutcomeRecord
 	err                       error
 }
 
@@ -197,4 +266,19 @@ func (store *fakeStore) ListCheckIns(_ context.Context, userID int64, proposalID
 func (store *fakeStore) CreateCheckIn(_ context.Context, record CheckInRecord) (CheckIn, error) {
 	store.checkInRecord = record
 	return store.createdCheckIn, store.err
+}
+
+func (store *fakeStore) GetOutcome(_ context.Context, userID int64, proposalID string) (Outcome, error) {
+	store.userID, store.proposalID = userID, proposalID
+	return store.outcome, store.err
+}
+
+func (store *fakeStore) CreateOutcome(_ context.Context, record OutcomeRecord) (Outcome, error) {
+	store.outcomeRecord = record
+	return store.createdOutcome, store.err
+}
+
+func (store *fakeStore) DecideOutcome(_ context.Context, userID int64, proposalID, decision string) (Outcome, error) {
+	store.userID, store.proposalID, store.decision = userID, proposalID, decision
+	return store.decidedOutcome, store.err
 }

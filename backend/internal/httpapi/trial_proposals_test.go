@@ -21,6 +21,17 @@ func TestTrialProposalRoutesRequireAuthentication(t *testing.T) {
 			t.Fatalf("%s = %d", method, response.Code)
 		}
 	}
+	for _, path := range []string{
+		"/v1/trial-proposals/proposal-id/check-ins",
+		"/v1/trial-proposals/proposal-id/outcome",
+		"/v1/trial-proposals/proposal-id/outcome/decision",
+	} {
+		response := httptest.NewRecorder()
+		api.ServeHTTP(response, httptest.NewRequest(http.MethodPost, path, bytes.NewBufferString("{}")))
+		if response.Code != http.StatusUnauthorized {
+			t.Fatalf("POST %s = %d", path, response.Code)
+		}
+	}
 }
 
 func TestTrialProposalSendOwnerReviewAndDecision(t *testing.T) {
@@ -90,6 +101,63 @@ func TestTrialParticipantsListAndAddCheckIns(t *testing.T) {
 	}
 }
 
+func TestTrialParticipantsSubmitAndReviewOutcome(t *testing.T) {
+	calls := &trialProposalCalls{}
+	outcome := trialproposals.Outcome{
+		ID: "outcome-id", ProposalID: "proposal-id", ReviewStatus: "pending",
+		Input: trialproposals.OutcomeInput{
+			OutcomeStatus: "completed", DeliverableStatus: "met",
+			WorkSummary: "Delivered the agreed comparison flow with focused tests and review notes.",
+			EvidenceURL: "", CloseoutNotes: "Repository access can be removed after the documented handoff.",
+		},
+	}
+	manager := fakeTrialProposalManager{calls: calls, outcomeResult: outcome}
+	api := trialProposalTestAPI(manager, fakeAuthenticator{user: auth.User{ID: 7}})
+
+	load := httptest.NewRecorder()
+	api.ServeHTTP(load, authenticatedApplicationRequest(http.MethodGet, "/v1/trial-proposals/proposal-id/outcome", nil))
+	if load.Code != http.StatusOK || calls.operation != "get-outcome" {
+		t.Fatalf("load = %d, calls %#v: %s", load.Code, calls, load.Body.String())
+	}
+
+	body, _ := json.Marshal(outcome.Input)
+	create := httptest.NewRecorder()
+	api.ServeHTTP(create, authenticatedApplicationRequest(http.MethodPost, "/v1/trial-proposals/proposal-id/outcome", bytes.NewReader(body)))
+	if create.Code != http.StatusCreated || calls.operation != "create-outcome" || calls.outcomeInput.OutcomeStatus != "completed" {
+		t.Fatalf("create = %d, calls %#v: %s", create.Code, calls, create.Body.String())
+	}
+
+	decision := httptest.NewRecorder()
+	api.ServeHTTP(decision, authenticatedApplicationRequest(http.MethodPost, "/v1/trial-proposals/proposal-id/outcome/decision", bytes.NewBufferString(`{"decision":"confirmed"}`)))
+	if decision.Code != http.StatusOK || calls.operation != "decide-outcome" || calls.decision != "confirmed" {
+		t.Fatalf("decision = %d, calls %#v: %s", decision.Code, calls, decision.Body.String())
+	}
+}
+
+func TestTrialOutcomeMapsLifecycleErrors(t *testing.T) {
+	for _, test := range []struct {
+		method string
+		path   string
+		body   string
+		err    error
+		status int
+		code   string
+	}{
+		{http.MethodGet, "/v1/trial-proposals/proposal-id/outcome", "", trialproposals.ErrOutcomeNotFound, http.StatusNotFound, "trial_outcome_not_found"},
+		{http.MethodPost, "/v1/trial-proposals/proposal-id/outcome", `{"outcomeStatus":"completed","deliverableStatus":"met","workSummary":"A complete and sufficiently detailed outcome summary.","evidenceUrl":"","closeoutNotes":"A complete handoff was recorded."}`, trialproposals.ErrOutcomeUnavailable, http.StatusConflict, "trial_outcome_unavailable"},
+		{http.MethodPost, "/v1/trial-proposals/proposal-id/outcome/decision", `{"decision":"confirmed"}`, trialproposals.ErrOutcomeDecisionUnavailable, http.StatusConflict, "trial_outcome_decision_unavailable"},
+	} {
+		api := trialProposalTestAPI(fakeTrialProposalManager{err: test.err}, fakeAuthenticator{user: auth.User{ID: 7}})
+		response := httptest.NewRecorder()
+		api.ServeHTTP(response, authenticatedApplicationRequest(test.method, test.path, bytes.NewBufferString(test.body)))
+		var envelope errorEnvelope
+		_ = json.NewDecoder(response.Body).Decode(&envelope)
+		if response.Code != test.status || envelope.Error.Code != test.code {
+			t.Fatalf("%s %s = %d, %#v", test.method, test.path, response.Code, envelope)
+		}
+	}
+}
+
 func TestTrialProposalRejectsInvalidBodyAndMapsDomainErrors(t *testing.T) {
 	for _, body := range []string{`{"unknown":true}`, `{} {}`} {
 		api := trialProposalTestAPI(fakeTrialProposalManager{}, fakeAuthenticator{user: auth.User{ID: 7}})
@@ -150,6 +218,7 @@ type trialProposalCalls struct {
 	proposalID   string
 	decision     string
 	checkInInput trialproposals.CheckInInput
+	outcomeInput trialproposals.OutcomeInput
 }
 
 type fakeTrialProposalManager struct {
@@ -158,6 +227,7 @@ type fakeTrialProposalManager struct {
 	listResult    []trialproposals.OwnerProposal
 	checkInResult trialproposals.CheckIn
 	checkInList   []trialproposals.CheckIn
+	outcomeResult trialproposals.Outcome
 	err           error
 }
 
@@ -209,4 +279,25 @@ func (fake fakeTrialProposalManager) AddCheckIn(_ context.Context, userID int64,
 		fake.calls.operation, fake.calls.userID, fake.calls.proposalID, fake.calls.checkInInput = "add-check-in", userID, proposalID, input
 	}
 	return fake.checkInResult, fake.err
+}
+
+func (fake fakeTrialProposalManager) GetOutcome(_ context.Context, userID int64, proposalID string) (trialproposals.Outcome, error) {
+	if fake.calls != nil {
+		fake.calls.operation, fake.calls.userID, fake.calls.proposalID = "get-outcome", userID, proposalID
+	}
+	return fake.outcomeResult, fake.err
+}
+
+func (fake fakeTrialProposalManager) CreateOutcome(_ context.Context, userID int64, proposalID string, input trialproposals.OutcomeInput) (trialproposals.Outcome, error) {
+	if fake.calls != nil {
+		fake.calls.operation, fake.calls.userID, fake.calls.proposalID, fake.calls.outcomeInput = "create-outcome", userID, proposalID, input
+	}
+	return fake.outcomeResult, fake.err
+}
+
+func (fake fakeTrialProposalManager) DecideOutcome(_ context.Context, userID int64, proposalID, decision string) (trialproposals.Outcome, error) {
+	if fake.calls != nil {
+		fake.calls.operation, fake.calls.userID, fake.calls.proposalID, fake.calls.decision = "decide-outcome", userID, proposalID, decision
+	}
+	return fake.outcomeResult, fake.err
 }

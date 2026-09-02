@@ -37,6 +37,14 @@ type trialCheckInListResponse struct {
 	} `json:"meta"`
 }
 
+type trialOutcomeResponse struct {
+	Data trialproposals.Outcome `json:"data"`
+}
+
+type trialOutcomeDecisionRequest struct {
+	Decision string `json:"decision"`
+}
+
 func (api *API) getOwnTrialProposal(writer http.ResponseWriter, request *http.Request) {
 	writer.Header().Set("Cache-Control", "no-store")
 	user, ok := api.requireUser(writer, request)
@@ -165,6 +173,88 @@ func (api *API) addTrialCheckIn(writer http.ResponseWriter, request *http.Reques
 		return
 	}
 	writeJSON(writer, http.StatusCreated, trialCheckInResponse{Data: result})
+}
+
+func (api *API) getTrialOutcome(writer http.ResponseWriter, request *http.Request) {
+	writer.Header().Set("Cache-Control", "no-store")
+	user, ok := api.requireUser(writer, request)
+	if !ok {
+		return
+	}
+	result, err := api.trialProposals.GetOutcome(request.Context(), user.ID, request.PathValue("proposalId"))
+	if api.writeTrialOutcomeError(writer, err) {
+		return
+	}
+	writeJSON(writer, http.StatusOK, trialOutcomeResponse{Data: result})
+}
+
+func (api *API) createTrialOutcome(writer http.ResponseWriter, request *http.Request) {
+	writer.Header().Set("Cache-Control", "no-store")
+	user, ok := api.requireUser(writer, request)
+	if !ok {
+		return
+	}
+	var input trialproposals.OutcomeInput
+	decoder := json.NewDecoder(http.MaxBytesReader(writer, request.Body, maximumTrialProposalBody))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil {
+		writeError(writer, http.StatusBadRequest, apiError{Code: "invalid_request", Message: "Provide a valid trial outcome."})
+		return
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		writeError(writer, http.StatusBadRequest, apiError{Code: "invalid_request", Message: "Provide exactly one trial outcome."})
+		return
+	}
+	result, err := api.trialProposals.CreateOutcome(request.Context(), user.ID, request.PathValue("proposalId"), input)
+	if api.writeTrialOutcomeError(writer, err) {
+		return
+	}
+	writeJSON(writer, http.StatusCreated, trialOutcomeResponse{Data: result})
+}
+
+func (api *API) decideTrialOutcome(writer http.ResponseWriter, request *http.Request) {
+	writer.Header().Set("Cache-Control", "no-store")
+	user, ok := api.requireUser(writer, request)
+	if !ok {
+		return
+	}
+	var input trialOutcomeDecisionRequest
+	decoder := json.NewDecoder(http.MaxBytesReader(writer, request.Body, maximumTrialProposalBody))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil {
+		writeError(writer, http.StatusBadRequest, apiError{Code: "invalid_request", Message: "Provide a confirmed or disputed outcome decision."})
+		return
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		writeError(writer, http.StatusBadRequest, apiError{Code: "invalid_request", Message: "Provide exactly one outcome decision."})
+		return
+	}
+	result, err := api.trialProposals.DecideOutcome(request.Context(), user.ID, request.PathValue("proposalId"), input.Decision)
+	if api.writeTrialOutcomeError(writer, err) {
+		return
+	}
+	writeJSON(writer, http.StatusOK, trialOutcomeResponse{Data: result})
+}
+
+func (api *API) writeTrialOutcomeError(writer http.ResponseWriter, err error) bool {
+	if err == nil {
+		return false
+	}
+	var fieldError *trialproposals.FieldError
+	switch {
+	case errors.As(err, &fieldError):
+		writeError(writer, http.StatusBadRequest, apiError{Code: "invalid_trial_outcome", Message: fieldError.Message, Field: fieldError.Field})
+	case errors.Is(err, trialproposals.ErrOutcomeNotFound):
+		writeError(writer, http.StatusNotFound, apiError{Code: "trial_outcome_not_found", Message: "No trial outcome is available to you."})
+	case errors.Is(err, trialproposals.ErrOutcomeUnavailable):
+		writeError(writer, http.StatusConflict, apiError{Code: "trial_outcome_unavailable", Message: "This trial outcome cannot be submitted."})
+	case errors.Is(err, trialproposals.ErrOutcomeDecisionUnavailable):
+		writeError(writer, http.StatusConflict, apiError{Code: "trial_outcome_decision_unavailable", Message: "This trial outcome cannot be decided."})
+	default:
+		api.logger.Error("manage trial outcome failed", "error", err)
+		writeError(writer, http.StatusInternalServerError, apiError{Code: "internal_error", Message: "The trial outcome request could not be completed."})
+	}
+	return true
 }
 
 func (api *API) writeTrialProposalError(writer http.ResponseWriter, err error) bool {

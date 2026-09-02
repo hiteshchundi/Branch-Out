@@ -14,12 +14,15 @@ import (
 )
 
 var (
-	ErrNotFound            = errors.New("trial proposal not found")
-	ErrUnavailable         = errors.New("trial proposal unavailable")
-	ErrSendUnavailable     = errors.New("trial proposal send unavailable")
-	ErrReviewNotFound      = errors.New("trial proposal review opening not found")
-	ErrDecisionUnavailable = errors.New("trial proposal decision unavailable")
-	ErrWorkspaceNotFound   = errors.New("trial workspace not found")
+	ErrNotFound                   = errors.New("trial proposal not found")
+	ErrUnavailable                = errors.New("trial proposal unavailable")
+	ErrSendUnavailable            = errors.New("trial proposal send unavailable")
+	ErrReviewNotFound             = errors.New("trial proposal review opening not found")
+	ErrDecisionUnavailable        = errors.New("trial proposal decision unavailable")
+	ErrWorkspaceNotFound          = errors.New("trial workspace not found")
+	ErrOutcomeNotFound            = errors.New("trial outcome not found")
+	ErrOutcomeUnavailable         = errors.New("trial outcome unavailable")
+	ErrOutcomeDecisionUnavailable = errors.New("trial outcome decision unavailable")
 )
 
 type FieldError struct {
@@ -95,6 +98,34 @@ type CheckInRecord struct {
 	Input        CheckInInput
 }
 
+type OutcomeInput struct {
+	OutcomeStatus     string `json:"outcomeStatus"`
+	DeliverableStatus string `json:"deliverableStatus"`
+	WorkSummary       string `json:"workSummary"`
+	EvidenceURL       string `json:"evidenceUrl"`
+	CloseoutNotes     string `json:"closeoutNotes"`
+}
+
+type Outcome struct {
+	ID                     string        `json:"id"`
+	ProposalID             string        `json:"proposalId"`
+	Input                  OutcomeInput  `json:"input"`
+	ReviewStatus           string        `json:"reviewStatus"`
+	SubmittedBy            CheckInAuthor `json:"submittedBy"`
+	SubmittedByRole        string        `json:"submittedByRole"`
+	SubmittedByCurrentUser bool          `json:"submittedByCurrentUser"`
+	CanDecide              bool          `json:"canDecide"`
+	SubmittedAt            time.Time     `json:"submittedAt"`
+	DecidedAt              *time.Time    `json:"decidedAt"`
+}
+
+type OutcomeRecord struct {
+	ID                string
+	ProposalID        string
+	SubmittedByUserID int64
+	Input             OutcomeInput
+}
+
 type Record struct {
 	Proposal
 	ApplicantUserID int64
@@ -108,6 +139,9 @@ type Store interface {
 	Decide(context.Context, int64, string, string, string) (Proposal, error)
 	ListCheckIns(context.Context, int64, string) ([]CheckIn, error)
 	CreateCheckIn(context.Context, CheckInRecord) (CheckIn, error)
+	GetOutcome(context.Context, int64, string) (Outcome, error)
+	CreateOutcome(context.Context, OutcomeRecord) (Outcome, error)
+	DecideOutcome(context.Context, int64, string, string) (Outcome, error)
 }
 
 func (manager *Manager) SendOwn(ctx context.Context, userID int64, openingID string) (Proposal, error) {
@@ -174,6 +208,71 @@ func (manager *Manager) AddCheckIn(ctx context.Context, userID int64, proposalID
 	return manager.store.CreateCheckIn(ctx, CheckInRecord{
 		ID: id, ProposalID: proposalID, AuthorUserID: userID, Input: input,
 	})
+}
+
+func (manager *Manager) GetOutcome(ctx context.Context, userID int64, proposalID string) (Outcome, error) {
+	proposalID = strings.TrimSpace(proposalID)
+	if proposalID == "" {
+		return Outcome{}, ErrOutcomeNotFound
+	}
+	return manager.store.GetOutcome(ctx, userID, proposalID)
+}
+
+func (manager *Manager) CreateOutcome(ctx context.Context, userID int64, proposalID string, input OutcomeInput) (Outcome, error) {
+	proposalID = strings.TrimSpace(proposalID)
+	if proposalID == "" {
+		return Outcome{}, ErrOutcomeUnavailable
+	}
+	normalized, err := normalizeOutcomeInput(input)
+	if err != nil {
+		return Outcome{}, err
+	}
+	id, err := randomID(manager.random)
+	if err != nil {
+		return Outcome{}, fmt.Errorf("generate trial outcome ID: %w", err)
+	}
+	return manager.store.CreateOutcome(ctx, OutcomeRecord{
+		ID: id, ProposalID: proposalID, SubmittedByUserID: userID, Input: normalized,
+	})
+}
+
+func (manager *Manager) DecideOutcome(ctx context.Context, userID int64, proposalID, decision string) (Outcome, error) {
+	proposalID = strings.TrimSpace(proposalID)
+	decision = strings.TrimSpace(decision)
+	if proposalID == "" || (decision != "confirmed" && decision != "disputed") {
+		return Outcome{}, ErrOutcomeDecisionUnavailable
+	}
+	return manager.store.DecideOutcome(ctx, userID, proposalID, decision)
+}
+
+func normalizeOutcomeInput(input OutcomeInput) (OutcomeInput, error) {
+	input.OutcomeStatus = strings.TrimSpace(input.OutcomeStatus)
+	input.DeliverableStatus = strings.TrimSpace(input.DeliverableStatus)
+	input.WorkSummary = strings.TrimSpace(input.WorkSummary)
+	input.EvidenceURL = strings.TrimSpace(input.EvidenceURL)
+	input.CloseoutNotes = strings.TrimSpace(input.CloseoutNotes)
+	if input.OutcomeStatus != "completed" && input.OutcomeStatus != "partially_completed" && input.OutcomeStatus != "stopped_early" {
+		return OutcomeInput{}, &FieldError{Field: "outcomeStatus", Message: "outcomeStatus is unsupported"}
+	}
+	if input.DeliverableStatus != "met" && input.DeliverableStatus != "partially_met" && input.DeliverableStatus != "not_met" {
+		return OutcomeInput{}, &FieldError{Field: "deliverableStatus", Message: "deliverableStatus is unsupported"}
+	}
+	if length := len([]rune(input.WorkSummary)); length < 30 || length > 1000 {
+		return OutcomeInput{}, &FieldError{Field: "workSummary", Message: "workSummary has an invalid length"}
+	}
+	if length := len([]rune(input.CloseoutNotes)); length < 20 || length > 1000 {
+		return OutcomeInput{}, &FieldError{Field: "closeoutNotes", Message: "closeoutNotes has an invalid length"}
+	}
+	if len(input.EvidenceURL) > 2048 {
+		return OutcomeInput{}, &FieldError{Field: "evidenceUrl", Message: "evidenceUrl is too long"}
+	}
+	if input.EvidenceURL != "" {
+		parsed, err := url.ParseRequestURI(input.EvidenceURL)
+		if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
+			return OutcomeInput{}, &FieldError{Field: "evidenceUrl", Message: "evidenceUrl must be a complete http or https URL"}
+		}
+	}
+	return input, nil
 }
 
 type Manager struct {

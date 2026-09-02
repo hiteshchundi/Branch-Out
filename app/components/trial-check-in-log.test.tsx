@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { TrialCheckInInput } from '../data/trial-proposals';
 import { TrialCheckInLog, validateTrialCheckIn } from './trial-check-in-log';
 
+vi.mock('./trial-outcome-closeout', () => ({ TrialOutcomeCloseout: () => <section aria-label="Trial outcome test boundary" /> }));
+
 const proposalID = '81818181-8181-4181-a181-818181818181';
 const validInput: TrialCheckInInput = {
   kind: 'progress', update: 'Completed the API boundary and added focused tests.', evidenceUrl: '',

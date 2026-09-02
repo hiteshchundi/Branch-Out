@@ -2943,6 +2943,93 @@ main:focus {
   justify-self: start;
 }
 
+.trial-outcome-closeout {
+  border-top: 1px solid var(--border);
+  margin-top: 30px;
+  padding-top: 28px;
+}
+
+.trial-outcome-closeout > header {
+  align-items: flex-start;
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+}
+
+.trial-outcome-closeout h5 {
+  font-size: 1.25rem;
+  margin: 4px 0 0;
+}
+
+.trial-outcome-status {
+  border-radius: 999px;
+  font-size: 0.72rem;
+  padding: 6px 10px;
+  text-transform: uppercase;
+}
+
+.trial-outcome-status.pending { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.trial-outcome-status.confirmed { background: color-mix(in srgb, var(--accent-strong) 18%, transparent); }
+.trial-outcome-status.disputed { background: color-mix(in srgb, var(--danger) 14%, transparent); }
+
+.trial-outcome-form {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1fr 1fr;
+  margin-top: 20px;
+}
+
+.trial-outcome-form label,
+.trial-outcome-record {
+  display: grid;
+  gap: 8px;
+}
+
+.trial-outcome-form input,
+.trial-outcome-form select,
+.trial-outcome-form textarea {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font: inherit;
+  padding: 12px;
+}
+
+.trial-outcome-form [aria-invalid='true'] { border-color: var(--danger); }
+
+.trial-outcome-confirmation {
+  align-items: flex-start;
+  display: flex !important;
+}
+
+.trial-outcome-confirmation input { margin-top: 4px; }
+
+.trial-outcome-record {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-top: 20px;
+  padding: 20px;
+}
+
+.trial-outcome-record dl {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr 1fr;
+  margin: 0;
+}
+
+.trial-outcome-record dl > div {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.trial-outcome-record dt { color: var(--muted); font-size: 0.76rem; text-transform: uppercase; }
+.trial-outcome-record dd { line-height: 1.55; margin: 5px 0 0; }
+.trial-outcome-decision { border-top: 1px solid var(--border); margin-top: 12px; padding-top: 18px; }
+.trial-outcome-decision > div:first-child { display: flex; flex-wrap: wrap; gap: 10px; }
+
 .trial-complete dl > div {
   background: var(--surface);
   padding: 15px;
@@ -3474,6 +3561,11 @@ main:focus {
   }
 
   .trial-check-in-form {
+    grid-template-columns: 1fr;
+  }
+
+  .trial-outcome-form,
+  .trial-outcome-record dl {
     grid-template-columns: 1fr;
   }
 

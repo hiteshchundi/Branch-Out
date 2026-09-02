@@ -126,6 +126,103 @@ FROM inserted
 JOIN trial_proposals AS proposal ON proposal.id = inserted.proposal_id
 JOIN profiles ON profiles.user_id = inserted.author_user_id;
 
+-- name: GetTrialOutcomeForParticipant :one
+SELECT
+    outcome.id, outcome.proposal_id, outcome.submitted_by_user_id,
+    outcome.outcome_status, outcome.deliverable_status, outcome.work_summary,
+    outcome.evidence_url, outcome.closeout_notes, outcome.review_status,
+    outcome.submitted_at, outcome.decided_at,
+    profiles.display_name AS submitted_by_display_name,
+    CASE
+        WHEN outcome.submitted_by_user_id = proposal.applicant_user_id THEN 'applicant'
+        ELSE 'owner'
+    END AS submitted_by_role,
+    (
+        outcome.review_status = 'pending'
+        AND outcome.submitted_by_user_id <> sqlc.arg(participant_user_id)
+    ) AS can_decide
+FROM trial_outcomes AS outcome
+JOIN trial_proposals AS proposal ON proposal.id = outcome.proposal_id
+JOIN project_openings AS opening ON opening.id = proposal.opening_id
+JOIN profiles ON profiles.user_id = outcome.submitted_by_user_id
+WHERE outcome.proposal_id = sqlc.arg(proposal_id)
+  AND proposal.proposal_status = 'accepted'
+  AND (
+      proposal.applicant_user_id = sqlc.arg(participant_user_id)
+      OR opening.owner_user_id = sqlc.arg(participant_user_id)
+  );
+
+-- name: CreateTrialOutcomeForParticipant :one
+WITH inserted AS (
+    INSERT INTO trial_outcomes (
+        id, proposal_id, submitted_by_user_id, outcome_status,
+        deliverable_status, work_summary, evidence_url, closeout_notes
+    )
+    SELECT
+        sqlc.arg(id), proposal.id, sqlc.arg(submitted_by_user_id),
+        sqlc.arg(outcome_status), sqlc.arg(deliverable_status),
+        sqlc.arg(work_summary), sqlc.arg(evidence_url), sqlc.arg(closeout_notes)
+    FROM trial_proposals AS proposal
+    JOIN project_openings AS opening ON opening.id = proposal.opening_id
+    WHERE proposal.id = sqlc.arg(proposal_id)
+      AND proposal.proposal_status = 'accepted'
+      AND (
+          proposal.applicant_user_id = sqlc.arg(submitted_by_user_id)
+          OR opening.owner_user_id = sqlc.arg(submitted_by_user_id)
+      )
+    ON CONFLICT (proposal_id) DO NOTHING
+    RETURNING *
+)
+SELECT
+    inserted.id, inserted.proposal_id, inserted.submitted_by_user_id,
+    inserted.outcome_status, inserted.deliverable_status, inserted.work_summary,
+    inserted.evidence_url, inserted.closeout_notes, inserted.review_status,
+    inserted.submitted_at, inserted.decided_at,
+    profiles.display_name AS submitted_by_display_name,
+    CASE
+        WHEN inserted.submitted_by_user_id = proposal.applicant_user_id THEN 'applicant'
+        ELSE 'owner'
+    END AS submitted_by_role,
+    false AS can_decide
+FROM inserted
+JOIN trial_proposals AS proposal ON proposal.id = inserted.proposal_id
+JOIN profiles ON profiles.user_id = inserted.submitted_by_user_id;
+
+-- name: DecideTrialOutcomeForParticipant :one
+WITH decided AS (
+    UPDATE trial_outcomes AS outcome SET
+        review_status = sqlc.arg(decision),
+        decided_by_user_id = sqlc.arg(participant_user_id),
+        decided_at = now()
+    FROM trial_proposals AS proposal
+    JOIN project_openings AS opening ON opening.id = proposal.opening_id
+    WHERE outcome.proposal_id = sqlc.arg(proposal_id)
+      AND proposal.id = outcome.proposal_id
+      AND proposal.proposal_status = 'accepted'
+      AND outcome.review_status = 'pending'
+      AND outcome.submitted_by_user_id <> sqlc.arg(participant_user_id)
+      AND (
+          proposal.applicant_user_id = sqlc.arg(participant_user_id)
+          OR opening.owner_user_id = sqlc.arg(participant_user_id)
+      )
+      AND sqlc.arg(decision)::text IN ('confirmed', 'disputed')
+    RETURNING outcome.*
+)
+SELECT
+    decided.id, decided.proposal_id, decided.submitted_by_user_id,
+    decided.outcome_status, decided.deliverable_status, decided.work_summary,
+    decided.evidence_url, decided.closeout_notes, decided.review_status,
+    decided.submitted_at, decided.decided_at,
+    profiles.display_name AS submitted_by_display_name,
+    CASE
+        WHEN decided.submitted_by_user_id = proposal.applicant_user_id THEN 'applicant'
+        ELSE 'owner'
+    END AS submitted_by_role,
+    false AS can_decide
+FROM decided
+JOIN trial_proposals AS proposal ON proposal.id = decided.proposal_id
+JOIN profiles ON profiles.user_id = decided.submitted_by_user_id;
+
 -- name: GetOwnedOpeningTrialProposalReviewScope :one
 SELECT id
 FROM project_openings

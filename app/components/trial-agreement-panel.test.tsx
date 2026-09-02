@@ -9,6 +9,8 @@ import {
   validateTrialStep,
 } from './trial-agreement-panel';
 
+vi.mock('./trial-check-in-log', () => ({ TrialCheckInLog: () => <section aria-label="Trial execution test boundary" /> }));
+
 const project = projects[0];
 const authenticatedUser: AuthenticatedUser = {
   id: 42,

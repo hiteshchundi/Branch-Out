@@ -249,6 +249,12 @@ applicant and opening owner. Either participant can append a timestamped
 HTTPS evidence link. Check-ins are immutable so the timeline remains an honest
 record; they are never shown in public discovery.
 
+Either participant can then submit one private factual closeout covering the
+trial result, deliverable result, delivered work, optional evidence, and handoff
+or remaining work. The other participant—not the submitter—can permanently
+confirm or dispute it. A confirmed closeout still remains private and does not
+publish feedback or create a trust signal.
+
 ## Outcome feedback and trust candidates
 
 **Preview outcome review** inside a project's trial milestone opens a three-step
@@ -266,9 +272,10 @@ and “Yes” to collaborating again. Completed or partial work can instead beco
 **Work Demonstrated candidate**. A stopped outcome creates no signal candidate.
 The interface displays every factor and never calculates a hidden score.
 
-Each project stores a separate draft locally. No feedback or trust signal is
-published; counterpart confirmation and moderation require the future account
-and backend systems.
+Each project stores a separate feedback draft locally. The mutually reviewed
+factual closeout in the private trial workspace does not publish this richer
+feedback draft or any trust signal; moderation and publication remain future
+work.
 
 ## Current boundaries
 
@@ -296,8 +303,10 @@ and backend systems.
   accepted. Accepted applicants can save and explicitly send one proposal;
   opening owners can privately accept or decline once. Mutually accepted
   proposals provide a participant-only immutable execution log. Check-in edits,
-  deletions, file uploads, completion decisions, counterproposals, signatures,
-  and replacement proposals are not implemented.
+  deletions, and file uploads are unavailable. One participant can submit a
+  read-only factual outcome and the counterpart can confirm or dispute it once.
+  Outcome revisions, dispute resolution, counterproposals, signatures, and
+  replacement proposals are not implemented.
 - Outcome-review drafts and trust candidates stay local and are not confirmed or
   published.
 - Saved openings stay only in the current browser and are not synchronized.

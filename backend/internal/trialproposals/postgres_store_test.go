@@ -40,6 +40,7 @@ func TestPostgresTrialProposalLifecycle(t *testing.T) {
 	applicant := createTrialTestUser(t, ctx, authStore, profileService, identifier+1, "Accepted Applicant")
 	otherApplicant := createTrialTestUser(t, ctx, authStore, profileService, identifier+2, "Other Applicant")
 	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), "DELETE FROM trial_outcomes WHERE submitted_by_user_id = ANY($1)", []int64{owner.ID, applicant.ID, otherApplicant.ID})
 		_, _ = pool.Exec(context.Background(), "DELETE FROM trial_check_ins WHERE author_user_id = ANY($1)", []int64{owner.ID, applicant.ID, otherApplicant.ID})
 		_, _ = pool.Exec(context.Background(), "DELETE FROM trial_proposals WHERE applicant_user_id = ANY($1)", []int64{applicant.ID, otherApplicant.ID})
 		_, _ = pool.Exec(context.Background(), "DELETE FROM applications WHERE applicant_user_id = ANY($1)", []int64{applicant.ID, otherApplicant.ID})
@@ -153,6 +154,30 @@ func TestPostgresTrialProposalLifecycle(t *testing.T) {
 	checkIns, err := manager.ListCheckIns(ctx, applicant.ID, proposal.ID)
 	if err != nil || len(checkIns) != 2 || checkIns[0].Kind != "progress" || checkIns[1].Kind != "milestone" {
 		t.Fatalf("ListCheckIns() = %#v, %v", checkIns, err)
+	}
+	if _, err := manager.GetOutcome(ctx, otherApplicant.ID, proposal.ID); !errors.Is(err, ErrOutcomeNotFound) {
+		t.Fatalf("non-participant GetOutcome() error = %v, want ErrOutcomeNotFound", err)
+	}
+	outcome, err := manager.CreateOutcome(ctx, applicant.ID, proposal.ID, validOutcomeInput())
+	if err != nil || outcome.ReviewStatus != "pending" || !outcome.SubmittedByCurrentUser || outcome.CanDecide {
+		t.Fatalf("CreateOutcome() = %#v, %v", outcome, err)
+	}
+	if _, err := manager.CreateOutcome(ctx, owner.ID, proposal.ID, validOutcomeInput()); !errors.Is(err, ErrOutcomeUnavailable) {
+		t.Fatalf("duplicate CreateOutcome() error = %v, want ErrOutcomeUnavailable", err)
+	}
+	ownerView, err := manager.GetOutcome(ctx, owner.ID, proposal.ID)
+	if err != nil || !ownerView.CanDecide || ownerView.SubmittedByCurrentUser || ownerView.SubmittedBy.DisplayName != "Accepted Applicant" {
+		t.Fatalf("owner GetOutcome() = %#v, %v", ownerView, err)
+	}
+	if _, err := manager.DecideOutcome(ctx, applicant.ID, proposal.ID, "confirmed"); !errors.Is(err, ErrOutcomeDecisionUnavailable) {
+		t.Fatalf("submitter DecideOutcome() error = %v, want ErrOutcomeDecisionUnavailable", err)
+	}
+	confirmed, err := manager.DecideOutcome(ctx, owner.ID, proposal.ID, "confirmed")
+	if err != nil || confirmed.ReviewStatus != "confirmed" || confirmed.DecidedAt == nil || confirmed.CanDecide {
+		t.Fatalf("DecideOutcome() = %#v, %v", confirmed, err)
+	}
+	if _, err := manager.DecideOutcome(ctx, owner.ID, proposal.ID, "disputed"); !errors.Is(err, ErrOutcomeDecisionUnavailable) {
+		t.Fatalf("repeated DecideOutcome() error = %v, want ErrOutcomeDecisionUnavailable", err)
 	}
 }
 

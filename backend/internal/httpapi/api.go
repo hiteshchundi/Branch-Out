@@ -62,6 +62,9 @@ type TrialProposalManager interface {
 	Decide(context.Context, int64, string, string, string) (trialproposals.Proposal, error)
 	ListCheckIns(context.Context, int64, string) ([]trialproposals.CheckIn, error)
 	AddCheckIn(context.Context, int64, string, trialproposals.CheckInInput) (trialproposals.CheckIn, error)
+	GetOutcome(context.Context, int64, string) (trialproposals.Outcome, error)
+	CreateOutcome(context.Context, int64, string, trialproposals.OutcomeInput) (trialproposals.Outcome, error)
+	DecideOutcome(context.Context, int64, string, string) (trialproposals.Outcome, error)
 }
 
 type listResponse struct {
@@ -109,6 +112,9 @@ func New(repository openings.Repository, openingManager OpeningManager, applicat
 	routes.HandleFunc("POST /v1/openings/{id}/trial-proposals/{proposalId}/decision", api.decideTrialProposal)
 	routes.HandleFunc("GET /v1/trial-proposals/{proposalId}/check-ins", api.listTrialCheckIns)
 	routes.HandleFunc("POST /v1/trial-proposals/{proposalId}/check-ins", api.addTrialCheckIn)
+	routes.HandleFunc("GET /v1/trial-proposals/{proposalId}/outcome", api.getTrialOutcome)
+	routes.HandleFunc("POST /v1/trial-proposals/{proposalId}/outcome", api.createTrialOutcome)
+	routes.HandleFunc("POST /v1/trial-proposals/{proposalId}/outcome/decision", api.decideTrialOutcome)
 	routes.HandleFunc("GET /v1/auth/github/start", api.startGitHubAuth)
 	routes.HandleFunc("GET /v1/auth/github/callback", api.finishGitHubAuth)
 	routes.HandleFunc("GET /v1/session", api.currentSession)
@@ -132,6 +138,8 @@ func New(repository openings.Repository, openingManager OpeningManager, applicat
 	routes.HandleFunc("OPTIONS /v1/openings/{id}/trial-proposals", api.preflight)
 	routes.HandleFunc("OPTIONS /v1/openings/{id}/trial-proposals/{proposalId}/decision", api.preflight)
 	routes.HandleFunc("OPTIONS /v1/trial-proposals/{proposalId}/check-ins", api.preflight)
+	routes.HandleFunc("OPTIONS /v1/trial-proposals/{proposalId}/outcome", api.preflight)
+	routes.HandleFunc("OPTIONS /v1/trial-proposals/{proposalId}/outcome/decision", api.preflight)
 	routes.HandleFunc("/", api.notFound)
 
 	return api.recoverPanics(api.logRequests(api.cors(routes)))

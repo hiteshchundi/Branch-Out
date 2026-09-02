@@ -7,6 +7,9 @@ import {
   decideTrialProposal,
   addTrialCheckIn,
   listTrialCheckIns,
+  createTrialOutcome,
+  decideTrialOutcome,
+  loadTrialOutcome,
   TrialProposalAPIError,
   type TrialProposalInput,
 } from './trial-proposals';
@@ -109,6 +112,32 @@ describe('trial proposal API client', () => {
     expect(fetcher).toHaveBeenLastCalledWith(
       `http://localhost:8080/v1/trial-proposals/${proposal.id}/check-ins`,
       expect.objectContaining({ method: 'POST', credentials: 'include' }),
+    );
+  });
+
+  it('loads, submits, and confirms a private trial outcome', async () => {
+    const outcomeInput = {
+      outcomeStatus: 'completed', deliverableStatus: 'met',
+      workSummary: 'Delivered the agreed comparison flow with focused tests and review notes.',
+      evidenceUrl: '', closeoutNotes: 'Repository access can be removed after the documented handoff.',
+    } as const;
+    const pending = {
+      id: '92929292-9292-4292-a292-929292929292', proposalId: proposal.id, input: outcomeInput,
+      reviewStatus: 'pending', submittedBy: { displayName: 'Asha Rao' }, submittedByRole: 'applicant',
+      submittedByCurrentUser: true, canDecide: false, submittedAt: '2026-09-15T10:00:00Z', decidedAt: null,
+    } as const;
+    const confirmed = { ...pending, reviewStatus: 'confirmed', submittedByCurrentUser: false, decidedAt: '2026-09-15T11:00:00Z' } as const;
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: pending }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: pending }), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: confirmed }), { status: 200 }));
+    vi.stubGlobal('fetch', fetcher);
+    await expect(loadTrialOutcome(proposal.id)).resolves.toEqual(pending);
+    await expect(createTrialOutcome(proposal.id, outcomeInput)).resolves.toEqual(pending);
+    await expect(decideTrialOutcome(proposal.id, 'confirmed')).resolves.toEqual(confirmed);
+    expect(fetcher).toHaveBeenLastCalledWith(
+      `http://localhost:8080/v1/trial-proposals/${proposal.id}/outcome/decision`,
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ decision: 'confirmed' }) }),
     );
   });
 });

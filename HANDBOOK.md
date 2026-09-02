@@ -488,6 +488,21 @@ Entries cannot be edited or deleted, which preserves the shared execution
 history. The log does not itself complete a trial, publish evidence, or create a
 trust signal.
 
+### Submit and review the factual closeout
+
+Below the execution log, either participant can submit the trial's one private
+outcome record. The form requires the trial result, deliverable result, a
+30–1000 character description of delivered work, and 20–1000 characters about
+handoff or remaining work. One optional evidence link may use HTTP or HTTPS.
+
+Submission requires a separate confirmation and makes the record read-only. The
+person who submitted it cannot decide it. The other participant can select
+**Confirm outcome** or **Dispute outcome**, review a permanent-action
+confirmation, and record that decision once. A confirmed result means both
+people agreed to this factual private record. A disputed result preserves the
+disagreement and cannot support a trust signal. Neither state publishes
+feedback, evidence, or a badge.
+
 ## Review a trial outcome
 
 **What it is:** A project-specific post-trial review that connects observable
@@ -738,8 +753,10 @@ configuration, and operating details live in `backend/README.md`.
 - Accepted applicants can send one trial proposal and opening owners can accept
   or decline once. Mutually accepted proposals have a participant-only,
   immutable progress/blocker/milestone log. Editing or deleting check-ins,
-  completion decisions, counterproposals, replacements, and electronic
-  signatures are not available.
+  file uploads, and check-in revisions are unavailable. Either participant can
+  submit one factual closeout and only the counterpart can confirm or dispute it
+  once. Outcome revisions, dispute resolution, counterproposals, replacements,
+  and electronic signatures are not available.
 - Outcome feedback and trust-signal candidates cannot be mutually confirmed,
   moderated, or published.
 - Saved openings do not synchronize between browsers or devices.

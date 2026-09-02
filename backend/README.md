@@ -78,6 +78,9 @@ checks PostgreSQL on every request and returns HTTP 503 with
 - `POST /v1/openings/{id}/trial-proposals/{proposalId}/decision` — irreversibly accept or decline a sent proposal
 - `GET /v1/trial-proposals/{proposalId}/check-ins` — list the accepted trial's participant-only execution log
 - `POST /v1/trial-proposals/{proposalId}/check-ins` — append an immutable progress, blocker, or milestone check-in
+- `GET /v1/trial-proposals/{proposalId}/outcome` — load the participant-only factual closeout
+- `POST /v1/trial-proposals/{proposalId}/outcome` — submit the accepted trial's one immutable outcome
+- `POST /v1/trial-proposals/{proposalId}/outcome/decision` — let only the counterpart confirm or dispute once
 
 Discovery accepts optional filters. Structured values use the labels already
 shown by the frontend.
@@ -148,6 +151,13 @@ applicant or opening owner. The database scopes every list and insert to that
 participant relationship. Entries are append-only, timestamped, and categorized
 as progress, blocker, or milestone; an optional evidence URL must use HTTP or
 HTTPS. Check-ins do not complete the trial or publish evidence.
+
+Outcome routes use the same accepted-proposal participant scope. Either
+participant can create the proposal's single factual closeout, but conflict-safe
+insertion prevents replacements. Only the other participant can move a pending
+outcome to `confirmed` or `disputed`; submitters cannot self-confirm and the
+first decision cannot be repeated. Both states remain private and publish no
+feedback or trust signal.
 
 The complete contract is in [`openapi.yaml`](openapi.yaml).
 
@@ -267,5 +277,7 @@ load its final state. Opening owners can review only sent proposals and accept
 or decline once. A mutually accepted proposal then exposes an immutable private
 execution log to exactly the applicant and opening owner. Either participant can
 append progress, blocker, or milestone check-ins with an optional safe evidence
-URL. Editing or deleting check-ins, completion decisions, counterproposals, and
-signatures remain outside this milestone.
+URL. Either participant can submit one factual closeout and only the counterpart
+can confirm or dispute it once. Editing or deleting check-ins, outcome revisions,
+dispute resolution, counterproposals, and signatures remain outside this
+milestone.

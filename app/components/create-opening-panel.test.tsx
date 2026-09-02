@@ -8,6 +8,8 @@ import {
   validateOpeningStep,
 } from './create-opening-panel';
 
+vi.mock('./trial-check-in-log', () => ({ TrialCheckInLog: () => <section aria-label="Trial execution test boundary" /> }));
+
 const completeDraft: OpeningDraft = {
   projectName: 'Climate mapper',
   problem: 'Help local teams understand climate risks with clear regional data.',

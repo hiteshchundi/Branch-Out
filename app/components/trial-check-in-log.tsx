@@ -8,6 +8,7 @@ import {
   type TrialCheckIn,
   type TrialCheckInInput,
 } from '../data/trial-proposals';
+import { TrialOutcomeCloseout } from './trial-outcome-closeout';
 
 const emptyInput: TrialCheckInInput = { kind: 'progress', update: '', evidenceUrl: '' };
 
@@ -104,6 +105,7 @@ export function TrialCheckInLog({ proposalId }: { proposalId: string }) {
           {message && <p aria-live="polite" className="save-message">{message}</p>}
         </form>
       )}
+      <TrialOutcomeCloseout proposalId={proposalId} />
     </section>
   );
 }

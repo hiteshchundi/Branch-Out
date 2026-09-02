@@ -43,6 +43,27 @@ export type TrialCheckIn = TrialCheckInInput & {
   createdAt: string;
 };
 
+export type TrialOutcomeInput = {
+  outcomeStatus: 'completed' | 'partially_completed' | 'stopped_early';
+  deliverableStatus: 'met' | 'partially_met' | 'not_met';
+  workSummary: string;
+  evidenceUrl: string;
+  closeoutNotes: string;
+};
+
+export type TrialOutcome = {
+  id: string;
+  proposalId: string;
+  input: TrialOutcomeInput;
+  reviewStatus: 'pending' | 'confirmed' | 'disputed';
+  submittedBy: { displayName: string };
+  submittedByRole: 'applicant' | 'owner';
+  submittedByCurrentUser: boolean;
+  canDecide: boolean;
+  submittedAt: string;
+  decidedAt: string | null;
+};
+
 type APIEnvelope = { data?: unknown };
 type APIErrorEnvelope = { error?: { code?: unknown; field?: unknown } };
 
@@ -140,6 +161,40 @@ function isHTTPURL(value: string) {
   } catch {
     return false;
   }
+}
+
+function parseTrialOutcome(value: unknown): TrialOutcome {
+  if (!value || typeof value !== 'object') throw new Error('The API returned an invalid trial outcome.');
+  const outcome = value as Record<string, unknown>;
+  const input = outcome.input as Record<string, unknown> | undefined;
+  const submittedBy = outcome.submittedBy as Record<string, unknown> | undefined;
+  if (
+    typeof outcome.id !== 'string'
+    || typeof outcome.proposalId !== 'string'
+    || !input
+    || !['completed', 'partially_completed', 'stopped_early'].includes(input.outcomeStatus as string)
+    || !['met', 'partially_met', 'not_met'].includes(input.deliverableStatus as string)
+    || typeof input.workSummary !== 'string'
+    || typeof input.evidenceUrl !== 'string'
+    || (input.evidenceUrl !== '' && !isHTTPURL(input.evidenceUrl))
+    || typeof input.closeoutNotes !== 'string'
+    || !['pending', 'confirmed', 'disputed'].includes(outcome.reviewStatus as string)
+    || !submittedBy
+    || typeof submittedBy.displayName !== 'string'
+    || !['applicant', 'owner'].includes(outcome.submittedByRole as string)
+    || typeof outcome.submittedByCurrentUser !== 'boolean'
+    || typeof outcome.canDecide !== 'boolean'
+    || typeof outcome.submittedAt !== 'string'
+    || (outcome.decidedAt !== null && typeof outcome.decidedAt !== 'string')
+  ) throw new Error('The API returned an invalid trial outcome.');
+  const reviewStatus = outcome.reviewStatus as TrialOutcome['reviewStatus'];
+  if (
+    (reviewStatus === 'pending' && outcome.decidedAt !== null)
+    || (reviewStatus !== 'pending' && typeof outcome.decidedAt !== 'string')
+    || (outcome.submittedByCurrentUser === true && outcome.canDecide === true)
+    || (reviewStatus !== 'pending' && outcome.canDecide === true)
+  ) throw new Error('The API returned an invalid trial outcome lifecycle.');
+  return outcome as TrialOutcome;
 }
 
 async function parseError(response: Response) {
@@ -242,4 +297,41 @@ export async function addTrialCheckIn(proposalId: string, input: TrialCheckInInp
   if (!response.ok) throw await parseError(response);
   const body = await response.json() as APIEnvelope;
   return parseTrialCheckIn(body.data);
+}
+
+export async function loadTrialOutcome(proposalId: string, signal?: AbortSignal) {
+  const response = await fetch(
+    `${getAPIBaseURL()}/v1/trial-proposals/${encodeURIComponent(proposalId)}/outcome`,
+    { credentials: 'include', headers: { Accept: 'application/json' }, signal },
+  );
+  if (response.status === 404) return null;
+  if (!response.ok) throw await parseError(response);
+  const body = await response.json() as APIEnvelope;
+  return parseTrialOutcome(body.data);
+}
+
+export async function createTrialOutcome(proposalId: string, input: TrialOutcomeInput) {
+  const response = await fetch(
+    `${getAPIBaseURL()}/v1/trial-proposals/${encodeURIComponent(proposalId)}/outcome`,
+    {
+      body: JSON.stringify(input), credentials: 'include',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, method: 'POST',
+    },
+  );
+  if (!response.ok) throw await parseError(response);
+  const body = await response.json() as APIEnvelope;
+  return parseTrialOutcome(body.data);
+}
+
+export async function decideTrialOutcome(proposalId: string, decision: 'confirmed' | 'disputed') {
+  const response = await fetch(
+    `${getAPIBaseURL()}/v1/trial-proposals/${encodeURIComponent(proposalId)}/outcome/decision`,
+    {
+      body: JSON.stringify({ decision }), credentials: 'include',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, method: 'POST',
+    },
+  );
+  if (!response.ok) throw await parseError(response);
+  const body = await response.json() as APIEnvelope;
+  return parseTrialOutcome(body.data);
 }

@@ -88,6 +88,183 @@ func (q *Queries) CreateTrialCheckInForParticipant(ctx context.Context, arg Crea
 	return i, err
 }
 
+const createTrialOutcomeForParticipant = `-- name: CreateTrialOutcomeForParticipant :one
+WITH inserted AS (
+    INSERT INTO trial_outcomes (
+        id, proposal_id, submitted_by_user_id, outcome_status,
+        deliverable_status, work_summary, evidence_url, closeout_notes
+    )
+    SELECT
+        $1, proposal.id, $2,
+        $3, $4,
+        $5, $6, $7
+    FROM trial_proposals AS proposal
+    JOIN project_openings AS opening ON opening.id = proposal.opening_id
+    WHERE proposal.id = $8
+      AND proposal.proposal_status = 'accepted'
+      AND (
+          proposal.applicant_user_id = $2
+          OR opening.owner_user_id = $2
+      )
+    ON CONFLICT (proposal_id) DO NOTHING
+    RETURNING id, proposal_id, submitted_by_user_id, outcome_status, deliverable_status, work_summary, evidence_url, closeout_notes, review_status, decided_by_user_id, submitted_at, decided_at
+)
+SELECT
+    inserted.id, inserted.proposal_id, inserted.submitted_by_user_id,
+    inserted.outcome_status, inserted.deliverable_status, inserted.work_summary,
+    inserted.evidence_url, inserted.closeout_notes, inserted.review_status,
+    inserted.submitted_at, inserted.decided_at,
+    profiles.display_name AS submitted_by_display_name,
+    CASE
+        WHEN inserted.submitted_by_user_id = proposal.applicant_user_id THEN 'applicant'
+        ELSE 'owner'
+    END AS submitted_by_role,
+    false AS can_decide
+FROM inserted
+JOIN trial_proposals AS proposal ON proposal.id = inserted.proposal_id
+JOIN profiles ON profiles.user_id = inserted.submitted_by_user_id
+`
+
+type CreateTrialOutcomeForParticipantParams struct {
+	ID                string `db:"id" json:"id"`
+	SubmittedByUserID int64  `db:"submitted_by_user_id" json:"submitted_by_user_id"`
+	OutcomeStatus     string `db:"outcome_status" json:"outcome_status"`
+	DeliverableStatus string `db:"deliverable_status" json:"deliverable_status"`
+	WorkSummary       string `db:"work_summary" json:"work_summary"`
+	EvidenceUrl       string `db:"evidence_url" json:"evidence_url"`
+	CloseoutNotes     string `db:"closeout_notes" json:"closeout_notes"`
+	ProposalID        string `db:"proposal_id" json:"proposal_id"`
+}
+
+type CreateTrialOutcomeForParticipantRow struct {
+	ID                     string             `db:"id" json:"id"`
+	ProposalID             string             `db:"proposal_id" json:"proposal_id"`
+	SubmittedByUserID      int64              `db:"submitted_by_user_id" json:"submitted_by_user_id"`
+	OutcomeStatus          string             `db:"outcome_status" json:"outcome_status"`
+	DeliverableStatus      string             `db:"deliverable_status" json:"deliverable_status"`
+	WorkSummary            string             `db:"work_summary" json:"work_summary"`
+	EvidenceUrl            string             `db:"evidence_url" json:"evidence_url"`
+	CloseoutNotes          string             `db:"closeout_notes" json:"closeout_notes"`
+	ReviewStatus           string             `db:"review_status" json:"review_status"`
+	SubmittedAt            time.Time          `db:"submitted_at" json:"submitted_at"`
+	DecidedAt              pgtype.Timestamptz `db:"decided_at" json:"decided_at"`
+	SubmittedByDisplayName string             `db:"submitted_by_display_name" json:"submitted_by_display_name"`
+	SubmittedByRole        string             `db:"submitted_by_role" json:"submitted_by_role"`
+	CanDecide              bool               `db:"can_decide" json:"can_decide"`
+}
+
+func (q *Queries) CreateTrialOutcomeForParticipant(ctx context.Context, arg CreateTrialOutcomeForParticipantParams) (CreateTrialOutcomeForParticipantRow, error) {
+	row := q.db.QueryRow(ctx, createTrialOutcomeForParticipant,
+		arg.ID,
+		arg.SubmittedByUserID,
+		arg.OutcomeStatus,
+		arg.DeliverableStatus,
+		arg.WorkSummary,
+		arg.EvidenceUrl,
+		arg.CloseoutNotes,
+		arg.ProposalID,
+	)
+	var i CreateTrialOutcomeForParticipantRow
+	err := row.Scan(
+		&i.ID,
+		&i.ProposalID,
+		&i.SubmittedByUserID,
+		&i.OutcomeStatus,
+		&i.DeliverableStatus,
+		&i.WorkSummary,
+		&i.EvidenceUrl,
+		&i.CloseoutNotes,
+		&i.ReviewStatus,
+		&i.SubmittedAt,
+		&i.DecidedAt,
+		&i.SubmittedByDisplayName,
+		&i.SubmittedByRole,
+		&i.CanDecide,
+	)
+	return i, err
+}
+
+const decideTrialOutcomeForParticipant = `-- name: DecideTrialOutcomeForParticipant :one
+WITH decided AS (
+    UPDATE trial_outcomes AS outcome SET
+        review_status = $1,
+        decided_by_user_id = $2,
+        decided_at = now()
+    FROM trial_proposals AS proposal
+    JOIN project_openings AS opening ON opening.id = proposal.opening_id
+    WHERE outcome.proposal_id = $3
+      AND proposal.id = outcome.proposal_id
+      AND proposal.proposal_status = 'accepted'
+      AND outcome.review_status = 'pending'
+      AND outcome.submitted_by_user_id <> $2
+      AND (
+          proposal.applicant_user_id = $2
+          OR opening.owner_user_id = $2
+      )
+      AND $1::text IN ('confirmed', 'disputed')
+    RETURNING outcome.id, outcome.proposal_id, outcome.submitted_by_user_id, outcome.outcome_status, outcome.deliverable_status, outcome.work_summary, outcome.evidence_url, outcome.closeout_notes, outcome.review_status, outcome.decided_by_user_id, outcome.submitted_at, outcome.decided_at
+)
+SELECT
+    decided.id, decided.proposal_id, decided.submitted_by_user_id,
+    decided.outcome_status, decided.deliverable_status, decided.work_summary,
+    decided.evidence_url, decided.closeout_notes, decided.review_status,
+    decided.submitted_at, decided.decided_at,
+    profiles.display_name AS submitted_by_display_name,
+    CASE
+        WHEN decided.submitted_by_user_id = proposal.applicant_user_id THEN 'applicant'
+        ELSE 'owner'
+    END AS submitted_by_role,
+    false AS can_decide
+FROM decided
+JOIN trial_proposals AS proposal ON proposal.id = decided.proposal_id
+JOIN profiles ON profiles.user_id = decided.submitted_by_user_id
+`
+
+type DecideTrialOutcomeForParticipantParams struct {
+	Decision          string `db:"decision" json:"decision"`
+	ParticipantUserID *int64 `db:"participant_user_id" json:"participant_user_id"`
+	ProposalID        string `db:"proposal_id" json:"proposal_id"`
+}
+
+type DecideTrialOutcomeForParticipantRow struct {
+	ID                     string             `db:"id" json:"id"`
+	ProposalID             string             `db:"proposal_id" json:"proposal_id"`
+	SubmittedByUserID      int64              `db:"submitted_by_user_id" json:"submitted_by_user_id"`
+	OutcomeStatus          string             `db:"outcome_status" json:"outcome_status"`
+	DeliverableStatus      string             `db:"deliverable_status" json:"deliverable_status"`
+	WorkSummary            string             `db:"work_summary" json:"work_summary"`
+	EvidenceUrl            string             `db:"evidence_url" json:"evidence_url"`
+	CloseoutNotes          string             `db:"closeout_notes" json:"closeout_notes"`
+	ReviewStatus           string             `db:"review_status" json:"review_status"`
+	SubmittedAt            time.Time          `db:"submitted_at" json:"submitted_at"`
+	DecidedAt              pgtype.Timestamptz `db:"decided_at" json:"decided_at"`
+	SubmittedByDisplayName string             `db:"submitted_by_display_name" json:"submitted_by_display_name"`
+	SubmittedByRole        string             `db:"submitted_by_role" json:"submitted_by_role"`
+	CanDecide              bool               `db:"can_decide" json:"can_decide"`
+}
+
+func (q *Queries) DecideTrialOutcomeForParticipant(ctx context.Context, arg DecideTrialOutcomeForParticipantParams) (DecideTrialOutcomeForParticipantRow, error) {
+	row := q.db.QueryRow(ctx, decideTrialOutcomeForParticipant, arg.Decision, arg.ParticipantUserID, arg.ProposalID)
+	var i DecideTrialOutcomeForParticipantRow
+	err := row.Scan(
+		&i.ID,
+		&i.ProposalID,
+		&i.SubmittedByUserID,
+		&i.OutcomeStatus,
+		&i.DeliverableStatus,
+		&i.WorkSummary,
+		&i.EvidenceUrl,
+		&i.CloseoutNotes,
+		&i.ReviewStatus,
+		&i.SubmittedAt,
+		&i.DecidedAt,
+		&i.SubmittedByDisplayName,
+		&i.SubmittedByRole,
+		&i.CanDecide,
+	)
+	return i, err
+}
+
 const decideTrialProposalForOwner = `-- name: DecideTrialProposalForOwner :one
 UPDATE trial_proposals AS proposal SET
     proposal_status = $1,
@@ -211,6 +388,77 @@ func (q *Queries) GetOwnedOpeningTrialProposalReviewScope(ctx context.Context, a
 	var id string
 	err := row.Scan(&id)
 	return id, err
+}
+
+const getTrialOutcomeForParticipant = `-- name: GetTrialOutcomeForParticipant :one
+SELECT
+    outcome.id, outcome.proposal_id, outcome.submitted_by_user_id,
+    outcome.outcome_status, outcome.deliverable_status, outcome.work_summary,
+    outcome.evidence_url, outcome.closeout_notes, outcome.review_status,
+    outcome.submitted_at, outcome.decided_at,
+    profiles.display_name AS submitted_by_display_name,
+    CASE
+        WHEN outcome.submitted_by_user_id = proposal.applicant_user_id THEN 'applicant'
+        ELSE 'owner'
+    END AS submitted_by_role,
+    (
+        outcome.review_status = 'pending'
+        AND outcome.submitted_by_user_id <> $1
+    ) AS can_decide
+FROM trial_outcomes AS outcome
+JOIN trial_proposals AS proposal ON proposal.id = outcome.proposal_id
+JOIN project_openings AS opening ON opening.id = proposal.opening_id
+JOIN profiles ON profiles.user_id = outcome.submitted_by_user_id
+WHERE outcome.proposal_id = $2
+  AND proposal.proposal_status = 'accepted'
+  AND (
+      proposal.applicant_user_id = $1
+      OR opening.owner_user_id = $1
+  )
+`
+
+type GetTrialOutcomeForParticipantParams struct {
+	ParticipantUserID int64  `db:"participant_user_id" json:"participant_user_id"`
+	ProposalID        string `db:"proposal_id" json:"proposal_id"`
+}
+
+type GetTrialOutcomeForParticipantRow struct {
+	ID                     string             `db:"id" json:"id"`
+	ProposalID             string             `db:"proposal_id" json:"proposal_id"`
+	SubmittedByUserID      int64              `db:"submitted_by_user_id" json:"submitted_by_user_id"`
+	OutcomeStatus          string             `db:"outcome_status" json:"outcome_status"`
+	DeliverableStatus      string             `db:"deliverable_status" json:"deliverable_status"`
+	WorkSummary            string             `db:"work_summary" json:"work_summary"`
+	EvidenceUrl            string             `db:"evidence_url" json:"evidence_url"`
+	CloseoutNotes          string             `db:"closeout_notes" json:"closeout_notes"`
+	ReviewStatus           string             `db:"review_status" json:"review_status"`
+	SubmittedAt            time.Time          `db:"submitted_at" json:"submitted_at"`
+	DecidedAt              pgtype.Timestamptz `db:"decided_at" json:"decided_at"`
+	SubmittedByDisplayName string             `db:"submitted_by_display_name" json:"submitted_by_display_name"`
+	SubmittedByRole        string             `db:"submitted_by_role" json:"submitted_by_role"`
+	CanDecide              *bool              `db:"can_decide" json:"can_decide"`
+}
+
+func (q *Queries) GetTrialOutcomeForParticipant(ctx context.Context, arg GetTrialOutcomeForParticipantParams) (GetTrialOutcomeForParticipantRow, error) {
+	row := q.db.QueryRow(ctx, getTrialOutcomeForParticipant, arg.ParticipantUserID, arg.ProposalID)
+	var i GetTrialOutcomeForParticipantRow
+	err := row.Scan(
+		&i.ID,
+		&i.ProposalID,
+		&i.SubmittedByUserID,
+		&i.OutcomeStatus,
+		&i.DeliverableStatus,
+		&i.WorkSummary,
+		&i.EvidenceUrl,
+		&i.CloseoutNotes,
+		&i.ReviewStatus,
+		&i.SubmittedAt,
+		&i.DecidedAt,
+		&i.SubmittedByDisplayName,
+		&i.SubmittedByRole,
+		&i.CanDecide,
+	)
+	return i, err
 }
 
 const getTrialWorkspaceForParticipant = `-- name: GetTrialWorkspaceForParticipant :one
