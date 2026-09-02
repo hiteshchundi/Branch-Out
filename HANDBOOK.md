@@ -523,6 +523,23 @@ Acknowledgement records delivery only: it does not approve, endorse, or alter
 the review. Neither review is published, scored, or turned into a badge. Public
 trust signals remain unavailable until moderation and publication controls exist.
 
+### Review the private account-backed candidate
+
+The workspace shows a readiness explanation until both reviews are submitted and
+each counterpart acknowledges receipt. It then derives one private trial-level
+candidate from fixed rules:
+
+- **Collaboration Proven candidate:** completed trial, met deliverable, both
+  participants chose **Yes** to collaborating again, and at least two behavior
+  labels were independently selected by both
+- **Work Demonstrated candidate:** completed or partially completed work that
+  does not satisfy every Collaboration Proven rule
+- **No trust signal candidate:** a stopped-early outcome
+
+Every factor appears beside the result. Branch-Out stores no numeric or hidden
+score. This candidate is not a profile badge and cannot be published; moderation
+and publication controls remain a separate future phase.
+
 ## Review a trial outcome
 
 **What it is:** A project-specific post-trial review that connects observable
@@ -777,9 +794,10 @@ configuration, and operating details live in `backend/README.md`.
   submit one factual closeout and only the counterpart can confirm or dispute it
   once. Outcome revisions, dispute resolution, counterproposals, replacements,
   and electronic signatures are not available.
-- Confirmed trials support private account-backed participant reviews and
-  receipt acknowledgement. Feedback cannot be edited, moderated, scored, or
-  published, and trust-signal candidates remain preview-only.
+- Confirmed trials support private account-backed participant reviews, receipt
+  acknowledgement, and a transparent trial-level candidate. Feedback and the
+  candidate cannot be edited, moderated, converted to profile reputation, or
+  published.
 - Saved openings do not synchronize between browsers or devices.
 - Early-access email addresses are not transmitted or stored.
 - Notification and moderation flows do not exist yet.

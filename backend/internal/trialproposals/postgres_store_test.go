@@ -213,6 +213,17 @@ func TestPostgresTrialProposalLifecycle(t *testing.T) {
 	if err != nil || len(applicantFeedbackView) != 2 || !applicantFeedbackView[1].CanAcknowledge {
 		t.Fatalf("applicant ListFeedback() = %#v, %v", applicantFeedbackView, err)
 	}
+	pendingCandidate, err := manager.GetTrustCandidate(ctx, applicant.ID, proposal.ID)
+	if err != nil || pendingCandidate.Ready || pendingCandidate.Kind != "not_ready" {
+		t.Fatalf("pending GetTrustCandidate() = %#v, %v", pendingCandidate, err)
+	}
+	if _, err := manager.AcknowledgeFeedback(ctx, applicant.ID, proposal.ID, ownerFeedback.ID); err != nil {
+		t.Fatalf("applicant AcknowledgeFeedback() error = %v", err)
+	}
+	readyCandidate, err := manager.GetTrustCandidate(ctx, owner.ID, proposal.ID)
+	if err != nil || !readyCandidate.Ready || readyCandidate.Kind != "work_demonstrated" {
+		t.Fatalf("ready GetTrustCandidate() = %#v, %v", readyCandidate, err)
+	}
 }
 
 func validPostgresFeedbackInput() FeedbackInput {

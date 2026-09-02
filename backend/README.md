@@ -84,6 +84,7 @@ checks PostgreSQL on every request and returns HTTP 503 with
 - `GET /v1/trial-proposals/{proposalId}/feedback` — privately list feedback after a confirmed outcome
 - `POST /v1/trial-proposals/{proposalId}/feedback` — submit each participant's one immutable private review
 - `POST /v1/trial-proposals/{proposalId}/feedback/{feedbackId}/acknowledge` — acknowledge receipt without implying agreement
+- `GET /v1/trial-proposals/{proposalId}/trust-candidate` — derive a private, transparent trial-level candidate
 
 Discovery accepts optional filters. Structured values use the labels already
 shown by the frontend.
@@ -161,6 +162,13 @@ insertion prevents replacements. Only the other participant can move a pending
 outcome to `confirmed` or `disputed`; submitters cannot self-confirm and the
 first decision cannot be repeated. Both states remain private and publish no
 feedback or trust signal.
+
+After a confirmed outcome, each participant can submit one immutable private
+review and acknowledge receiving the counterpart's review. Once both reviews
+and acknowledgements exist, the trust-candidate route applies fixed, visible
+rules to the immutable data. It returns readiness, a candidate kind, and every
+factor used. It persists no score and cannot publish feedback, a profile signal,
+or a badge.
 
 The complete contract is in [`openapi.yaml`](openapi.yaml).
 

@@ -154,6 +154,15 @@ type FeedbackRecord struct {
 	Input        FeedbackInput
 }
 
+type TrustCandidate struct {
+	ProposalID  string   `json:"proposalId"`
+	Ready       bool     `json:"ready"`
+	Kind        string   `json:"kind"`
+	Title       string   `json:"title"`
+	Explanation string   `json:"explanation"`
+	Factors     []string `json:"factors"`
+}
+
 type Record struct {
 	Proposal
 	ApplicantUserID int64
@@ -309,6 +318,95 @@ func (manager *Manager) AcknowledgeFeedback(ctx context.Context, userID int64, p
 		return Feedback{}, ErrFeedbackAcknowledgeUnavailable
 	}
 	return manager.store.AcknowledgeFeedback(ctx, userID, proposalID, feedbackID)
+}
+
+func (manager *Manager) GetTrustCandidate(ctx context.Context, userID int64, proposalID string) (TrustCandidate, error) {
+	proposalID = strings.TrimSpace(proposalID)
+	if proposalID == "" {
+		return TrustCandidate{}, ErrOutcomeNotFound
+	}
+	outcome, err := manager.store.GetOutcome(ctx, userID, proposalID)
+	if err != nil {
+		return TrustCandidate{}, err
+	}
+	feedback, err := manager.store.ListFeedback(ctx, userID, proposalID)
+	if err != nil {
+		return TrustCandidate{}, err
+	}
+	return deriveTrustCandidate(outcome, feedback), nil
+}
+
+func deriveTrustCandidate(outcome Outcome, feedback []Feedback) TrustCandidate {
+	result := TrustCandidate{
+		ProposalID: outcome.ProposalID, Kind: "not_ready", Title: "Trust candidate not ready",
+		Factors: []string{
+			"Outcome: " + readableOutcomeStatus(outcome.Input.OutcomeStatus),
+			"Deliverable: " + readableDeliverableStatus(outcome.Input.DeliverableStatus),
+		},
+	}
+	if outcome.ReviewStatus != "confirmed" {
+		result.Explanation = "Both participants must first confirm the factual trial outcome."
+		return result
+	}
+	if len(feedback) != 2 {
+		result.Explanation = "Both participants must submit one private review."
+		result.Factors = append(result.Factors, fmt.Sprintf("Private reviews: %d of 2", len(feedback)))
+		return result
+	}
+	for _, review := range feedback {
+		if review.AcknowledgedAt == nil {
+			result.Explanation = "Each participant must acknowledge receiving the counterpart's private review."
+			result.Factors = append(result.Factors, "Counterpart acknowledgements: incomplete")
+			return result
+		}
+	}
+
+	shared := sharedBehaviors(feedback[0].Input.ObservedBehaviors, feedback[1].Input.ObservedBehaviors)
+	bothYes := feedback[0].Input.CollaborateAgain == "yes" && feedback[1].Input.CollaborateAgain == "yes"
+	result.Ready = true
+	result.Factors = append(result.Factors,
+		"Both private reviews submitted and acknowledged",
+		fmt.Sprintf("Shared observed behaviors: %d", len(shared)),
+		"Both would collaborate again: "+map[bool]string{true: "Yes", false: "No"}[bothYes],
+	)
+	if outcome.Input.OutcomeStatus == "completed" && outcome.Input.DeliverableStatus == "met" && len(shared) >= 2 && bothYes {
+		result.Kind = "collaboration_proven"
+		result.Title = "Collaboration Proven candidate"
+		result.Explanation = "Every visible collaboration-evidence rule is satisfied. This remains private and requires moderation before any publication."
+		return result
+	}
+	if outcome.Input.OutcomeStatus == "completed" || outcome.Input.OutcomeStatus == "partially_completed" {
+		result.Kind = "work_demonstrated"
+		result.Title = "Work Demonstrated candidate"
+		result.Explanation = "The confirmed outcome supports a work-evidence review, but not every Collaboration Proven rule is satisfied."
+		return result
+	}
+	result.Kind = "no_signal"
+	result.Title = "No trust signal candidate"
+	result.Explanation = "The confirmed outcome does not support a trust signal. The private learning remains available to the participants."
+	return result
+}
+
+func sharedBehaviors(first, second []string) []string {
+	secondSet := make(map[string]bool, len(second))
+	for _, value := range second {
+		secondSet[value] = true
+	}
+	shared := make([]string, 0, len(first))
+	for _, value := range first {
+		if secondSet[value] {
+			shared = append(shared, value)
+		}
+	}
+	return shared
+}
+
+func readableOutcomeStatus(value string) string {
+	return map[string]string{"completed": "Completed", "partially_completed": "Partially completed", "stopped_early": "Stopped early"}[value]
+}
+
+func readableDeliverableStatus(value string) string {
+	return map[string]string{"met": "Met", "partially_met": "Partially met", "not_met": "Not met"}[value]
 }
 
 func normalizeFeedbackInput(input FeedbackInput) (FeedbackInput, error) {

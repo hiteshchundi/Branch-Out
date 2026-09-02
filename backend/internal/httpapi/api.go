@@ -68,6 +68,7 @@ type TrialProposalManager interface {
 	ListFeedback(context.Context, int64, string) ([]trialproposals.Feedback, error)
 	CreateFeedback(context.Context, int64, string, trialproposals.FeedbackInput) (trialproposals.Feedback, error)
 	AcknowledgeFeedback(context.Context, int64, string, string) (trialproposals.Feedback, error)
+	GetTrustCandidate(context.Context, int64, string) (trialproposals.TrustCandidate, error)
 }
 
 type listResponse struct {
@@ -121,6 +122,7 @@ func New(repository openings.Repository, openingManager OpeningManager, applicat
 	routes.HandleFunc("GET /v1/trial-proposals/{proposalId}/feedback", api.listTrialFeedback)
 	routes.HandleFunc("POST /v1/trial-proposals/{proposalId}/feedback", api.createTrialFeedback)
 	routes.HandleFunc("POST /v1/trial-proposals/{proposalId}/feedback/{feedbackId}/acknowledge", api.acknowledgeTrialFeedback)
+	routes.HandleFunc("GET /v1/trial-proposals/{proposalId}/trust-candidate", api.getTrialTrustCandidate)
 	routes.HandleFunc("GET /v1/auth/github/start", api.startGitHubAuth)
 	routes.HandleFunc("GET /v1/auth/github/callback", api.finishGitHubAuth)
 	routes.HandleFunc("GET /v1/session", api.currentSession)
@@ -148,6 +150,7 @@ func New(repository openings.Repository, openingManager OpeningManager, applicat
 	routes.HandleFunc("OPTIONS /v1/trial-proposals/{proposalId}/outcome/decision", api.preflight)
 	routes.HandleFunc("OPTIONS /v1/trial-proposals/{proposalId}/feedback", api.preflight)
 	routes.HandleFunc("OPTIONS /v1/trial-proposals/{proposalId}/feedback/{feedbackId}/acknowledge", api.preflight)
+	routes.HandleFunc("OPTIONS /v1/trial-proposals/{proposalId}/trust-candidate", api.preflight)
 	routes.HandleFunc("/", api.notFound)
 
 	return api.recoverPanics(api.logRequests(api.cors(routes)))

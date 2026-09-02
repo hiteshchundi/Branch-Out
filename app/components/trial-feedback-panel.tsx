@@ -5,10 +5,12 @@ import {
   acknowledgeTrialFeedback,
   createTrialFeedback,
   loadTrialFeedback,
+  loadTrialTrustCandidate,
   trialFeedbackBehaviors,
   type TrialFeedback,
   type TrialFeedbackBehavior,
   type TrialFeedbackInput,
+  type TrialTrustCandidate,
 } from '../data/trial-proposals';
 
 type FeedbackDraft = Omit<TrialFeedbackInput, 'collaborateAgain'> & { collaborateAgain: TrialFeedbackInput['collaborateAgain'] | '' };
@@ -46,12 +48,13 @@ export function TrialFeedbackPanel({ proposalId }: { proposalId: string }) {
   const [pendingAcknowledgement, setPendingAcknowledgement] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [candidate, setCandidate] = useState<TrialTrustCandidate | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
     let active = true;
-    loadTrialFeedback(proposalId, controller.signal)
-      .then((result) => { if (active) { setFeedback(result); setStatus('ready'); } })
+    Promise.all([loadTrialFeedback(proposalId, controller.signal), loadTrialTrustCandidate(proposalId, controller.signal)])
+      .then(([feedbackResult, candidateResult]) => { if (active) { setFeedback(feedbackResult); setCandidate(candidateResult); setStatus('ready'); } })
       .catch((error: unknown) => {
         if (!active || (error instanceof DOMException && error.name === 'AbortError')) return;
         setStatus('error');
@@ -76,6 +79,16 @@ export function TrialFeedbackPanel({ proposalId }: { proposalId: string }) {
     setMessage('');
   };
 
+  const refreshCandidate = async () => {
+    try {
+      setCandidate(await loadTrialTrustCandidate(proposalId));
+      return true;
+    } catch {
+      setCandidate(null);
+      return false;
+    }
+  };
+
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const nextErrors = validateTrialFeedback(draft);
@@ -91,9 +104,12 @@ export function TrialFeedbackPanel({ proposalId }: { proposalId: string }) {
         reviewSummary: draft.reviewSummary.trim(),
       });
       setFeedback((current) => [...current, created]);
+      const candidateRefreshed = await refreshCandidate();
       setDraft(emptyDraft);
       setSubmissionConfirmed(false);
-      setMessage('Your private, read-only feedback was submitted.');
+      setMessage(candidateRefreshed
+        ? 'Your private, read-only feedback was submitted.'
+        : 'Your private feedback was submitted, but the trust review could not be refreshed. Reopen this workspace to retry.');
     } catch {
       setMessage('The private feedback could not be submitted. You may already have a review for this trial.');
     } finally {
@@ -108,8 +124,11 @@ export function TrialFeedbackPanel({ proposalId }: { proposalId: string }) {
     try {
       const updated = await acknowledgeTrialFeedback(proposalId, feedbackId);
       setFeedback((current) => current.map((item) => item.id === updated.id ? updated : item));
+      const candidateRefreshed = await refreshCandidate();
       setPendingAcknowledgement(null);
-      setMessage('You acknowledged receiving this private feedback. Its content was not approved or changed.');
+      setMessage(candidateRefreshed
+        ? 'You acknowledged receiving this private feedback. Its content was not approved or changed.'
+        : 'Your acknowledgement was recorded, but the trust review could not be refreshed. Reopen this workspace to retry.');
     } catch {
       setMessage('The acknowledgement could not be recorded. Reopen this workspace to refresh it.');
     } finally {
@@ -142,6 +161,15 @@ export function TrialFeedbackPanel({ proposalId }: { proposalId: string }) {
           <label className="trial-outcome-confirmation full-field"><input checked={submissionConfirmed} onChange={(event) => setSubmissionConfirmed(event.target.checked)} type="checkbox" /><span>I reviewed this feedback, excluded secrets and personal data, and understand it becomes read-only when submitted.</span></label>
           <button className="secondary-button" disabled={!submissionConfirmed || isSaving} type="submit">{isSaving ? 'Submitting feedback…' : 'Submit private feedback'}</button>
         </form>
+      )}
+      {status === 'ready' && candidate && (
+        <section aria-label="Private trust candidate" className={`trial-trust-candidate ${candidate.kind}`}>
+          <span className="eyebrow">Transparent trust review</span>
+          <h6>{candidate.title}</h6>
+          <p>{candidate.explanation}</p>
+          <div><strong>Why this appears</strong><ul>{candidate.factors.map((factor) => <li key={factor}>{factor}</li>)}</ul></div>
+          <p className="trial-check-in-boundary">This candidate is private, trial-level, and rule-based. It is not a profile score or badge and cannot be published until moderation controls exist.</p>
+        </section>
       )}
       {message && <p aria-live="polite" className="save-message">{message}</p>}
     </section>

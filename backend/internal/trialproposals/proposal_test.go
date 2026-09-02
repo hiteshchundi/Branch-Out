@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 )
 
 func validInput() Input {
@@ -270,6 +271,40 @@ func TestManagerRejectsInvalidPrivateFeedback(t *testing.T) {
 		if !errors.As(err, &fieldError) || fieldError.Field != test.field {
 			t.Fatalf("CreateFeedback() error = %v, want field %q", err, test.field)
 		}
+	}
+}
+
+func TestManagerDerivesTransparentPrivateTrustCandidates(t *testing.T) {
+	now := time.Now()
+	baseOutcome := Outcome{ProposalID: "proposal-id", ReviewStatus: "confirmed", Input: OutcomeInput{OutcomeStatus: "completed", DeliverableStatus: "met"}}
+	baseFeedback := []Feedback{
+		{Input: FeedbackInput{ObservedBehaviors: []string{"reliable_delivery", "clear_communication", "sound_scope_judgment"}, CollaborateAgain: "yes"}, AcknowledgedAt: &now},
+		{Input: FeedbackInput{ObservedBehaviors: []string{"reliable_delivery", "clear_communication", "constructive_feedback"}, CollaborateAgain: "yes"}, AcknowledgedAt: &now},
+	}
+
+	store := &fakeStore{outcome: baseOutcome, feedback: baseFeedback}
+	manager := NewManager(store)
+	result, err := manager.GetTrustCandidate(context.Background(), 7, " proposal-id ")
+	if err != nil || !result.Ready || result.Kind != "collaboration_proven" || len(result.Factors) != 5 {
+		t.Fatalf("GetTrustCandidate() = %#v, %v", result, err)
+	}
+
+	store.feedback[1].Input.CollaborateAgain = "maybe"
+	result, err = manager.GetTrustCandidate(context.Background(), 7, "proposal-id")
+	if err != nil || result.Kind != "work_demonstrated" {
+		t.Fatalf("work candidate = %#v, %v", result, err)
+	}
+
+	store.outcome.Input.OutcomeStatus = "stopped_early"
+	result, err = manager.GetTrustCandidate(context.Background(), 7, "proposal-id")
+	if err != nil || result.Kind != "no_signal" {
+		t.Fatalf("no-signal candidate = %#v, %v", result, err)
+	}
+
+	store.feedback = store.feedback[:1]
+	result, err = manager.GetTrustCandidate(context.Background(), 7, "proposal-id")
+	if err != nil || result.Ready || result.Kind != "not_ready" || !strings.Contains(result.Explanation, "Both participants") {
+		t.Fatalf("not-ready candidate = %#v, %v", result, err)
 	}
 }
 

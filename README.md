@@ -261,6 +261,13 @@ a concrete example, a collaborate-again choice, and a private summary. The other
 participant can acknowledge receipt, but acknowledgement is explicitly not
 agreement or approval. Reviews remain private and do not create a score or badge.
 
+Once both reviews are submitted and acknowledged, Branch-Out derives a private
+trial-level trust candidate with every rule shown. **Collaboration Proven**
+requires a completed trial, met deliverable, both participants choosing to
+collaborate again, and at least two behaviors independently observed by both.
+Completed or partial work can produce **Work Demonstrated**; stopped work
+produces no signal candidate. This stores no hidden score and cannot publish.
+
 ## Outcome feedback and trust candidates
 
 **Preview outcome review** inside a project's trial milestone opens a three-step
@@ -279,9 +286,9 @@ and “Yes” to collaborating again. Completed or partial work can instead beco
 The interface displays every factor and never calculates a hidden score.
 
 Each project stores a separate preview draft locally. Confirmed account-backed
-trials now support private participant feedback in the accepted-trial workspace,
-but do not publish it or derive a trust signal. Moderation and publication remain
-future work.
+trials support private participant feedback and a transparent trial-level
+candidate in the accepted-trial workspace. Neither feedback nor the candidate
+can be published; moderation and publication remain future work.
 
 ## Current boundaries
 
@@ -315,6 +322,7 @@ future work.
   acknowledge receipt of the other's review without implying agreement.
   Outcome revisions, dispute resolution, counterproposals, signatures, and
   replacement proposals are not implemented.
-- Outcome-review previews and trust candidates stay local. Account-backed
-  participant reviews remain private and are not scored, moderated, or published.
+- Outcome-review previews stay local. Account-backed participant reviews and
+  their transparent trial-level candidate remain private and cannot be edited,
+  moderated, converted to profile reputation, or published.
 - Saved openings stay only in the current browser and are not synchronized.

@@ -14,6 +14,16 @@ const feedback = {
   author: { displayName: 'Asha Rao' }, authorRole: 'applicant', authoredByCurrentUser: true,
   canAcknowledge: false, submittedAt: '2026-09-15T12:00:00Z', acknowledgedAt: null,
 } as const;
+const notReadyCandidate = {
+  proposalId: proposalID, ready: false, kind: 'not_ready', title: 'Trust candidate not ready',
+  explanation: 'Both participants must submit one private review.',
+  factors: ['Outcome: Completed', 'Deliverable: Met', 'Private reviews: 1 of 2'],
+} as const;
+const readyCandidate = {
+  proposalId: proposalID, ready: true, kind: 'collaboration_proven', title: 'Collaboration Proven candidate',
+  explanation: 'Every visible collaboration-evidence rule is satisfied.',
+  factors: ['Outcome: Completed', 'Deliverable: Met', 'Both private reviews submitted and acknowledged', 'Shared observed behaviors: 2', 'Both would collaborate again: Yes'],
+} as const;
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -29,7 +39,9 @@ describe('TrialFeedbackPanel', () => {
   it('submits one immutable private review', async () => {
     const fetcher = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ data: feedback }), { status: 201 }));
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: notReadyCandidate }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: feedback }), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: notReadyCandidate }), { status: 200 }));
     vi.stubGlobal('fetch', fetcher);
     render(<TrialFeedbackPanel proposalId={proposalID} />);
     await screen.findByRole('button', { name: /submit private feedback/i });
@@ -42,7 +54,7 @@ describe('TrialFeedbackPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: /submit private feedback/i }));
     expect(await screen.findByText(/read-only feedback was submitted/i)).toBeInTheDocument();
     expect(screen.getByText(/awaiting acknowledgement/i)).toBeInTheDocument();
-    expect(fetcher).toHaveBeenLastCalledWith(
+    expect(fetcher).toHaveBeenCalledWith(
       `http://localhost:8080/v1/trial-proposals/${proposalID}/feedback`,
       expect.objectContaining({ method: 'POST', body: JSON.stringify(input) }),
     );
@@ -53,7 +65,9 @@ describe('TrialFeedbackPanel', () => {
     const acknowledged = { ...counterpartView, canAcknowledge: false, acknowledgedAt: '2026-09-15T13:00:00Z' };
     const fetcher = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [counterpartView] }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ data: acknowledged }), { status: 200 }));
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: notReadyCandidate }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: acknowledged }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: readyCandidate }), { status: 200 }));
     vi.stubGlobal('fetch', fetcher);
     render(<TrialFeedbackPanel proposalId={proposalID} />);
     const acknowledge = await screen.findByRole('button', { name: /acknowledge receipt/i });
@@ -61,5 +75,7 @@ describe('TrialFeedbackPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: /confirm acknowledgement/i }));
     expect(await screen.findByText(/content was not approved or changed/i)).toBeInTheDocument();
     expect(screen.getByText('Acknowledged')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /collaboration proven candidate/i })).toBeInTheDocument();
+    expect(screen.getByText(/not a profile score or badge/i)).toBeInTheDocument();
   });
 });

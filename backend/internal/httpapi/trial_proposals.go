@@ -56,6 +56,10 @@ type trialFeedbackListResponse struct {
 	} `json:"meta"`
 }
 
+type trialTrustCandidateResponse struct {
+	Data trialproposals.TrustCandidate `json:"data"`
+}
+
 func (api *API) getOwnTrialProposal(writer http.ResponseWriter, request *http.Request) {
 	writer.Header().Set("Cache-Control", "no-store")
 	user, ok := api.requireUser(writer, request)
@@ -339,6 +343,19 @@ func (api *API) writeTrialFeedbackError(writer http.ResponseWriter, err error) b
 		writeError(writer, http.StatusInternalServerError, apiError{Code: "internal_error", Message: "The private feedback request could not be completed."})
 	}
 	return true
+}
+
+func (api *API) getTrialTrustCandidate(writer http.ResponseWriter, request *http.Request) {
+	writer.Header().Set("Cache-Control", "no-store")
+	user, ok := api.requireUser(writer, request)
+	if !ok {
+		return
+	}
+	result, err := api.trialProposals.GetTrustCandidate(request.Context(), user.ID, request.PathValue("proposalId"))
+	if api.writeTrialOutcomeError(writer, err) {
+		return
+	}
+	writeJSON(writer, http.StatusOK, trialTrustCandidateResponse{Data: result})
 }
 
 func (api *API) writeTrialProposalError(writer http.ResponseWriter, err error) bool {

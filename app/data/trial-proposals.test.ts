@@ -13,6 +13,7 @@ import {
   acknowledgeTrialFeedback,
   createTrialFeedback,
   loadTrialFeedback,
+  loadTrialTrustCandidate,
   TrialProposalAPIError,
   type TrialProposalInput,
 } from './trial-proposals';
@@ -168,6 +169,22 @@ describe('trial proposal API client', () => {
     expect(fetcher).toHaveBeenLastCalledWith(
       `http://localhost:8080/v1/trial-proposals/${proposal.id}/feedback/${feedback.id}/acknowledge`,
       expect.objectContaining({ method: 'POST', credentials: 'include' }),
+    );
+  });
+
+  it('loads and validates the transparent private trust candidate', async () => {
+    const candidate = {
+      proposalId: proposal.id, ready: true, kind: 'collaboration_proven',
+      title: 'Collaboration Proven candidate',
+      explanation: 'Every visible collaboration-evidence rule is satisfied.',
+      factors: ['Outcome: Completed', 'Deliverable: Met', 'Shared observed behaviors: 2'],
+    } as const;
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: candidate }), { status: 200 }));
+    vi.stubGlobal('fetch', fetcher);
+    await expect(loadTrialTrustCandidate(proposal.id)).resolves.toEqual(candidate);
+    expect(fetcher).toHaveBeenCalledWith(
+      `http://localhost:8080/v1/trial-proposals/${proposal.id}/trust-candidate`,
+      expect.objectContaining({ credentials: 'include' }),
     );
   });
 });

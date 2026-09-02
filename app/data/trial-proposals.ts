@@ -89,6 +89,15 @@ export type TrialFeedback = {
   acknowledgedAt: string | null;
 };
 
+export type TrialTrustCandidate = {
+  proposalId: string;
+  ready: boolean;
+  kind: 'not_ready' | 'collaboration_proven' | 'work_demonstrated' | 'no_signal';
+  title: string;
+  explanation: string;
+  factors: string[];
+};
+
 type APIEnvelope = { data?: unknown };
 type APIErrorEnvelope = { error?: { code?: unknown; field?: unknown } };
 
@@ -251,6 +260,23 @@ function parseTrialFeedback(value: unknown): TrialFeedback {
     || (feedback.acknowledgedAt !== null && feedback.canAcknowledge === true)
   ) throw new Error('The API returned invalid private feedback.');
   return feedback as TrialFeedback;
+}
+
+function parseTrialTrustCandidate(value: unknown): TrialTrustCandidate {
+  if (!value || typeof value !== 'object') throw new Error('The API returned an invalid private trust candidate.');
+  const candidate = value as Record<string, unknown>;
+  if (
+    typeof candidate.proposalId !== 'string'
+    || typeof candidate.ready !== 'boolean'
+    || !['not_ready', 'collaboration_proven', 'work_demonstrated', 'no_signal'].includes(candidate.kind as string)
+    || typeof candidate.title !== 'string'
+    || typeof candidate.explanation !== 'string'
+    || !Array.isArray(candidate.factors)
+    || candidate.factors.some((factor) => typeof factor !== 'string')
+    || (candidate.ready === false && candidate.kind !== 'not_ready')
+    || (candidate.ready === true && candidate.kind === 'not_ready')
+  ) throw new Error('The API returned an invalid private trust candidate.');
+  return candidate as TrialTrustCandidate;
 }
 
 async function parseError(response: Response) {
@@ -426,4 +452,14 @@ export async function acknowledgeTrialFeedback(proposalId: string, feedbackId: s
   if (!response.ok) throw await parseError(response);
   const body = await response.json() as APIEnvelope;
   return parseTrialFeedback(body.data);
+}
+
+export async function loadTrialTrustCandidate(proposalId: string, signal?: AbortSignal) {
+  const response = await fetch(
+    `${getAPIBaseURL()}/v1/trial-proposals/${encodeURIComponent(proposalId)}/trust-candidate`,
+    { credentials: 'include', headers: { Accept: 'application/json' }, signal },
+  );
+  if (!response.ok) throw await parseError(response);
+  const body = await response.json() as APIEnvelope;
+  return parseTrialTrustCandidate(body.data);
 }

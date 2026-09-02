@@ -166,6 +166,23 @@ func TestTrialParticipantsSubmitAndAcknowledgePrivateFeedback(t *testing.T) {
 	}
 }
 
+func TestTrialParticipantsLoadPrivateTrustCandidate(t *testing.T) {
+	calls := &trialProposalCalls{}
+	candidate := trialproposals.TrustCandidate{
+		ProposalID: "proposal-id", Ready: true, Kind: "collaboration_proven",
+		Title: "Collaboration Proven candidate", Explanation: "Every visible rule is satisfied.",
+		Factors: []string{"Outcome: Completed", "Deliverable: Met"},
+	}
+	manager := fakeTrialProposalManager{calls: calls, trustCandidate: candidate}
+	api := trialProposalTestAPI(manager, fakeAuthenticator{user: auth.User{ID: 7}})
+
+	response := httptest.NewRecorder()
+	api.ServeHTTP(response, authenticatedApplicationRequest(http.MethodGet, "/v1/trial-proposals/proposal-id/trust-candidate", nil))
+	if response.Code != http.StatusOK || calls.operation != "get-trust-candidate" || !bytes.Contains(response.Body.Bytes(), []byte("collaboration_proven")) {
+		t.Fatalf("trust candidate = %d, calls %#v: %s", response.Code, calls, response.Body.String())
+	}
+}
+
 func TestTrialOutcomeMapsLifecycleErrors(t *testing.T) {
 	for _, test := range []struct {
 		method string
@@ -264,6 +281,7 @@ type fakeTrialProposalManager struct {
 	outcomeResult  trialproposals.Outcome
 	feedbackResult trialproposals.Feedback
 	feedbackList   []trialproposals.Feedback
+	trustCandidate trialproposals.TrustCandidate
 	err            error
 }
 
@@ -357,4 +375,11 @@ func (fake fakeTrialProposalManager) AcknowledgeFeedback(_ context.Context, user
 		fake.calls.operation, fake.calls.userID, fake.calls.proposalID, fake.calls.feedbackID = "acknowledge-feedback", userID, proposalID, feedbackID
 	}
 	return fake.feedbackResult, fake.err
+}
+
+func (fake fakeTrialProposalManager) GetTrustCandidate(_ context.Context, userID int64, proposalID string) (trialproposals.TrustCandidate, error) {
+	if fake.calls != nil {
+		fake.calls.operation, fake.calls.userID, fake.calls.proposalID = "get-trust-candidate", userID, proposalID
+	}
+	return fake.trustCandidate, fake.err
 }
