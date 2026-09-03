@@ -40,3 +40,9 @@ next-env.d.ts
 # Go backend build and coverage output
 /backend/bin/
 /backend/coverage.out
+
+# private project documentation (local only)
+/README.md
+/HANDBOOK.md
+/backend/README.md
+/docs/local/
