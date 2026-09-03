@@ -282,6 +282,16 @@ func TestPostgresTrialProposalLifecycle(t *testing.T) {
 	if err != nil || enforcedCandidate.Kind != "suppressed" || enforcedCandidate.Ready {
 		t.Fatalf("enforced trust candidate = %#v, %v", enforcedCandidate, err)
 	}
+	feedbackAppeal, err := safetyManager.CreateAppeal(ctx, owner.ID, safety.AppealInput{
+		TargetKind: "trial_feedback", TargetID: ownerFeedback.ID,
+		Reason: "The complete trial record provides context that should be considered before this removal remains permanent.",
+	})
+	if err != nil || feedbackAppeal.Status != "pending" || feedbackAppeal.ReportID != feedbackReport.ID {
+		t.Fatalf("feedback appeal = %#v, %v", feedbackAppeal, err)
+	}
+	if _, err := safetyManager.CreateAppeal(ctx, owner.ID, safety.AppealInput{TargetKind: "trial_feedback", TargetID: ownerFeedback.ID, Reason: "A duplicate appeal must not replace the original pending reconsideration request."}); !errors.Is(err, safety.ErrAppealUnavailable) {
+		t.Fatalf("duplicate appeal error = %v", err)
+	}
 	if _, err := safetyManager.Decide(ctx, otherApplicant.ID, candidateReport.ID, safety.DecisionInput{
 		Decision: "upheld", ModeratorNotes: "The captured candidate is misleading and must be removed from participant review.",
 	}); err != nil {
@@ -290,6 +300,10 @@ func TestPostgresTrialProposalLifecycle(t *testing.T) {
 	if removed, err := trialStore.TrustCandidateRemoved(ctx, owner.ID, proposal.ID); err != nil || !removed {
 		t.Fatalf("upheld candidate moderation = %v, %v", removed, err)
 	}
+	candidateAppeal, err := safetyManager.CreateAppeal(ctx, applicant.ID, safety.AppealInput{TargetKind: "trust_candidate", TargetID: proposal.ID, Reason: "The candidate should be reconsidered against the full confirmed outcome and both participant reviews."})
+	if err != nil || candidateAppeal.ReportID != candidateReport.ID { t.Fatalf("candidate appeal = %#v, %v", candidateAppeal, err) }
+	appeals, err := safetyManager.ListAppealsForModerator(ctx, otherApplicant.ID)
+	if err != nil || len(appeals) != 2 { t.Fatalf("moderation appeals = %#v, %v", appeals, err) }
 	if _, err := safetyManager.Decide(ctx, otherApplicant.ID, feedbackReport.ID, safety.DecisionInput{
 		Decision: "dismissed", ModeratorNotes: "A second decision must not replace the original immutable moderation outcome.",
 	}); !errors.Is(err, safety.ErrDecisionUnavailable) {

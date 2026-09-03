@@ -14,8 +14,12 @@ type fakeStore struct {
 	decision    DecisionInput
 	result      Report
 	listed      []Report
+	appealRecord AppealRecord
+	appeals     []Appeal
 	err         error
 }
+func (store *fakeStore) CreateAppeal(_ context.Context, record AppealRecord) (Appeal, error) { store.appealRecord = record; if len(store.appeals) > 0 { return store.appeals[0], store.err }; return Appeal{}, store.err }
+func (store *fakeStore) ListAppealsForModerator(_ context.Context, userID int64) ([]Appeal, error) { store.moderatorID = userID; return store.appeals, store.err }
 
 func (store *fakeStore) Create(_ context.Context, record Record) (Report, error) {
 	store.record = record
@@ -83,4 +87,15 @@ func TestManagerListsAndDecidesForModerator(t *testing.T) {
 	if err != nil || result.Status != "upheld" || store.reportID != "report-id" || store.decision.ModeratorNotes != "Confirmed a policy concern in the captured snapshot." {
 		t.Fatalf("Decide() = %#v, %v; store %#v", result, err, store)
 	}
+}
+
+func TestManagerCreatesBoundedModerationAppeal(t *testing.T) {
+	store := &fakeStore{appeals: []Appeal{{ID: "appeal-id", Status: "pending"}}}
+	manager := NewManager(store); manager.random = strings.NewReader(strings.Repeat("f", 16))
+	result, err := manager.CreateAppeal(context.Background(), 7, AppealInput{TargetKind: "trial_feedback", TargetID: " feedback-id ", Reason: " The moderator should reconsider this removal using the complete trial context. "})
+	if err != nil || result.ID != "appeal-id" || store.appealRecord.ID != "66666666-6666-4666-a666-666666666666" || store.appealRecord.TargetID != "feedback-id" {
+		t.Fatalf("CreateAppeal() = %#v, %v; record %#v", result, err, store.appealRecord)
+	}
+	if _, err := manager.CreateAppeal(context.Background(), 7, AppealInput{TargetKind: "trial_feedback", TargetID: "feedback-id", Reason: "short"}); err == nil { t.Fatal("short appeal accepted") }
+	if appeals, err := manager.ListAppealsForModerator(context.Background(), 8); err != nil || len(appeals) != 1 || store.moderatorID != 8 { t.Fatalf("ListAppealsForModerator() = %#v, %v", appeals, err) }
 }

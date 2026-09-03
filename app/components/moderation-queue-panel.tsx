@@ -10,6 +10,7 @@ import {
   type ModerationStatus,
 } from '../data/moderation';
 import { useAccessibleDialog } from './use-accessible-dialog';
+import { listModerationAppeals, type ModerationAppeal } from '../data/moderation-appeals';
 
 const statusLabels: Record<ModerationStatus, string> = { pending: 'Pending review', upheld: 'Upheld', dismissed: 'Dismissed' };
 const targetLabels = { trial_feedback: 'Private participant feedback', trust_candidate: 'Private trust candidate' };
@@ -41,8 +42,9 @@ function CapturedSnapshot({ snapshot }: { snapshot: Record<string, unknown> }) {
 
 export function ModerationQueuePanel({ onClose }: { onClose: () => void }) {
   const [reports, setReports] = useState<ModerationReport[]>([]);
+  const [appeals, setAppeals] = useState<ModerationAppeal[]>([]);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
-  const [filter, setFilter] = useState<ModerationStatus>('pending');
+  const [filter, setFilter] = useState<ModerationStatus | 'appeals'>('pending');
   const [activeReportId, setActiveReportId] = useState<string | null>(null);
   const [decision, setDecision] = useState<ModerationDecision | ''>('');
   const [notes, setNotes] = useState('');
@@ -58,8 +60,8 @@ export function ModerationQueuePanel({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     const controller = new AbortController();
-    listModerationReports(controller.signal)
-      .then((result) => { setReports(result); setStatus('ready'); })
+    Promise.all([listModerationReports(controller.signal), listModerationAppeals(controller.signal)])
+      .then(([reportResult, appealResult]) => { setReports(reportResult); setAppeals(appealResult); setStatus('ready'); })
       .catch((error: unknown) => {
         if (error instanceof DOMException && error.name === 'AbortError') return;
         setStatus('error');
@@ -108,15 +110,17 @@ export function ModerationQueuePanel({ onClose }: { onClose: () => void }) {
               {statusLabels[reportStatus]} <span>{reports.filter((report) => report.status === reportStatus).length}</span>
             </button>
           ))}
+          <button aria-pressed={filter === 'appeals'} onClick={() => setFilter('appeals')} type="button">Pending appeals <span>{appeals.length}</span></button>
         </div>
 
         {message && <p className="moderation-message" role="status">{message}</p>}
         {status === 'loading' && <p className="moderation-state" role="status">Loading private reports…</p>}
         {status === 'error' && <div className="moderation-state"><p>The moderation queue could not be loaded.</p><button className="secondary-button" onClick={() => { setStatus('loading'); setRetry((current) => current + 1); }} type="button">Retry</button></div>}
-        {status === 'ready' && visibleReports.length === 0 && <p className="moderation-state">No {statusLabels[filter].toLowerCase()} reports.</p>}
+        {status === 'ready' && filter !== 'appeals' && visibleReports.length === 0 && <p className="moderation-state">No {statusLabels[filter].toLowerCase()} reports.</p>}
+        {status === 'ready' && filter === 'appeals' && appeals.length === 0 && <p className="moderation-state">No pending appeals.</p>}
 
         <div className="moderation-list">
-          {status === 'ready' && visibleReports.map((report) => (
+          {status === 'ready' && filter !== 'appeals' && visibleReports.map((report) => (
             <article className="moderation-report" key={report.id}>
               <div className="moderation-report-heading">
                 <div><span className={`moderation-status moderation-status-${report.status}`}>{statusLabels[report.status]}</span><h3>{targetLabels[report.targetKind]}</h3></div>
@@ -143,8 +147,16 @@ export function ModerationQueuePanel({ onClose }: { onClose: () => void }) {
               )}
             </article>
           ))}
+          {status === 'ready' && filter === 'appeals' && appeals.map((appeal) => (
+            <article className="moderation-report moderation-appeal-record" key={appeal.id}>
+              <div className="moderation-report-heading"><div><span className="moderation-status moderation-status-pending">Pending appeal</span><h3>{targetLabels[appeal.targetKind]}</h3></div><time dateTime={appeal.createdAt}>{new Date(appeal.createdAt).toLocaleString()}</time></div>
+              <dl className="moderation-report-facts"><div><dt>Appellant</dt><dd>@{appeal.appellantLogin}</dd></div><div><dt>Report ID</dt><dd>{appeal.reportId}</dd></div><div><dt>Target ID</dt><dd>{appeal.targetId}</dd></div></dl>
+              <section className="moderation-reason"><h4>Reason for reconsideration</h4><p>{appeal.reason}</p></section>
+              <p className="moderation-boundary">Appeal decisions and restoration are not part of this intake phase. The original removal remains active.</p>
+            </article>
+          ))}
         </div>
-        <p className="moderation-boundary">This workspace records policy findings only. It does not remove content, sanction an account, publish a trust signal, or manage appeals.</p>
+        <p className="moderation-boundary">This workspace records policy findings and receives appeals. It does not sanction an account, publish a trust signal, decide appeals, or restore removed content.</p>
       </section>
     </div>
   );

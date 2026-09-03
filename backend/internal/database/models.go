@@ -28,6 +28,15 @@ type Application struct {
 	WithdrawnAt           pgtype.Timestamptz `db:"withdrawn_at" json:"withdrawn_at"`
 }
 
+type ModerationAppeal struct {
+	ID              string    `db:"id" json:"id"`
+	ReportID        string    `db:"report_id" json:"report_id"`
+	AppellantUserID int64     `db:"appellant_user_id" json:"appellant_user_id"`
+	Reason          string    `db:"reason" json:"reason"`
+	AppealStatus    string    `db:"appeal_status" json:"appeal_status"`
+	CreatedAt       time.Time `db:"created_at" json:"created_at"`
+}
+
 type OauthAttempt struct {
 	StateHash    []byte    `db:"state_hash" json:"state_hash"`
 	CodeVerifier string    `db:"code_verifier" json:"code_verifier"`

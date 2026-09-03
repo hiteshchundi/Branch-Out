@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: Branch-Out API
-  version: 0.17.0
-  description: PostgreSQL-backed discovery, GitHub authentication with server-held account roles, member profiles, owner-managed opening lifecycles, proof-led applications, private trial collaboration, safety reporting, moderator review, and upheld-content enforcement for Branch-Out.
+  version: 0.18.0
+  description: PostgreSQL-backed discovery, GitHub authentication with server-held account roles, member profiles, owner-managed opening lifecycles, proof-led applications, private trial collaboration, safety reporting, moderator review, upheld-content enforcement, and moderation-appeal intake for Branch-Out.
 servers:
   - url: http://localhost:8080
 paths:
@@ -1158,6 +1158,48 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+  /v1/moderation-appeals:
+    post:
+      operationId: createModerationAppeal
+      summary: Appeal one upheld participant-facing removal
+      description: Allows the removed feedback author, or a non-reporting participant affected by an upheld trust-candidate report, to submit one pending appeal. Removal remains active.
+      security: [{sessionCookie: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ModerationAppealInput'}
+      responses:
+        '201':
+          description: The pending appeal was created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties: {data: {$ref: '#/components/schemas/ModerationAppeal'}}
+        '400': {description: The appeal is malformed., content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}}
+        '401': {description: No valid session is present., content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}}
+        '409': {description: The item is not upheld, the member is ineligible, or an appeal already exists., content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}}
+  /v1/moderation/appeals:
+    get:
+      operationId: listModerationAppeals
+      summary: List pending moderation appeals
+      description: Requires a moderator and returns read-only appeal intake records. Decisions and restoration are not available in this phase.
+      security: [{sessionCookie: []}]
+      responses:
+        '200':
+          description: Pending appeal intake queue.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data: {type: array, items: {$ref: '#/components/schemas/ModerationAppeal'}}
+                  meta: {type: object, required: [count], properties: {count: {type: integer, minimum: 0}}}
+        '401': {description: No valid session is present., content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}}
+        '403': {description: The authenticated member is not a moderator., content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}}
   /v1/moderation/reports/{reportId}/decision:
     post:
       operationId: decideModerationReport
@@ -2099,6 +2141,26 @@ components:
           type: string
           minLength: 20
           maxLength: 1000
+    ModerationAppealInput:
+      type: object
+      additionalProperties: false
+      required: [targetKind, targetId, reason]
+      properties:
+        targetKind: {type: string, enum: [trial_feedback, trust_candidate]}
+        targetId: {type: string, minLength: 1, maxLength: 100}
+        reason: {type: string, minLength: 30, maxLength: 1000}
+    ModerationAppeal:
+      type: object
+      required: [id, reportId, targetKind, targetId, reason, status, appellantLogin, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        reportId: {type: string, format: uuid}
+        targetKind: {type: string, enum: [trial_feedback, trust_candidate]}
+        targetId: {type: string}
+        reason: {type: string}
+        status: {type: string, enum: [pending]}
+        appellantLogin: {type: string}
+        createdAt: {type: string, format: date-time}
     SafetyReportReceipt:
       type: object
       required: [id, targetKind, targetId, category, status, createdAt]

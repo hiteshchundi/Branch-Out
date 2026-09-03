@@ -302,7 +302,12 @@ Reports enter a role-gated moderator queue. Moderators can permanently uphold or
 dismiss a pending report with required notes. Reporting alone changes nothing.
 An upheld finding replaces the targeted feedback with a content-free removal
 record and suppresses the affected trust candidate for both trial participants.
-It does not penalize an account, publish a signal, or provide an appeal flow.
+It does not penalize an account or publish a signal.
+
+The author of removed feedback, or a non-reporting participant affected by a
+removed trust candidate, can submit one 30–1000 character appeal. The removal
+stays active, and moderators can view pending appeals in the dashboard. Appeal
+decisions and restoration are not implemented yet.
 
 Authenticated moderator accounts see **Moderation** in the header. The dashboard
 separates pending, upheld, and dismissed reports, shows the reporter explanation
@@ -349,5 +354,6 @@ moderator role for every queue request and decision.
 - Participant safety reports, immutable evidence snapshots, and moderator
   decisions are account-backed and available through a role-gated dashboard.
   Upheld feedback and trust candidates are removed from participant-facing
-  responses. Account sanctions, restoration, and appeals are not implemented.
+  responses. Appeal intake is available, but appeal decisions, restoration, and
+  account sanctions are not implemented.
 - Saved openings stay only in the current browser and are not synchronized.

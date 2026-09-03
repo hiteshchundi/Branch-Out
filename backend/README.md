@@ -88,6 +88,8 @@ checks PostgreSQL on every request and returns HTTP 503 with
 - `POST /v1/safety-reports` — submit a participant-scoped report with a private moderation snapshot
 - `GET /v1/moderation/reports` — list the role-gated moderator queue
 - `POST /v1/moderation/reports/{reportId}/decision` — irreversibly uphold or dismiss a pending report
+- `POST /v1/moderation-appeals` — submit one eligible appeal while removal remains active
+- `GET /v1/moderation/appeals` — list the moderator-only pending appeal queue
 
 Discovery accepts optional filters. Structured values use the labels already
 shown by the frontend.
@@ -193,8 +195,14 @@ The queue returns pending reports first. A moderator can record one permanent
 `upheld` or `dismissed` decision with 20–1000 characters of notes. An upheld
 decision redacts the targeted feedback from participant responses and suppresses
 the affected trust candidate. The immutable moderation snapshot remains
-available in the moderator queue. Member sanctions, restoration, appeals, and
-automated trust-signal publication remain separate future workflows.
+available in the moderator queue. Member sanctions, restoration, appeal
+decisions, and automated trust-signal publication remain separate future workflows.
+
+The author of upheld feedback, or a non-reporting participant affected by an
+upheld trust-candidate report, can create one appeal with a 30–1000 character
+reason. PostgreSQL resolves the upheld report and participant relationship; the
+client cannot choose another report or appellant. Moderators can list pending
+appeals, but appeal decisions and restoration remain a separate next phase.
 The authenticated session response includes the server-held `accountRole`, so
 the frontend can show its moderator dashboard only to eligible accounts; the
 moderator endpoints remain the authoritative authorization boundary.

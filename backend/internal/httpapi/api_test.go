@@ -78,11 +78,13 @@ type safetyCalls struct {
 	reportID  string
 	input     safety.Input
 	decision  safety.DecisionInput
+	appeal    safety.AppealInput
 }
 type fakeSafetyManager struct {
 	calls  *safetyCalls
 	result safety.Report
 	listed []safety.Report
+	appeals []safety.Appeal
 	err    error
 }
 
@@ -103,6 +105,15 @@ func (fake fakeSafetyManager) Decide(_ context.Context, userID int64, reportID s
 		fake.calls.operation, fake.calls.userID, fake.calls.reportID, fake.calls.decision = "decide", userID, reportID, input
 	}
 	return fake.result, fake.err
+}
+func (fake fakeSafetyManager) CreateAppeal(_ context.Context, userID int64, input safety.AppealInput) (safety.Appeal, error) {
+	if fake.calls != nil { fake.calls.operation, fake.calls.userID, fake.calls.appeal = "create-appeal", userID, input }
+	if len(fake.appeals) > 0 { return fake.appeals[0], fake.err }
+	return safety.Appeal{}, fake.err
+}
+func (fake fakeSafetyManager) ListAppealsForModerator(_ context.Context, userID int64) ([]safety.Appeal, error) {
+	if fake.calls != nil { fake.calls.operation, fake.calls.userID = "list-appeals", userID }
+	return fake.appeals, fake.err
 }
 
 func TestListOpeningsReturnsFilteredEnvelope(t *testing.T) {

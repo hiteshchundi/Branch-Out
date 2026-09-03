@@ -13,6 +13,7 @@ import {
   type TrialTrustCandidate,
 } from '../data/trial-proposals';
 import { SafetyReportForm } from './safety-report-form';
+import { ModerationAppealForm } from './moderation-appeal-form';
 
 type FeedbackDraft = Omit<TrialFeedbackInput, 'collaborateAgain'> & { collaborateAgain: TrialFeedbackInput['collaborateAgain'] | '' };
 type FeedbackField = keyof FeedbackDraft;
@@ -149,7 +150,7 @@ export function TrialFeedbackPanel({ proposalId }: { proposalId: string }) {
         <article className="trial-feedback-record" key={item.id}>
           <header><div><strong>{item.author.displayName}</strong><span>{item.authorRole === 'owner' ? 'Opening owner' : 'Applicant'}</span></div><small>{item.moderationStatus === 'removed' ? 'Removed after moderation' : item.acknowledgedAt ? 'Acknowledged' : item.authoredByCurrentUser ? 'Awaiting acknowledgement' : 'New feedback'}</small></header>
           {item.moderationStatus === 'removed' ? (
-            <p className="trial-feedback-removed">This private review is no longer available because an authorized moderator upheld a safety report. Its captured evidence remains restricted to the moderator record.</p>
+            <div><p className="trial-feedback-removed">This private review is no longer available because an authorized moderator upheld a safety report. Its captured evidence remains restricted to the moderator record.</p>{item.authoredByCurrentUser && <ModerationAppealForm targetId={item.id} targetKind="trial_feedback" />}</div>
           ) : (
             <>
               <ul className="trial-feedback-behaviors">{item.input.observedBehaviors.map((behavior) => <li key={behavior}>{behaviorLabels[behavior]}</li>)}</ul>
@@ -178,6 +179,7 @@ export function TrialFeedbackPanel({ proposalId }: { proposalId: string }) {
           <div><strong>Why this appears</strong><ul>{candidate.factors.map((factor) => <li key={factor}>{factor}</li>)}</ul></div>
           <p className="trial-check-in-boundary">This candidate is private, trial-level, and rule-based. It is not a profile score or badge, and public signal publication is not available.</p>
           {candidate.kind !== 'suppressed' && <SafetyReportForm buttonLabel="Report this trust review" targetId={proposalId} targetKind="trust_candidate" />}
+          {candidate.kind === 'suppressed' && <ModerationAppealForm targetId={proposalId} targetKind="trust_candidate" />}
         </section>
       )}
       {message && <p aria-live="polite" className="save-message">{message}</p>}

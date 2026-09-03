@@ -572,8 +572,22 @@ closes with `Escape`, and returns focus to its header control.
 
 The dashboard does not cache reports in browser storage. Captured evidence stays
 private to authorized moderators. Upholding enforces participant-facing removal
-immediately; account sanctions, restoration, appeals, and trust-signal
-publication are not yet available.
+immediately.
+
+### Appeal an upheld removal
+
+The author of removed feedback sees **Appeal this removal** on its lifecycle
+record. A participant affected by a directly removed trust candidate sees the
+same action below the suppressed candidate. Explain the reconsideration request
+in 30–1000 characters, exclude secrets and personal information, and confirm
+that the removal remains active while the appeal is pending. Each upheld report
+accepts only one appeal, and reporters cannot appeal their own upheld report.
+
+Moderators can open **Pending appeals** in the moderation dashboard to see the
+appellant, linked report and target, and the reconsideration reason. This phase
+is intake-only: moderators cannot decide the appeal yet, and no content is
+automatically restored. Account sanctions and trust-signal publication also
+remain unavailable.
 
 ## Review a trial outcome
 
@@ -836,11 +850,12 @@ configuration, and operating details live in `backend/README.md`.
 - Trial participants can submit private safety reports, and authorized
   moderators can review captured evidence and uphold or dismiss them once in the
   visible role-gated dashboard. Upheld items are removed from participant-facing
-  feedback and candidate responses. Account sanctions, restoration, and appeals
-  are not available.
+  feedback and candidate responses. Eligible participants can submit one appeal
+  and moderators can review the pending intake record. Appeal decisions,
+  restoration, and account sanctions are not available.
 - Saved openings do not synchronize between browsers or devices.
 - Early-access email addresses are not transmitted or stored.
-- Notification, appeal, and account-sanction flows do not exist yet.
+- Notification, appeal-decision, restoration, and account-sanction flows do not exist yet.
 
 ## Handbook maintenance rule
 

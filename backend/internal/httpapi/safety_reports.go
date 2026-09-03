@@ -30,6 +30,11 @@ type safetyReportListResponse struct {
 		Count int `json:"count"`
 	} `json:"meta"`
 }
+type moderationAppealResponse struct { Data safety.Appeal `json:"data"` }
+type moderationAppealListResponse struct {
+	Data []safety.Appeal `json:"data"`
+	Meta struct { Count int `json:"count"` } `json:"meta"`
+}
 
 func (api *API) createSafetyReport(writer http.ResponseWriter, request *http.Request) {
 	writer.Header().Set("Cache-Control", "no-store")
@@ -83,6 +88,28 @@ func (api *API) decideModerationReport(writer http.ResponseWriter, request *http
 	writeJSON(writer, http.StatusOK, safetyReportResponse{Data: result})
 }
 
+func (api *API) createModerationAppeal(writer http.ResponseWriter, request *http.Request) {
+	writer.Header().Set("Cache-Control", "no-store")
+	user, ok := api.requireUser(writer, request)
+	if !ok { return }
+	var input safety.AppealInput
+	if !decodeSafetyBody(writer, request, &input, "Provide one valid moderation appeal.") { return }
+	result, err := api.safety.CreateAppeal(request.Context(), user.ID, input)
+	if api.writeSafetyError(writer, err) { return }
+	writeJSON(writer, http.StatusCreated, moderationAppealResponse{Data: result})
+}
+
+func (api *API) listModerationAppeals(writer http.ResponseWriter, request *http.Request) {
+	writer.Header().Set("Cache-Control", "no-store")
+	user, ok := api.requireUser(writer, request)
+	if !ok { return }
+	results, err := api.safety.ListAppealsForModerator(request.Context(), user.ID)
+	if api.writeSafetyError(writer, err) { return }
+	response := moderationAppealListResponse{Data: results}
+	response.Meta.Count = len(results)
+	writeJSON(writer, http.StatusOK, response)
+}
+
 func decodeSafetyBody(writer http.ResponseWriter, request *http.Request, destination any, message string) bool {
 	decoder := json.NewDecoder(http.MaxBytesReader(writer, request.Body, maximumTrialProposalBody))
 	decoder.DisallowUnknownFields()
@@ -111,6 +138,8 @@ func (api *API) writeSafetyError(writer http.ResponseWriter, err error) bool {
 		writeError(writer, http.StatusConflict, apiError{Code: "safety_report_unavailable", Message: "This item cannot be reported by the current member, or a report already exists."})
 	case errors.Is(err, safety.ErrDecisionUnavailable):
 		writeError(writer, http.StatusConflict, apiError{Code: "moderation_decision_unavailable", Message: "This report cannot be decided."})
+	case errors.Is(err, safety.ErrAppealUnavailable):
+		writeError(writer, http.StatusConflict, apiError{Code: "moderation_appeal_unavailable", Message: "This upheld item cannot be appealed by the current member, or an appeal already exists."})
 	default:
 		api.logger.Error("manage safety report failed", "error", err)
 		writeError(writer, http.StatusInternalServerError, apiError{Code: "internal_error", Message: "The safety report request could not be completed."})
