@@ -42,7 +42,6 @@ next-env.d.ts
 /backend/coverage.out
 
 # private project documentation (local only)
-/README.md
 /HANDBOOK.md
 /backend/README.md
 /docs/local/
