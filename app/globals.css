@@ -1205,6 +1205,8 @@ main:focus {
 .moderation-status-pending { background: var(--accent-soft); color: var(--accent-strong); }
 .moderation-status-upheld { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
 .moderation-status-dismissed { background: var(--surface-raised); color: var(--muted); }
+.moderation-status-granted { background: var(--accent-soft); color: var(--accent-strong); }
+.moderation-status-denied { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
 
 .moderation-report-facts,
 .moderation-snapshot {

@@ -29,12 +29,15 @@ type Application struct {
 }
 
 type ModerationAppeal struct {
-	ID              string    `db:"id" json:"id"`
-	ReportID        string    `db:"report_id" json:"report_id"`
-	AppellantUserID int64     `db:"appellant_user_id" json:"appellant_user_id"`
-	Reason          string    `db:"reason" json:"reason"`
-	AppealStatus    string    `db:"appeal_status" json:"appeal_status"`
-	CreatedAt       time.Time `db:"created_at" json:"created_at"`
+	ID               string             `db:"id" json:"id"`
+	ReportID         string             `db:"report_id" json:"report_id"`
+	AppellantUserID  int64              `db:"appellant_user_id" json:"appellant_user_id"`
+	Reason           string             `db:"reason" json:"reason"`
+	AppealStatus     string             `db:"appeal_status" json:"appeal_status"`
+	CreatedAt        time.Time          `db:"created_at" json:"created_at"`
+	ReviewedByUserID *int64             `db:"reviewed_by_user_id" json:"reviewed_by_user_id"`
+	ModeratorNotes   *string            `db:"moderator_notes" json:"moderator_notes"`
+	DecidedAt        pgtype.Timestamptz `db:"decided_at" json:"decided_at"`
 }
 
 type OauthAttempt struct {

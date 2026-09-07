@@ -14,10 +14,11 @@ import (
 )
 
 var (
-	ErrReportUnavailable   = errors.New("safety report unavailable")
-	ErrModeratorForbidden  = errors.New("moderator access forbidden")
-	ErrDecisionUnavailable = errors.New("safety report decision unavailable")
-	ErrAppealUnavailable   = errors.New("moderation appeal unavailable")
+	ErrReportUnavailable         = errors.New("safety report unavailable")
+	ErrModeratorForbidden        = errors.New("moderator access forbidden")
+	ErrDecisionUnavailable       = errors.New("safety report decision unavailable")
+	ErrAppealUnavailable         = errors.New("moderation appeal unavailable")
+	ErrAppealDecisionUnavailable = errors.New("moderation appeal decision unavailable")
 )
 
 type FieldError struct{ Field, Message string }
@@ -42,15 +43,22 @@ type AppealInput struct {
 	Reason     string `json:"reason"`
 }
 
+type AppealDecisionInput struct {
+	Decision       string `json:"decision"`
+	ModeratorNotes string `json:"moderatorNotes"`
+}
+
 type Appeal struct {
-	ID             string    `json:"id"`
-	ReportID       string    `json:"reportId"`
-	TargetKind     string    `json:"targetKind"`
-	TargetID       string    `json:"targetId"`
-	Reason         string    `json:"reason"`
-	Status         string    `json:"status"`
-	AppellantLogin string    `json:"appellantLogin"`
-	CreatedAt      time.Time `json:"createdAt"`
+	ID             string     `json:"id"`
+	ReportID       string     `json:"reportId"`
+	TargetKind     string     `json:"targetKind"`
+	TargetID       string     `json:"targetId"`
+	Reason         string     `json:"reason"`
+	Status         string     `json:"status"`
+	AppellantLogin string     `json:"appellantLogin"`
+	ModeratorNotes *string    `json:"moderatorNotes"`
+	CreatedAt      time.Time  `json:"createdAt"`
+	DecidedAt      *time.Time `json:"decidedAt"`
 }
 
 type Reporter struct {
@@ -88,6 +96,7 @@ type Store interface {
 	Decide(context.Context, int64, string, DecisionInput) (Report, error)
 	CreateAppeal(context.Context, AppealRecord) (Appeal, error)
 	ListAppealsForModerator(context.Context, int64) ([]Appeal, error)
+	DecideAppeal(context.Context, int64, string, AppealDecisionInput) (Appeal, error)
 }
 
 type Manager struct {
@@ -148,6 +157,19 @@ func (manager *Manager) CreateAppeal(ctx context.Context, appellantUserID int64,
 
 func (manager *Manager) ListAppealsForModerator(ctx context.Context, moderatorUserID int64) ([]Appeal, error) {
 	return manager.store.ListAppealsForModerator(ctx, moderatorUserID)
+}
+
+func (manager *Manager) DecideAppeal(ctx context.Context, moderatorUserID int64, appealID string, input AppealDecisionInput) (Appeal, error) {
+	appealID = strings.TrimSpace(appealID)
+	input.Decision = strings.TrimSpace(input.Decision)
+	input.ModeratorNotes = strings.TrimSpace(input.ModeratorNotes)
+	if appealID == "" || (input.Decision != "granted" && input.Decision != "denied") {
+		return Appeal{}, ErrAppealDecisionUnavailable
+	}
+	if length := len([]rune(input.ModeratorNotes)); length < 20 || length > 1000 {
+		return Appeal{}, &FieldError{Field: "moderatorNotes", Message: "moderatorNotes has an invalid length"}
+	}
+	return manager.store.DecideAppeal(ctx, moderatorUserID, appealID, input)
 }
 
 func normalizeInput(input Input) (Input, error) {

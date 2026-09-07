@@ -8,6 +8,8 @@ package database
 import (
 	"context"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createTrialFeedbackModerationAppeal = `-- name: CreateTrialFeedbackModerationAppeal :one
@@ -27,9 +29,9 @@ WITH eligible_report AS (
     SELECT $3, eligible_report.id, $2, $4
     FROM eligible_report
     ON CONFLICT (report_id) DO NOTHING
-    RETURNING id, report_id, appellant_user_id, reason, appeal_status, created_at
+    RETURNING id, report_id, appellant_user_id, reason, appeal_status, created_at, reviewed_by_user_id, moderator_notes, decided_at
 )
-SELECT inserted.id, inserted.report_id, inserted.appellant_user_id, inserted.reason, inserted.appeal_status, inserted.created_at, report.target_kind, report.target_id, appellant.github_login AS appellant_github_login
+SELECT inserted.id, inserted.report_id, inserted.appellant_user_id, inserted.reason, inserted.appeal_status, inserted.created_at, inserted.reviewed_by_user_id, inserted.moderator_notes, inserted.decided_at, report.target_kind, report.target_id, appellant.github_login AS appellant_github_login
 FROM inserted
 JOIN safety_reports AS report ON report.id = inserted.report_id
 JOIN users AS appellant ON appellant.id = inserted.appellant_user_id
@@ -43,15 +45,18 @@ type CreateTrialFeedbackModerationAppealParams struct {
 }
 
 type CreateTrialFeedbackModerationAppealRow struct {
-	ID                   string    `db:"id" json:"id"`
-	ReportID             string    `db:"report_id" json:"report_id"`
-	AppellantUserID      int64     `db:"appellant_user_id" json:"appellant_user_id"`
-	Reason               string    `db:"reason" json:"reason"`
-	AppealStatus         string    `db:"appeal_status" json:"appeal_status"`
-	CreatedAt            time.Time `db:"created_at" json:"created_at"`
-	TargetKind           string    `db:"target_kind" json:"target_kind"`
-	TargetID             string    `db:"target_id" json:"target_id"`
-	AppellantGithubLogin string    `db:"appellant_github_login" json:"appellant_github_login"`
+	ID                   string             `db:"id" json:"id"`
+	ReportID             string             `db:"report_id" json:"report_id"`
+	AppellantUserID      int64              `db:"appellant_user_id" json:"appellant_user_id"`
+	Reason               string             `db:"reason" json:"reason"`
+	AppealStatus         string             `db:"appeal_status" json:"appeal_status"`
+	CreatedAt            time.Time          `db:"created_at" json:"created_at"`
+	ReviewedByUserID     *int64             `db:"reviewed_by_user_id" json:"reviewed_by_user_id"`
+	ModeratorNotes       *string            `db:"moderator_notes" json:"moderator_notes"`
+	DecidedAt            pgtype.Timestamptz `db:"decided_at" json:"decided_at"`
+	TargetKind           string             `db:"target_kind" json:"target_kind"`
+	TargetID             string             `db:"target_id" json:"target_id"`
+	AppellantGithubLogin string             `db:"appellant_github_login" json:"appellant_github_login"`
 }
 
 func (q *Queries) CreateTrialFeedbackModerationAppeal(ctx context.Context, arg CreateTrialFeedbackModerationAppealParams) (CreateTrialFeedbackModerationAppealRow, error) {
@@ -69,6 +74,9 @@ func (q *Queries) CreateTrialFeedbackModerationAppeal(ctx context.Context, arg C
 		&i.Reason,
 		&i.AppealStatus,
 		&i.CreatedAt,
+		&i.ReviewedByUserID,
+		&i.ModeratorNotes,
+		&i.DecidedAt,
 		&i.TargetKind,
 		&i.TargetID,
 		&i.AppellantGithubLogin,
@@ -97,9 +105,9 @@ WITH eligible_report AS (
     SELECT $3, eligible_report.id, $2, $4
     FROM eligible_report
     ON CONFLICT (report_id) DO NOTHING
-    RETURNING id, report_id, appellant_user_id, reason, appeal_status, created_at
+    RETURNING id, report_id, appellant_user_id, reason, appeal_status, created_at, reviewed_by_user_id, moderator_notes, decided_at
 )
-SELECT inserted.id, inserted.report_id, inserted.appellant_user_id, inserted.reason, inserted.appeal_status, inserted.created_at, report.target_kind, report.target_id, appellant.github_login AS appellant_github_login
+SELECT inserted.id, inserted.report_id, inserted.appellant_user_id, inserted.reason, inserted.appeal_status, inserted.created_at, inserted.reviewed_by_user_id, inserted.moderator_notes, inserted.decided_at, report.target_kind, report.target_id, appellant.github_login AS appellant_github_login
 FROM inserted
 JOIN safety_reports AS report ON report.id = inserted.report_id
 JOIN users AS appellant ON appellant.id = inserted.appellant_user_id
@@ -113,15 +121,18 @@ type CreateTrustCandidateModerationAppealParams struct {
 }
 
 type CreateTrustCandidateModerationAppealRow struct {
-	ID                   string    `db:"id" json:"id"`
-	ReportID             string    `db:"report_id" json:"report_id"`
-	AppellantUserID      int64     `db:"appellant_user_id" json:"appellant_user_id"`
-	Reason               string    `db:"reason" json:"reason"`
-	AppealStatus         string    `db:"appeal_status" json:"appeal_status"`
-	CreatedAt            time.Time `db:"created_at" json:"created_at"`
-	TargetKind           string    `db:"target_kind" json:"target_kind"`
-	TargetID             string    `db:"target_id" json:"target_id"`
-	AppellantGithubLogin string    `db:"appellant_github_login" json:"appellant_github_login"`
+	ID                   string             `db:"id" json:"id"`
+	ReportID             string             `db:"report_id" json:"report_id"`
+	AppellantUserID      int64              `db:"appellant_user_id" json:"appellant_user_id"`
+	Reason               string             `db:"reason" json:"reason"`
+	AppealStatus         string             `db:"appeal_status" json:"appeal_status"`
+	CreatedAt            time.Time          `db:"created_at" json:"created_at"`
+	ReviewedByUserID     *int64             `db:"reviewed_by_user_id" json:"reviewed_by_user_id"`
+	ModeratorNotes       *string            `db:"moderator_notes" json:"moderator_notes"`
+	DecidedAt            pgtype.Timestamptz `db:"decided_at" json:"decided_at"`
+	TargetKind           string             `db:"target_kind" json:"target_kind"`
+	TargetID             string             `db:"target_id" json:"target_id"`
+	AppellantGithubLogin string             `db:"appellant_github_login" json:"appellant_github_login"`
 }
 
 func (q *Queries) CreateTrustCandidateModerationAppeal(ctx context.Context, arg CreateTrustCandidateModerationAppealParams) (CreateTrustCandidateModerationAppealRow, error) {
@@ -139,6 +150,80 @@ func (q *Queries) CreateTrustCandidateModerationAppeal(ctx context.Context, arg 
 		&i.Reason,
 		&i.AppealStatus,
 		&i.CreatedAt,
+		&i.ReviewedByUserID,
+		&i.ModeratorNotes,
+		&i.DecidedAt,
+		&i.TargetKind,
+		&i.TargetID,
+		&i.AppellantGithubLogin,
+	)
+	return i, err
+}
+
+const decideModerationAppealForModerator = `-- name: DecideModerationAppealForModerator :one
+WITH decided AS (
+    UPDATE moderation_appeals AS appeal SET
+        appeal_status = $1,
+        reviewed_by_user_id = $2,
+        moderator_notes = $3,
+        decided_at = now()
+    WHERE appeal.id = $4
+      AND appeal.appeal_status = 'pending'
+      AND $1::text IN ('granted', 'denied')
+      AND appeal.appellant_user_id <> $2
+      AND EXISTS (
+          SELECT 1 FROM users AS moderator
+          WHERE moderator.id = $2
+            AND moderator.account_role = 'moderator'
+      )
+    RETURNING appeal.id, appeal.report_id, appeal.appellant_user_id, appeal.reason, appeal.appeal_status, appeal.created_at, appeal.reviewed_by_user_id, appeal.moderator_notes, appeal.decided_at
+)
+SELECT decided.id, decided.report_id, decided.appellant_user_id, decided.reason, decided.appeal_status, decided.created_at, decided.reviewed_by_user_id, decided.moderator_notes, decided.decided_at, report.target_kind, report.target_id, appellant.github_login AS appellant_github_login
+FROM decided
+JOIN safety_reports AS report ON report.id = decided.report_id
+JOIN users AS appellant ON appellant.id = decided.appellant_user_id
+`
+
+type DecideModerationAppealForModeratorParams struct {
+	Decision        string  `db:"decision" json:"decision"`
+	ModeratorUserID *int64  `db:"moderator_user_id" json:"moderator_user_id"`
+	ModeratorNotes  *string `db:"moderator_notes" json:"moderator_notes"`
+	AppealID        string  `db:"appeal_id" json:"appeal_id"`
+}
+
+type DecideModerationAppealForModeratorRow struct {
+	ID                   string             `db:"id" json:"id"`
+	ReportID             string             `db:"report_id" json:"report_id"`
+	AppellantUserID      int64              `db:"appellant_user_id" json:"appellant_user_id"`
+	Reason               string             `db:"reason" json:"reason"`
+	AppealStatus         string             `db:"appeal_status" json:"appeal_status"`
+	CreatedAt            time.Time          `db:"created_at" json:"created_at"`
+	ReviewedByUserID     *int64             `db:"reviewed_by_user_id" json:"reviewed_by_user_id"`
+	ModeratorNotes       *string            `db:"moderator_notes" json:"moderator_notes"`
+	DecidedAt            pgtype.Timestamptz `db:"decided_at" json:"decided_at"`
+	TargetKind           string             `db:"target_kind" json:"target_kind"`
+	TargetID             string             `db:"target_id" json:"target_id"`
+	AppellantGithubLogin string             `db:"appellant_github_login" json:"appellant_github_login"`
+}
+
+func (q *Queries) DecideModerationAppealForModerator(ctx context.Context, arg DecideModerationAppealForModeratorParams) (DecideModerationAppealForModeratorRow, error) {
+	row := q.db.QueryRow(ctx, decideModerationAppealForModerator,
+		arg.Decision,
+		arg.ModeratorUserID,
+		arg.ModeratorNotes,
+		arg.AppealID,
+	)
+	var i DecideModerationAppealForModeratorRow
+	err := row.Scan(
+		&i.ID,
+		&i.ReportID,
+		&i.AppellantUserID,
+		&i.Reason,
+		&i.AppealStatus,
+		&i.CreatedAt,
+		&i.ReviewedByUserID,
+		&i.ModeratorNotes,
+		&i.DecidedAt,
 		&i.TargetKind,
 		&i.TargetID,
 		&i.AppellantGithubLogin,
@@ -147,7 +232,7 @@ func (q *Queries) CreateTrustCandidateModerationAppeal(ctx context.Context, arg 
 }
 
 const listModerationAppealsForModerator = `-- name: ListModerationAppealsForModerator :many
-SELECT appeal.id, appeal.report_id, appeal.appellant_user_id, appeal.reason, appeal.appeal_status, appeal.created_at, report.target_kind, report.target_id, appellant.github_login AS appellant_github_login
+SELECT appeal.id, appeal.report_id, appeal.appellant_user_id, appeal.reason, appeal.appeal_status, appeal.created_at, appeal.reviewed_by_user_id, appeal.moderator_notes, appeal.decided_at, report.target_kind, report.target_id, appellant.github_login AS appellant_github_login
 FROM moderation_appeals AS appeal
 JOIN safety_reports AS report ON report.id = appeal.report_id
 JOIN users AS appellant ON appellant.id = appeal.appellant_user_id
@@ -156,19 +241,25 @@ WHERE EXISTS (
     WHERE moderator.id = $1
       AND moderator.account_role = 'moderator'
 )
-ORDER BY appeal.created_at ASC, appeal.id ASC
+ORDER BY
+    CASE WHEN appeal.appeal_status = 'pending' THEN 0 ELSE 1 END,
+    appeal.created_at ASC,
+    appeal.id ASC
 `
 
 type ListModerationAppealsForModeratorRow struct {
-	ID                   string    `db:"id" json:"id"`
-	ReportID             string    `db:"report_id" json:"report_id"`
-	AppellantUserID      int64     `db:"appellant_user_id" json:"appellant_user_id"`
-	Reason               string    `db:"reason" json:"reason"`
-	AppealStatus         string    `db:"appeal_status" json:"appeal_status"`
-	CreatedAt            time.Time `db:"created_at" json:"created_at"`
-	TargetKind           string    `db:"target_kind" json:"target_kind"`
-	TargetID             string    `db:"target_id" json:"target_id"`
-	AppellantGithubLogin string    `db:"appellant_github_login" json:"appellant_github_login"`
+	ID                   string             `db:"id" json:"id"`
+	ReportID             string             `db:"report_id" json:"report_id"`
+	AppellantUserID      int64              `db:"appellant_user_id" json:"appellant_user_id"`
+	Reason               string             `db:"reason" json:"reason"`
+	AppealStatus         string             `db:"appeal_status" json:"appeal_status"`
+	CreatedAt            time.Time          `db:"created_at" json:"created_at"`
+	ReviewedByUserID     *int64             `db:"reviewed_by_user_id" json:"reviewed_by_user_id"`
+	ModeratorNotes       *string            `db:"moderator_notes" json:"moderator_notes"`
+	DecidedAt            pgtype.Timestamptz `db:"decided_at" json:"decided_at"`
+	TargetKind           string             `db:"target_kind" json:"target_kind"`
+	TargetID             string             `db:"target_id" json:"target_id"`
+	AppellantGithubLogin string             `db:"appellant_github_login" json:"appellant_github_login"`
 }
 
 func (q *Queries) ListModerationAppealsForModerator(ctx context.Context, moderatorUserID int64) ([]ListModerationAppealsForModeratorRow, error) {
@@ -187,6 +278,9 @@ func (q *Queries) ListModerationAppealsForModerator(ctx context.Context, moderat
 			&i.Reason,
 			&i.AppealStatus,
 			&i.CreatedAt,
+			&i.ReviewedByUserID,
+			&i.ModeratorNotes,
+			&i.DecidedAt,
 			&i.TargetKind,
 			&i.TargetID,
 			&i.AppellantGithubLogin,

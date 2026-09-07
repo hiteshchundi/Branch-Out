@@ -45,10 +45,22 @@ func TestParticipantsSubmitAppealsAndModeratorsListThem(t *testing.T) {
 	api := safetyTestAPI(fakeSafetyManager{calls: calls, appeals: []safety.Appeal{appeal}})
 	create := httptest.NewRecorder()
 	api.ServeHTTP(create, authenticatedApplicationRequest(http.MethodPost, "/v1/moderation-appeals", bytes.NewBufferString(`{"targetKind":"trial_feedback","targetId":"feedback-id","reason":"The full trial context supports reconsidering this removal."}`)))
-	if create.Code != http.StatusCreated || calls.operation != "create-appeal" || calls.appeal.TargetID != "feedback-id" { t.Fatalf("create appeal = %d, %#v: %s", create.Code, calls, create.Body.String()) }
+	if create.Code != http.StatusCreated || calls.operation != "create-appeal" || calls.appeal.TargetID != "feedback-id" {
+		t.Fatalf("create appeal = %d, %#v: %s", create.Code, calls, create.Body.String())
+	}
 	list := httptest.NewRecorder()
 	api.ServeHTTP(list, authenticatedApplicationRequest(http.MethodGet, "/v1/moderation/appeals", nil))
-	if list.Code != http.StatusOK || calls.operation != "list-appeals" || !bytes.Contains(list.Body.Bytes(), []byte("appeal-id")) { t.Fatalf("list appeals = %d, %#v: %s", list.Code, calls, list.Body.String()) }
+	if list.Code != http.StatusOK || calls.operation != "list-appeals" || !bytes.Contains(list.Body.Bytes(), []byte("appeal-id")) {
+		t.Fatalf("list appeals = %d, %#v: %s", list.Code, calls, list.Body.String())
+	}
+	decided := appeal
+	decided.Status = "granted"
+	api = safetyTestAPI(fakeSafetyManager{calls: calls, appeals: []safety.Appeal{decided}})
+	decision := httptest.NewRecorder()
+	api.ServeHTTP(decision, authenticatedApplicationRequest(http.MethodPost, "/v1/moderation/appeals/appeal-id/decision", bytes.NewBufferString(`{"decision":"granted","moderatorNotes":"The complete context supports restoring the removed item."}`)))
+	if decision.Code != http.StatusOK || calls.operation != "decide-appeal" || calls.appealID != "appeal-id" || calls.appealDecision.Decision != "granted" {
+		t.Fatalf("decide appeal = %d, %#v: %s", decision.Code, calls, decision.Body.String())
+	}
 }
 
 func TestSafetyRoutesMapAuthorizationAndLifecycleErrors(t *testing.T) {
@@ -64,6 +76,7 @@ func TestSafetyRoutesMapAuthorizationAndLifecycleErrors(t *testing.T) {
 		{"/v1/moderation/reports", http.MethodGet, "", safety.ErrModeratorForbidden, http.StatusForbidden, "moderator_access_forbidden"},
 		{"/v1/moderation/reports/report-id/decision", http.MethodPost, `{"decision":"dismissed","moderatorNotes":"The captured content does not violate the current moderation policy."}`, safety.ErrDecisionUnavailable, http.StatusConflict, "moderation_decision_unavailable"},
 		{"/v1/moderation-appeals", http.MethodPost, `{"targetKind":"trial_feedback","targetId":"feedback-id","reason":"The full trial context supports reconsidering this removal."}`, safety.ErrAppealUnavailable, http.StatusConflict, "moderation_appeal_unavailable"},
+		{"/v1/moderation/appeals/appeal-id/decision", http.MethodPost, `{"decision":"denied","moderatorNotes":"The original decision remains supported by the captured evidence."}`, safety.ErrAppealDecisionUnavailable, http.StatusConflict, "moderation_appeal_decision_unavailable"},
 	} {
 		api := safetyTestAPI(fakeSafetyManager{err: test.err})
 		response := httptest.NewRecorder()

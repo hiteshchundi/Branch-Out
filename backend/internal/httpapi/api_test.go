@@ -73,19 +73,21 @@ func TestReadinessReturnsUnavailableWhenDependencyFails(t *testing.T) {
 }
 
 type safetyCalls struct {
-	operation string
-	userID    int64
-	reportID  string
-	input     safety.Input
-	decision  safety.DecisionInput
-	appeal    safety.AppealInput
+	operation      string
+	userID         int64
+	reportID       string
+	input          safety.Input
+	decision       safety.DecisionInput
+	appeal         safety.AppealInput
+	appealID       string
+	appealDecision safety.AppealDecisionInput
 }
 type fakeSafetyManager struct {
-	calls  *safetyCalls
-	result safety.Report
-	listed []safety.Report
+	calls   *safetyCalls
+	result  safety.Report
+	listed  []safety.Report
 	appeals []safety.Appeal
-	err    error
+	err     error
 }
 
 func (fake fakeSafetyManager) Create(_ context.Context, userID int64, input safety.Input) (safety.Report, error) {
@@ -107,13 +109,28 @@ func (fake fakeSafetyManager) Decide(_ context.Context, userID int64, reportID s
 	return fake.result, fake.err
 }
 func (fake fakeSafetyManager) CreateAppeal(_ context.Context, userID int64, input safety.AppealInput) (safety.Appeal, error) {
-	if fake.calls != nil { fake.calls.operation, fake.calls.userID, fake.calls.appeal = "create-appeal", userID, input }
-	if len(fake.appeals) > 0 { return fake.appeals[0], fake.err }
+	if fake.calls != nil {
+		fake.calls.operation, fake.calls.userID, fake.calls.appeal = "create-appeal", userID, input
+	}
+	if len(fake.appeals) > 0 {
+		return fake.appeals[0], fake.err
+	}
 	return safety.Appeal{}, fake.err
 }
 func (fake fakeSafetyManager) ListAppealsForModerator(_ context.Context, userID int64) ([]safety.Appeal, error) {
-	if fake.calls != nil { fake.calls.operation, fake.calls.userID = "list-appeals", userID }
+	if fake.calls != nil {
+		fake.calls.operation, fake.calls.userID = "list-appeals", userID
+	}
 	return fake.appeals, fake.err
+}
+func (fake fakeSafetyManager) DecideAppeal(_ context.Context, userID int64, appealID string, input safety.AppealDecisionInput) (safety.Appeal, error) {
+	if fake.calls != nil {
+		fake.calls.operation, fake.calls.userID, fake.calls.appealID, fake.calls.appealDecision = "decide-appeal", userID, appealID, input
+	}
+	if len(fake.appeals) > 0 {
+		return fake.appeals[0], fake.err
+	}
+	return safety.Appeal{}, fake.err
 }
 
 func TestListOpeningsReturnsFilteredEnvelope(t *testing.T) {

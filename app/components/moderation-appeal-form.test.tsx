@@ -6,7 +6,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe('ModerationAppealForm', () => {
   it('requires a bounded reason and explicit pending-removal confirmation', async () => {
-    const appeal = { id: 'appeal-id', reportId: 'report-id', targetKind: 'trial_feedback', targetId: 'feedback-id', reason: 'The complete trial context should be considered before this removal remains permanent.', status: 'pending', appellantLogin: 'author', createdAt: '2026-09-02T10:00:00Z' };
+    const appeal = { id: 'appeal-id', reportId: 'report-id', targetKind: 'trial_feedback', targetId: 'feedback-id', reason: 'The complete trial context should be considered before this removal remains permanent.', status: 'pending', appellantLogin: 'author', moderatorNotes: null, createdAt: '2026-09-02T10:00:00Z', decidedAt: null };
     const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: appeal }), { status: 201 }));
     vi.stubGlobal('fetch', fetcher);
     render(<ModerationAppealForm targetId="feedback-id" targetKind="trial_feedback" />);

@@ -58,15 +58,27 @@ describe('ModerationQueuePanel', () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
-  it('shows pending participant appeals without implying a decision', async () => {
-    const appeal = { id: 'appeal-id', reportId: pendingReport.id, targetKind: 'trial_feedback', targetId: 'feedback-id', reason: 'The complete trial context should be considered before this removal remains permanent.', status: 'pending', appellantLogin: 'review-author', createdAt: '2026-09-02T10:00:00Z' };
-    vi.stubGlobal('fetch', vi.fn()
+  it('lets a moderator grant an appeal and confirms restoration', async () => {
+    const appeal = { id: 'appeal-id', reportId: pendingReport.id, targetKind: 'trial_feedback', targetId: 'feedback-id', reason: 'The complete trial context should be considered before this removal remains permanent.', status: 'pending', appellantLogin: 'review-author', moderatorNotes: null, createdAt: '2026-09-02T10:00:00Z', decidedAt: null };
+    const decidedAppeal = { ...appeal, status: 'granted', moderatorNotes: 'The complete context supports restoring the participant-facing review.', decidedAt: '2026-09-02T11:00:00Z' };
+    const fetcher = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [appeal] }), { status: 200 })));
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [appeal] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: decidedAppeal }), { status: 200 }));
+    vi.stubGlobal('fetch', fetcher);
     render(<ModerationQueuePanel onClose={vi.fn()} />);
-    fireEvent.click(await screen.findByRole('button', { name: /pending appeals 1/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /appeals 1/i }));
     expect(screen.getByText('@review-author')).toBeInTheDocument();
     expect(screen.getByText(appeal.reason)).toBeInTheDocument();
-    expect(screen.getByText(/appeal decisions and restoration are not part/i)).toBeInTheDocument();
+    const record = screen.getByRole('article');
+    fireEvent.click(within(record).getByRole('button', { name: /review appeal/i }));
+    const submit = within(record).getByRole('button', { name: /record appeal decision/i });
+    expect(submit).toBeDisabled();
+    fireEvent.click(within(record).getByLabelText(/grant and restore/i));
+    fireEvent.change(within(record).getByLabelText(/moderator notes/i), { target: { value: decidedAppeal.moderatorNotes } });
+    fireEvent.click(within(record).getByLabelText(/decision is permanent/i));
+    fireEvent.click(submit);
+    expect(await screen.findByRole('status')).toHaveTextContent(/has been restored/i);
+    expect(within(record).getByText(/participant-facing item was restored/i)).toBeInTheDocument();
   });
 });

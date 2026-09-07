@@ -8,18 +8,37 @@ import (
 )
 
 type fakeStore struct {
-	record      Record
-	moderatorID int64
-	reportID    string
-	decision    DecisionInput
-	result      Report
-	listed      []Report
-	appealRecord AppealRecord
-	appeals     []Appeal
-	err         error
+	record         Record
+	moderatorID    int64
+	reportID       string
+	decision       DecisionInput
+	result         Report
+	listed         []Report
+	appealRecord   AppealRecord
+	appealID       string
+	appealDecision AppealDecisionInput
+	appeals        []Appeal
+	err            error
 }
-func (store *fakeStore) CreateAppeal(_ context.Context, record AppealRecord) (Appeal, error) { store.appealRecord = record; if len(store.appeals) > 0 { return store.appeals[0], store.err }; return Appeal{}, store.err }
-func (store *fakeStore) ListAppealsForModerator(_ context.Context, userID int64) ([]Appeal, error) { store.moderatorID = userID; return store.appeals, store.err }
+
+func (store *fakeStore) CreateAppeal(_ context.Context, record AppealRecord) (Appeal, error) {
+	store.appealRecord = record
+	if len(store.appeals) > 0 {
+		return store.appeals[0], store.err
+	}
+	return Appeal{}, store.err
+}
+func (store *fakeStore) ListAppealsForModerator(_ context.Context, userID int64) ([]Appeal, error) {
+	store.moderatorID = userID
+	return store.appeals, store.err
+}
+func (store *fakeStore) DecideAppeal(_ context.Context, userID int64, appealID string, input AppealDecisionInput) (Appeal, error) {
+	store.moderatorID, store.appealID, store.appealDecision = userID, appealID, input
+	if len(store.appeals) > 0 {
+		return store.appeals[0], store.err
+	}
+	return Appeal{}, store.err
+}
 
 func (store *fakeStore) Create(_ context.Context, record Record) (Report, error) {
 	store.record = record
@@ -91,11 +110,33 @@ func TestManagerListsAndDecidesForModerator(t *testing.T) {
 
 func TestManagerCreatesBoundedModerationAppeal(t *testing.T) {
 	store := &fakeStore{appeals: []Appeal{{ID: "appeal-id", Status: "pending"}}}
-	manager := NewManager(store); manager.random = strings.NewReader(strings.Repeat("f", 16))
+	manager := NewManager(store)
+	manager.random = strings.NewReader(strings.Repeat("f", 16))
 	result, err := manager.CreateAppeal(context.Background(), 7, AppealInput{TargetKind: "trial_feedback", TargetID: " feedback-id ", Reason: " The moderator should reconsider this removal using the complete trial context. "})
 	if err != nil || result.ID != "appeal-id" || store.appealRecord.ID != "66666666-6666-4666-a666-666666666666" || store.appealRecord.TargetID != "feedback-id" {
 		t.Fatalf("CreateAppeal() = %#v, %v; record %#v", result, err, store.appealRecord)
 	}
-	if _, err := manager.CreateAppeal(context.Background(), 7, AppealInput{TargetKind: "trial_feedback", TargetID: "feedback-id", Reason: "short"}); err == nil { t.Fatal("short appeal accepted") }
-	if appeals, err := manager.ListAppealsForModerator(context.Background(), 8); err != nil || len(appeals) != 1 || store.moderatorID != 8 { t.Fatalf("ListAppealsForModerator() = %#v, %v", appeals, err) }
+	if _, err := manager.CreateAppeal(context.Background(), 7, AppealInput{TargetKind: "trial_feedback", TargetID: "feedback-id", Reason: "short"}); err == nil {
+		t.Fatal("short appeal accepted")
+	}
+	if appeals, err := manager.ListAppealsForModerator(context.Background(), 8); err != nil || len(appeals) != 1 || store.moderatorID != 8 {
+		t.Fatalf("ListAppealsForModerator() = %#v, %v", appeals, err)
+	}
+}
+
+func TestManagerValidatesAndDecidesModerationAppeal(t *testing.T) {
+	store := &fakeStore{appeals: []Appeal{{ID: "appeal-id", Status: "granted"}}}
+	manager := NewManager(store)
+	result, err := manager.DecideAppeal(context.Background(), 8, " appeal-id ", AppealDecisionInput{
+		Decision: " granted ", ModeratorNotes: " The original removal is reversed after reviewing the complete context. ",
+	})
+	if err != nil || result.Status != "granted" || store.appealID != "appeal-id" || store.appealDecision.ModeratorNotes != "The original removal is reversed after reviewing the complete context." {
+		t.Fatalf("DecideAppeal() = %#v, %v; store %#v", result, err, store)
+	}
+	if _, err := manager.DecideAppeal(context.Background(), 8, "appeal-id", AppealDecisionInput{Decision: "edited", ModeratorNotes: strings.Repeat("x", 30)}); !errors.Is(err, ErrAppealDecisionUnavailable) {
+		t.Fatalf("invalid appeal decision error = %v", err)
+	}
+	if _, err := manager.DecideAppeal(context.Background(), 8, "appeal-id", AppealDecisionInput{Decision: "denied", ModeratorNotes: "short"}); err == nil {
+		t.Fatal("short appeal decision notes accepted")
+	}
 }

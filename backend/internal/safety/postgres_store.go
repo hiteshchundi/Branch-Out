@@ -84,33 +84,69 @@ func (store *PostgresStore) CreateAppeal(ctx context.Context, record AppealRecor
 		row, err := store.queries.CreateTrialFeedbackModerationAppeal(ctx, database.CreateTrialFeedbackModerationAppealParams{
 			AppellantUserID: record.AppellantUserID, TargetID: record.TargetID, ID: record.ID, Reason: record.Reason,
 		})
-		if errors.Is(err, pgx.ErrNoRows) { return Appeal{}, ErrAppealUnavailable }
-		if err != nil { return Appeal{}, err }
-		return appealFromValues(row.ID, row.ReportID, row.TargetKind, row.TargetID, row.Reason, row.AppealStatus, row.AppellantGithubLogin, row.CreatedAt), nil
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Appeal{}, ErrAppealUnavailable
+		}
+		if err != nil {
+			return Appeal{}, err
+		}
+		return appealFromValues(row.ID, row.ReportID, row.TargetKind, row.TargetID, row.Reason, row.AppealStatus, row.AppellantGithubLogin, row.ModeratorNotes, row.CreatedAt, row.DecidedAt), nil
 	}
 	row, err := store.queries.CreateTrustCandidateModerationAppeal(ctx, database.CreateTrustCandidateModerationAppealParams{
 		AppellantUserID: record.AppellantUserID, TargetID: record.TargetID, ID: record.ID, Reason: record.Reason,
 	})
-	if errors.Is(err, pgx.ErrNoRows) { return Appeal{}, ErrAppealUnavailable }
-	if err != nil { return Appeal{}, err }
-	return appealFromValues(row.ID, row.ReportID, row.TargetKind, row.TargetID, row.Reason, row.AppealStatus, row.AppellantGithubLogin, row.CreatedAt), nil
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Appeal{}, ErrAppealUnavailable
+	}
+	if err != nil {
+		return Appeal{}, err
+	}
+	return appealFromValues(row.ID, row.ReportID, row.TargetKind, row.TargetID, row.Reason, row.AppealStatus, row.AppellantGithubLogin, row.ModeratorNotes, row.CreatedAt, row.DecidedAt), nil
 }
 
 func (store *PostgresStore) ListAppealsForModerator(ctx context.Context, moderatorUserID int64) ([]Appeal, error) {
 	if _, err := store.queries.GetModeratorSafetyScope(ctx, moderatorUserID); errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrModeratorForbidden
-	} else if err != nil { return nil, err }
+	} else if err != nil {
+		return nil, err
+	}
 	rows, err := store.queries.ListModerationAppealsForModerator(ctx, moderatorUserID)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	results := make([]Appeal, 0, len(rows))
 	for _, row := range rows {
-		results = append(results, appealFromValues(row.ID, row.ReportID, row.TargetKind, row.TargetID, row.Reason, row.AppealStatus, row.AppellantGithubLogin, row.CreatedAt))
+		results = append(results, appealFromValues(row.ID, row.ReportID, row.TargetKind, row.TargetID, row.Reason, row.AppealStatus, row.AppellantGithubLogin, row.ModeratorNotes, row.CreatedAt, row.DecidedAt))
 	}
 	return results, nil
 }
 
-func appealFromValues(id, reportID, targetKind, targetID, reason, status, appellantLogin string, createdAt time.Time) Appeal {
-	return Appeal{ID: id, ReportID: reportID, TargetKind: targetKind, TargetID: targetID, Reason: reason, Status: status, AppellantLogin: appellantLogin, CreatedAt: createdAt}
+func (store *PostgresStore) DecideAppeal(ctx context.Context, moderatorUserID int64, appealID string, input AppealDecisionInput) (Appeal, error) {
+	if _, err := store.queries.GetModeratorSafetyScope(ctx, moderatorUserID); errors.Is(err, pgx.ErrNoRows) {
+		return Appeal{}, ErrModeratorForbidden
+	} else if err != nil {
+		return Appeal{}, err
+	}
+	row, err := store.queries.DecideModerationAppealForModerator(ctx, database.DecideModerationAppealForModeratorParams{
+		Decision: input.Decision, ModeratorUserID: &moderatorUserID,
+		ModeratorNotes: &input.ModeratorNotes, AppealID: appealID,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Appeal{}, ErrAppealDecisionUnavailable
+	}
+	if err != nil {
+		return Appeal{}, err
+	}
+	return appealFromValues(row.ID, row.ReportID, row.TargetKind, row.TargetID, row.Reason, row.AppealStatus, row.AppellantGithubLogin, row.ModeratorNotes, row.CreatedAt, row.DecidedAt), nil
+}
+
+func appealFromValues(id, reportID, targetKind, targetID, reason, status, appellantLogin string, notes *string, createdAt time.Time, decidedValue pgtype.Timestamptz) Appeal {
+	var decidedAt *time.Time
+	if decidedValue.Valid {
+		value := decidedValue.Time
+		decidedAt = &value
+	}
+	return Appeal{ID: id, ReportID: reportID, TargetKind: targetKind, TargetID: targetID, Reason: reason, Status: status, AppellantLogin: appellantLogin, ModeratorNotes: notes, CreatedAt: createdAt, DecidedAt: decidedAt}
 }
 
 func fromValues(id, targetKind, targetID, category, details string, snapshot []byte, status, reporterLogin string, notes *string, createdAt time.Time, decidedValue pgtype.Timestamptz) Report {

@@ -43,6 +43,7 @@ func TestPostgresTrialProposalLifecycle(t *testing.T) {
 	applicant := createTrialTestUser(t, ctx, authStore, profileService, identifier+1, "Accepted Applicant")
 	otherApplicant := createTrialTestUser(t, ctx, authStore, profileService, identifier+2, "Other Applicant")
 	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), "DELETE FROM moderation_appeals WHERE appellant_user_id = ANY($1)", []int64{owner.ID, applicant.ID, otherApplicant.ID})
 		_, _ = pool.Exec(context.Background(), "DELETE FROM safety_reports WHERE reporter_user_id = ANY($1)", []int64{owner.ID, applicant.ID, otherApplicant.ID})
 		_, _ = pool.Exec(context.Background(), "DELETE FROM trial_feedback WHERE author_user_id = ANY($1)", []int64{owner.ID, applicant.ID, otherApplicant.ID})
 		_, _ = pool.Exec(context.Background(), "DELETE FROM trial_outcomes WHERE submitted_by_user_id = ANY($1)", []int64{owner.ID, applicant.ID, otherApplicant.ID})
@@ -301,9 +302,37 @@ func TestPostgresTrialProposalLifecycle(t *testing.T) {
 		t.Fatalf("upheld candidate moderation = %v, %v", removed, err)
 	}
 	candidateAppeal, err := safetyManager.CreateAppeal(ctx, applicant.ID, safety.AppealInput{TargetKind: "trust_candidate", TargetID: proposal.ID, Reason: "The candidate should be reconsidered against the full confirmed outcome and both participant reviews."})
-	if err != nil || candidateAppeal.ReportID != candidateReport.ID { t.Fatalf("candidate appeal = %#v, %v", candidateAppeal, err) }
+	if err != nil || candidateAppeal.ReportID != candidateReport.ID {
+		t.Fatalf("candidate appeal = %#v, %v", candidateAppeal, err)
+	}
 	appeals, err := safetyManager.ListAppealsForModerator(ctx, otherApplicant.ID)
-	if err != nil || len(appeals) != 2 { t.Fatalf("moderation appeals = %#v, %v", appeals, err) }
+	if err != nil || len(appeals) != 2 {
+		t.Fatalf("moderation appeals = %#v, %v", appeals, err)
+	}
+	grantedAppeal, err := safetyManager.DecideAppeal(ctx, otherApplicant.ID, feedbackAppeal.ID, safety.AppealDecisionInput{
+		Decision: "granted", ModeratorNotes: "The complete trial context supports restoring the participant-facing feedback.",
+	})
+	if err != nil || grantedAppeal.Status != "granted" || grantedAppeal.DecidedAt == nil {
+		t.Fatalf("granted appeal = %#v, %v", grantedAppeal, err)
+	}
+	restoredFeedback, err := manager.ListFeedback(ctx, applicant.ID, proposal.ID)
+	if err != nil || len(restoredFeedback) != 2 || restoredFeedback[1].ModerationStatus != "visible" || len(restoredFeedback[1].Input.ObservedBehaviors) == 0 {
+		t.Fatalf("restored feedback = %#v, %v", restoredFeedback, err)
+	}
+	deniedAppeal, err := safetyManager.DecideAppeal(ctx, otherApplicant.ID, candidateAppeal.ID, safety.AppealDecisionInput{
+		Decision: "denied", ModeratorNotes: "The captured evidence continues to support the original candidate removal decision.",
+	})
+	if err != nil || deniedAppeal.Status != "denied" || deniedAppeal.DecidedAt == nil {
+		t.Fatalf("denied appeal = %#v, %v", deniedAppeal, err)
+	}
+	if removed, err := trialStore.TrustCandidateRemoved(ctx, owner.ID, proposal.ID); err != nil || !removed {
+		t.Fatalf("denied candidate appeal = %v, %v", removed, err)
+	}
+	if _, err := safetyManager.DecideAppeal(ctx, otherApplicant.ID, feedbackAppeal.ID, safety.AppealDecisionInput{
+		Decision: "denied", ModeratorNotes: "A second decision must not replace the original immutable appeal outcome.",
+	}); !errors.Is(err, safety.ErrAppealDecisionUnavailable) {
+		t.Fatalf("repeated appeal decision error = %v, want ErrAppealDecisionUnavailable", err)
+	}
 	if _, err := safetyManager.Decide(ctx, otherApplicant.ID, feedbackReport.ID, safety.DecisionInput{
 		Decision: "dismissed", ModeratorNotes: "A second decision must not replace the original immutable moderation outcome.",
 	}); !errors.Is(err, safety.ErrDecisionUnavailable) {

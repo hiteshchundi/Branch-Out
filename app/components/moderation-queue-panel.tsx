@@ -10,10 +10,16 @@ import {
   type ModerationStatus,
 } from '../data/moderation';
 import { useAccessibleDialog } from './use-accessible-dialog';
-import { listModerationAppeals, type ModerationAppeal } from '../data/moderation-appeals';
+import {
+  decideModerationAppeal,
+  listModerationAppeals,
+  type ModerationAppeal,
+  type ModerationAppealDecision,
+} from '../data/moderation-appeals';
 
 const statusLabels: Record<ModerationStatus, string> = { pending: 'Pending review', upheld: 'Upheld', dismissed: 'Dismissed' };
 const targetLabels = { trial_feedback: 'Private participant feedback', trust_candidate: 'Private trust candidate' };
+const appealStatusLabels = { pending: 'Pending appeal', granted: 'Appeal granted', denied: 'Appeal denied' };
 
 function readableLabel(key: string) {
   return key.replace(/([A-Z])/g, ' $1').replace(/^./, (letter) => letter.toUpperCase());
@@ -46,9 +52,13 @@ export function ModerationQueuePanel({ onClose }: { onClose: () => void }) {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [filter, setFilter] = useState<ModerationStatus | 'appeals'>('pending');
   const [activeReportId, setActiveReportId] = useState<string | null>(null);
+  const [activeAppealId, setActiveAppealId] = useState<string | null>(null);
   const [decision, setDecision] = useState<ModerationDecision | ''>('');
   const [notes, setNotes] = useState('');
   const [confirmed, setConfirmed] = useState(false);
+  const [appealDecision, setAppealDecision] = useState<ModerationAppealDecision | ''>('');
+  const [appealNotes, setAppealNotes] = useState('');
+  const [appealConfirmed, setAppealConfirmed] = useState(false);
   const [message, setMessage] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [retry, setRetry] = useState(0);
@@ -96,6 +106,35 @@ export function ModerationQueuePanel({ onClose }: { onClose: () => void }) {
     }
   };
 
+  const beginAppealDecision = (appeal: ModerationAppeal) => {
+    setActiveAppealId(appeal.id);
+    setAppealDecision('');
+    setAppealNotes('');
+    setAppealConfirmed(false);
+    setMessage('');
+  };
+
+  const saveAppealDecision = async (appeal: ModerationAppeal) => {
+    const normalizedNotes = appealNotes.trim();
+    if (!appealDecision || normalizedNotes.length < 20 || normalizedNotes.length > 1000 || !appealConfirmed) return;
+    setIsSaving(true);
+    setMessage('');
+    try {
+      const updated = await decideModerationAppeal(appeal.id, appealDecision, normalizedNotes);
+      setAppeals((current) => current.map((item) => item.id === updated.id ? updated : item));
+      setActiveAppealId(null);
+      setMessage(appealDecision === 'granted'
+        ? 'Appeal granted. The participant-facing item has been restored.'
+        : 'Appeal denied. The original removal remains active.');
+    } catch (error) {
+      setMessage(error instanceof Error && error.message === 'appeal_decision_unavailable'
+        ? 'This appeal was already decided. Refresh the queue to see its current status.'
+        : 'The appeal decision could not be recorded. Try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
       <section aria-labelledby="moderation-title" aria-modal="true" className="moderation-panel" onMouseDown={(event) => event.stopPropagation()} ref={dialogRef} role="dialog">
@@ -110,14 +149,14 @@ export function ModerationQueuePanel({ onClose }: { onClose: () => void }) {
               {statusLabels[reportStatus]} <span>{reports.filter((report) => report.status === reportStatus).length}</span>
             </button>
           ))}
-          <button aria-pressed={filter === 'appeals'} onClick={() => setFilter('appeals')} type="button">Pending appeals <span>{appeals.length}</span></button>
+          <button aria-pressed={filter === 'appeals'} onClick={() => setFilter('appeals')} type="button">Appeals <span>{appeals.filter((appeal) => appeal.status === 'pending').length}</span></button>
         </div>
 
         {message && <p className="moderation-message" role="status">{message}</p>}
         {status === 'loading' && <p className="moderation-state" role="status">Loading private reports…</p>}
         {status === 'error' && <div className="moderation-state"><p>The moderation queue could not be loaded.</p><button className="secondary-button" onClick={() => { setStatus('loading'); setRetry((current) => current + 1); }} type="button">Retry</button></div>}
         {status === 'ready' && filter !== 'appeals' && visibleReports.length === 0 && <p className="moderation-state">No {statusLabels[filter].toLowerCase()} reports.</p>}
-        {status === 'ready' && filter === 'appeals' && appeals.length === 0 && <p className="moderation-state">No pending appeals.</p>}
+        {status === 'ready' && filter === 'appeals' && appeals.length === 0 && <p className="moderation-state">No appeals.</p>}
 
         <div className="moderation-list">
           {status === 'ready' && filter !== 'appeals' && visibleReports.map((report) => (
@@ -149,14 +188,23 @@ export function ModerationQueuePanel({ onClose }: { onClose: () => void }) {
           ))}
           {status === 'ready' && filter === 'appeals' && appeals.map((appeal) => (
             <article className="moderation-report moderation-appeal-record" key={appeal.id}>
-              <div className="moderation-report-heading"><div><span className="moderation-status moderation-status-pending">Pending appeal</span><h3>{targetLabels[appeal.targetKind]}</h3></div><time dateTime={appeal.createdAt}>{new Date(appeal.createdAt).toLocaleString()}</time></div>
+              <div className="moderation-report-heading"><div><span className={`moderation-status moderation-status-${appeal.status}`}>{appealStatusLabels[appeal.status]}</span><h3>{targetLabels[appeal.targetKind]}</h3></div><time dateTime={appeal.createdAt}>{new Date(appeal.createdAt).toLocaleString()}</time></div>
               <dl className="moderation-report-facts"><div><dt>Appellant</dt><dd>@{appeal.appellantLogin}</dd></div><div><dt>Report ID</dt><dd>{appeal.reportId}</dd></div><div><dt>Target ID</dt><dd>{appeal.targetId}</dd></div></dl>
               <section className="moderation-reason"><h4>Reason for reconsideration</h4><p>{appeal.reason}</p></section>
-              <p className="moderation-boundary">Appeal decisions and restoration are not part of this intake phase. The original removal remains active.</p>
+              {appeal.status === 'pending' && activeAppealId !== appeal.id && <button className="primary-button" onClick={() => beginAppealDecision(appeal)} type="button">Review appeal</button>}
+              {appeal.status !== 'pending' && <section className="moderation-decision"><h4>Appeal decision notes</h4><p>{appeal.moderatorNotes}</p>{appeal.decidedAt && <time dateTime={appeal.decidedAt}>Decided {new Date(appeal.decidedAt).toLocaleString()}</time>}<p>{appeal.status === 'granted' ? 'The participant-facing item was restored.' : 'The original removal remains active.'}</p></section>}
+              {activeAppealId === appeal.id && (
+                <form className="moderation-decision-form" onSubmit={(event) => { event.preventDefault(); void saveAppealDecision(appeal); }}>
+                  <fieldset><legend>Appeal decision</legend><label><input checked={appealDecision === 'granted'} name={`appeal-decision-${appeal.id}`} onChange={() => setAppealDecision('granted')} type="radio" /> Grant and restore</label><label><input checked={appealDecision === 'denied'} name={`appeal-decision-${appeal.id}`} onChange={() => setAppealDecision('denied')} type="radio" /> Deny and keep removed</label></fieldset>
+                  <label>Moderator notes<textarea aria-describedby={`appeal-notes-help-${appeal.id}`} maxLength={1000} minLength={20} onChange={(event) => setAppealNotes(event.target.value)} required rows={4} value={appealNotes} /><small id={`appeal-notes-help-${appeal.id}`}>20–1000 characters. Explain the reviewed context and final finding.</small></label>
+                  <label className="confirmation-row"><input checked={appealConfirmed} onChange={(event) => setAppealConfirmed(event.target.checked)} type="checkbox" /> I understand this appeal decision is permanent and granting it restores the item.</label>
+                  <div><button className="primary-button" disabled={!appealDecision || appealNotes.trim().length < 20 || !appealConfirmed || isSaving} type="submit">{isSaving ? 'Recording appeal decision…' : 'Record appeal decision'}</button><button className="text-button" disabled={isSaving} onClick={() => setActiveAppealId(null)} type="button">Cancel</button></div>
+                </form>
+              )}
             </article>
           ))}
         </div>
-        <p className="moderation-boundary">This workspace records policy findings and receives appeals. It does not sanction an account, publish a trust signal, decide appeals, or restore removed content.</p>
+        <p className="moderation-boundary">Granted appeals restore participant-facing content; denied appeals keep the original removal active. Account sanctions and public trust-signal decisions remain separate moderator workflows.</p>
       </section>
     </div>
   );

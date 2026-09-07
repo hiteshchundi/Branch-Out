@@ -32,6 +32,11 @@ WITH acknowledged AS (
           WHERE report.target_kind = 'trial_feedback'
             AND report.target_id = feedback.id
             AND report.report_status = 'upheld'
+            AND NOT EXISTS (
+                SELECT 1 FROM moderation_appeals AS appeal
+                WHERE appeal.report_id = report.id
+                  AND appeal.appeal_status = 'granted'
+            )
       )
       AND (
           proposal.applicant_user_id = $1
@@ -680,6 +685,11 @@ SELECT EXISTS (
     WHERE report.target_kind = 'trust_candidate'
       AND report.target_id = proposal.id
       AND report.report_status = 'upheld'
+      AND NOT EXISTS (
+          SELECT 1 FROM moderation_appeals AS appeal
+          WHERE appeal.report_id = report.id
+            AND appeal.appeal_status = 'granted'
+      )
 ) AS removed
 FROM trial_proposals AS proposal
 JOIN project_openings AS opening ON opening.id = proposal.opening_id
@@ -805,6 +815,11 @@ LEFT JOIN LATERAL (
     WHERE report.target_kind = 'trial_feedback'
       AND report.target_id = feedback.id
       AND report.report_status = 'upheld'
+      AND NOT EXISTS (
+          SELECT 1 FROM moderation_appeals AS appeal
+          WHERE appeal.report_id = report.id
+            AND appeal.appeal_status = 'granted'
+      )
     LIMIT 1
 ) AS enforcement ON true
 WHERE feedback.proposal_id = $2

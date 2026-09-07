@@ -1185,7 +1185,7 @@ paths:
     get:
       operationId: listModerationAppeals
       summary: List pending moderation appeals
-      description: Requires a moderator and returns read-only appeal intake records. Decisions and restoration are not available in this phase.
+      description: Requires a moderator and returns pending and decided appeals. Pending records are ordered first.
       security: [{sessionCookie: []}]
       responses:
         '200':
@@ -1200,6 +1200,35 @@ paths:
                   meta: {type: object, required: [count], properties: {count: {type: integer, minimum: 0}}}
         '401': {description: No valid session is present., content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}}
         '403': {description: The authenticated member is not a moderator., content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}}
+  /v1/moderation/appeals/{appealId}/decision:
+    post:
+      operationId: decideModerationAppeal
+      summary: Grant or deny one pending moderation appeal
+      description: Requires a moderator. The first decision and required notes are immutable. Granting an appeal restores the participant-facing feedback or trust candidate; denying it keeps the original removal active.
+      security: [{sessionCookie: []}]
+      parameters:
+        - name: appealId
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ModerationAppealDecisionInput'}
+      responses:
+        '200':
+          description: The immutable appeal decision was recorded.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties: {data: {$ref: '#/components/schemas/ModerationAppeal'}}
+        '400': {description: The decision is malformed or fails validation., content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}}
+        '401': {description: No valid session is present., content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}}
+        '403': {description: The authenticated member is not a moderator., content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}}
+        '409': {description: The appeal is missing, already decided, or belongs to the moderator., content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}}
   /v1/moderation/reports/{reportId}/decision:
     post:
       operationId: decideModerationReport
@@ -2149,18 +2178,27 @@ components:
         targetKind: {type: string, enum: [trial_feedback, trust_candidate]}
         targetId: {type: string, minLength: 1, maxLength: 100}
         reason: {type: string, minLength: 30, maxLength: 1000}
+    ModerationAppealDecisionInput:
+      type: object
+      additionalProperties: false
+      required: [decision, moderatorNotes]
+      properties:
+        decision: {type: string, enum: [granted, denied]}
+        moderatorNotes: {type: string, minLength: 20, maxLength: 1000}
     ModerationAppeal:
       type: object
-      required: [id, reportId, targetKind, targetId, reason, status, appellantLogin, createdAt]
+      required: [id, reportId, targetKind, targetId, reason, status, appellantLogin, moderatorNotes, createdAt, decidedAt]
       properties:
         id: {type: string, format: uuid}
         reportId: {type: string, format: uuid}
         targetKind: {type: string, enum: [trial_feedback, trust_candidate]}
         targetId: {type: string}
         reason: {type: string}
-        status: {type: string, enum: [pending]}
+        status: {type: string, enum: [pending, granted, denied]}
         appellantLogin: {type: string}
+        moderatorNotes: {type: [string, 'null']}
         createdAt: {type: string, format: date-time}
+        decidedAt: {type: [string, 'null'], format: date-time}
     SafetyReportReceipt:
       type: object
       required: [id, targetKind, targetId, category, status, createdAt]

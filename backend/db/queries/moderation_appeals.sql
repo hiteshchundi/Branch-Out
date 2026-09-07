@@ -60,4 +60,30 @@ WHERE EXISTS (
     WHERE moderator.id = sqlc.arg(moderator_user_id)
       AND moderator.account_role = 'moderator'
 )
-ORDER BY appeal.created_at ASC, appeal.id ASC;
+ORDER BY
+    CASE WHEN appeal.appeal_status = 'pending' THEN 0 ELSE 1 END,
+    appeal.created_at ASC,
+    appeal.id ASC;
+
+-- name: DecideModerationAppealForModerator :one
+WITH decided AS (
+    UPDATE moderation_appeals AS appeal SET
+        appeal_status = sqlc.arg(decision),
+        reviewed_by_user_id = sqlc.arg(moderator_user_id),
+        moderator_notes = sqlc.arg(moderator_notes),
+        decided_at = now()
+    WHERE appeal.id = sqlc.arg(appeal_id)
+      AND appeal.appeal_status = 'pending'
+      AND sqlc.arg(decision)::text IN ('granted', 'denied')
+      AND appeal.appellant_user_id <> sqlc.arg(moderator_user_id)
+      AND EXISTS (
+          SELECT 1 FROM users AS moderator
+          WHERE moderator.id = sqlc.arg(moderator_user_id)
+            AND moderator.account_role = 'moderator'
+      )
+    RETURNING appeal.*
+)
+SELECT decided.*, report.target_kind, report.target_id, appellant.github_login AS appellant_github_login
+FROM decided
+JOIN safety_reports AS report ON report.id = decided.report_id
+JOIN users AS appellant ON appellant.id = decided.appellant_user_id;

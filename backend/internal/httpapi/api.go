@@ -79,6 +79,7 @@ type SafetyManager interface {
 	Decide(context.Context, int64, string, safety.DecisionInput) (safety.Report, error)
 	CreateAppeal(context.Context, int64, safety.AppealInput) (safety.Appeal, error)
 	ListAppealsForModerator(context.Context, int64) ([]safety.Appeal, error)
+	DecideAppeal(context.Context, int64, string, safety.AppealDecisionInput) (safety.Appeal, error)
 }
 
 type listResponse struct {
@@ -138,6 +139,7 @@ func New(repository openings.Repository, openingManager OpeningManager, applicat
 	routes.HandleFunc("POST /v1/moderation/reports/{reportId}/decision", api.decideModerationReport)
 	routes.HandleFunc("POST /v1/moderation-appeals", api.createModerationAppeal)
 	routes.HandleFunc("GET /v1/moderation/appeals", api.listModerationAppeals)
+	routes.HandleFunc("POST /v1/moderation/appeals/{appealId}/decision", api.decideModerationAppeal)
 	routes.HandleFunc("GET /v1/auth/github/start", api.startGitHubAuth)
 	routes.HandleFunc("GET /v1/auth/github/callback", api.finishGitHubAuth)
 	routes.HandleFunc("GET /v1/session", api.currentSession)
@@ -170,6 +172,8 @@ func New(repository openings.Repository, openingManager OpeningManager, applicat
 	routes.HandleFunc("OPTIONS /v1/moderation/reports", api.preflight)
 	routes.HandleFunc("OPTIONS /v1/moderation/reports/{reportId}/decision", api.preflight)
 	routes.HandleFunc("OPTIONS /v1/moderation-appeals", api.preflight)
+	routes.HandleFunc("OPTIONS /v1/moderation/appeals", api.preflight)
+	routes.HandleFunc("OPTIONS /v1/moderation/appeals/{appealId}/decision", api.preflight)
 	routes.HandleFunc("/", api.notFound)
 
 	return api.recoverPanics(api.logRequests(api.cors(routes)))
