@@ -14,11 +14,12 @@ export type OpeningDraftInput = {
   confidentiality: string;
 };
 
-export type PublicationStatus = 'draft' | 'published' | 'closed';
+export type PublicationStatus = 'draft' | 'published' | 'expired' | 'closed';
 
 export type OwnedOpening = {
   id: string;
   publicationStatus: PublicationStatus;
+  expiresAt: string | null;
   input: OpeningDraftInput;
 };
 
@@ -67,7 +68,7 @@ function parseRoleAndProject(title: unknown) {
 function parseOwnedOpening(value: unknown): OwnedOpening {
   if (!value || typeof value !== 'object') throw new Error('The API returned an invalid opening draft.');
   const opening = value as Record<string, unknown>;
-  if (!['draft', 'published', 'closed'].includes(opening.publicationStatus as string)) {
+  if (!['draft', 'published', 'expired', 'closed'].includes(opening.publicationStatus as string)) {
     throw new Error('The API returned an invalid opening draft.');
   }
   const identity = parseRoleAndProject(opening.title);
@@ -97,12 +98,16 @@ function parseOwnedOpening(value: unknown): OwnedOpening {
     || (opening.firstMilestone as string).trim().length > 500
     || (opening.ownerContribution as string).trim().length < 20
     || (opening.ownerContribution as string).trim().length > 500
+    || (opening.publicationStatus === 'draft'
+      ? opening.expiresAt !== null
+      : typeof opening.expiresAt !== 'string' || Number.isNaN(Date.parse(opening.expiresAt)))
   ) {
     throw new Error('The API returned an invalid opening draft.');
   }
   return {
     id: opening.id as string,
     publicationStatus: opening.publicationStatus as PublicationStatus,
+    expiresAt: opening.expiresAt as string | null,
     input: {
       ...identity,
       problem: (opening.summary as string).trim(),

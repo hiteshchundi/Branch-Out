@@ -4,6 +4,7 @@ package openings
 import (
 	"context"
 	"strings"
+	"time"
 )
 
 type Role string
@@ -50,6 +51,7 @@ type Opening struct {
 	OwnerName         string         `json:"ownerName"`
 	OwnerSignal       string         `json:"ownerSignal"`
 	Confidentiality   string         `json:"confidentiality"`
+	ExpiresAt         *time.Time     `json:"expiresAt"`
 }
 
 type Filters struct {
@@ -89,4 +91,8 @@ func Matches(opening Opening, filters Filters) bool {
 	return (filters.Role == "" || opening.Role == filters.Role) &&
 		(filters.Compensation == "" || opening.Compensation == filters.Compensation) &&
 		(filters.Commitment == "" || opening.CommitmentBand == filters.Commitment)
+}
+
+func IsDiscoverable(opening Opening, now time.Time) bool {
+	return opening.ExpiresAt != nil && opening.ExpiresAt.After(now)
 }

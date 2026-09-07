@@ -38,6 +38,7 @@ const responseDraft = {
   ownerContribution: input.ownerContribution,
   confidentiality: 'Public project details; no private credentials or client-confidential material.',
   publicationStatus: 'draft',
+  expiresAt: null,
 };
 
 afterEach(() => vi.unstubAllGlobals());
@@ -45,7 +46,7 @@ afterEach(() => vi.unstubAllGlobals());
 describe('opening draft API client', () => {
   it('loads and maps the current member draft', async () => {
     const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      data: [responseDraft, { ...responseDraft, id: '71717171-7171-4171-a171-717171717171', publicationStatus: 'published' }],
+      data: [responseDraft, { ...responseDraft, id: '71717171-7171-4171-a171-717171717171', publicationStatus: 'published', expiresAt: '2026-10-07T00:00:00Z' }],
       meta: { count: 2 },
     }), { status: 200 }));
     vi.stubGlobal('fetch', fetcher);
@@ -53,6 +54,7 @@ describe('opening draft API client', () => {
     await expect(listOwnedOpeningDrafts()).resolves.toEqual([{
       id: responseDraft.id,
       publicationStatus: 'draft',
+      expiresAt: null,
       input,
     }]);
     expect(fetcher).toHaveBeenCalledWith(
@@ -66,19 +68,28 @@ describe('opening draft API client', () => {
       ...responseDraft,
       id: '71717171-7171-4171-a171-717171717171',
       publicationStatus: 'published',
+      expiresAt: '2026-10-07T00:00:00Z',
     };
     const closed = {
       ...responseDraft,
       id: '81818181-8181-4181-a181-818181818181',
       publicationStatus: 'closed',
+      expiresAt: '2026-10-07T00:00:00Z',
+    };
+    const expired = {
+      ...responseDraft,
+      id: '91919191-9191-4191-a191-919191919191',
+      publicationStatus: 'expired',
+      expiresAt: '2026-09-01T00:00:00Z',
     };
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      data: [published, closed],
+      data: [published, expired, closed],
     }), { status: 200 })));
 
     await expect(listOwnedOpenings()).resolves.toEqual([
-      { id: published.id, publicationStatus: 'published', input },
-      { id: closed.id, publicationStatus: 'closed', input },
+      { id: published.id, publicationStatus: 'published', expiresAt: published.expiresAt, input },
+      { id: expired.id, publicationStatus: 'expired', expiresAt: expired.expiresAt, input },
+      { id: closed.id, publicationStatus: 'closed', expiresAt: closed.expiresAt, input },
     ]);
   });
 
@@ -105,7 +116,7 @@ describe('opening draft API client', () => {
   });
 
   it('publishes an owned draft with an explicit lifecycle request', async () => {
-    const published = { ...responseDraft, publicationStatus: 'published' };
+    const published = { ...responseDraft, publicationStatus: 'published', expiresAt: '2026-10-07T00:00:00Z' };
     const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: published }), { status: 200 }));
     vi.stubGlobal('fetch', fetcher);
 
@@ -117,7 +128,7 @@ describe('opening draft API client', () => {
   });
 
   it('closes an owned published opening with an explicit lifecycle request', async () => {
-    const closed = { ...responseDraft, publicationStatus: 'closed' };
+    const closed = { ...responseDraft, publicationStatus: 'closed', expiresAt: '2026-10-07T00:00:00Z' };
     const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: closed }), { status: 200 }));
     vi.stubGlobal('fetch', fetcher);
 

@@ -231,6 +231,7 @@ WHERE application.opening_id = $1
   AND application.status = 'draft'
   AND opening.id = application.opening_id
   AND opening.publication_status = 'published'
+  AND opening.expires_at > now()
   AND opening.owner_user_id IS DISTINCT FROM application.applicant_user_id
 RETURNING
     application.id, application.opening_id, application.applicant_user_id,
@@ -283,6 +284,7 @@ SELECT
 FROM project_openings AS opening
 WHERE opening.id = $9
   AND opening.publication_status = 'published'
+  AND opening.expires_at > now()
   AND opening.owner_user_id IS DISTINCT FROM $2
 ON CONFLICT (opening_id, applicant_user_id) DO UPDATE SET
     message = EXCLUDED.message,

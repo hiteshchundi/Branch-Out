@@ -182,6 +182,7 @@ export function CreateOpeningPanel({
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [openingID, setOpeningID] = useState<string | null>(null);
   const [openingStatus, setOpeningStatus] = useState<PublicationStatus | null>(null);
+  const [openingExpiresAt, setOpeningExpiresAt] = useState<string | null>(null);
   const [publishConfirmed, setPublishConfirmed] = useState(false);
   const [closeConfirmed, setCloseConfirmed] = useState(false);
   const [transitionMessage, setTransitionMessage] = useState('');
@@ -218,6 +219,7 @@ export function CreateOpeningPanel({
         if (openings[0]) {
           setOpeningID(openings[0].id);
           setOpeningStatus(openings[0].publicationStatus);
+          setOpeningExpiresAt(openings[0].expiresAt);
           setDraft(fromAPIInput(openings[0].input));
         }
         setLoadStatus('ready');
@@ -313,6 +315,7 @@ export function CreateOpeningPanel({
         : await createOpeningDraft(toAPIInput(draft));
       setOpeningID(saved.id);
       setOpeningStatus(saved.publicationStatus);
+      setOpeningExpiresAt(saved.expiresAt);
       setDraft(fromAPIInput(saved.input));
       if (complete) setIsComplete(true);
       else setSaveMessage('Private draft saved to your account. It has not been published.');
@@ -373,9 +376,10 @@ export function CreateOpeningPanel({
     try {
       const published = await publishOpening(openingID);
       setOpeningStatus(published.publicationStatus);
+      setOpeningExpiresAt(published.expiresAt);
       setDraft(fromAPIInput(published.input));
       setPublishConfirmed(false);
-      setTransitionMessage('Your opening is now visible in public discovery.');
+      setTransitionMessage('Your opening is now visible in public discovery for 30 days.');
       onOpeningChanged?.();
     } catch (error) {
       setTransitionMessage(transitionErrorMessage(error, 'published'));
@@ -391,6 +395,7 @@ export function CreateOpeningPanel({
     try {
       const closed = await closeOpening(openingID);
       setOpeningStatus(closed.publicationStatus);
+      setOpeningExpiresAt(closed.expiresAt);
       setDraft(fromAPIInput(closed.input));
       setCloseConfirmed(false);
       setTransitionMessage('The opening has been removed from public discovery.');
@@ -484,6 +489,7 @@ export function CreateOpeningPanel({
     setTransitionMessage('');
     setOpeningID(null);
     setOpeningStatus(null);
+    setOpeningExpiresAt(null);
     setIsComplete(false);
   };
 
@@ -522,6 +528,8 @@ export function CreateOpeningPanel({
               <span className="eyebrow">
                 {openingStatus === 'published'
                   ? 'Published opening'
+                  : openingStatus === 'expired'
+                    ? 'Opening expired'
                   : openingStatus === 'closed'
                     ? 'Opening closed'
                     : isAuthenticated ? 'Private draft saved' : 'Draft ready'}
@@ -529,7 +537,9 @@ export function CreateOpeningPanel({
               <h3>{draft.projectName}</h3>
               <p>
                 {openingStatus === 'published'
-                  ? 'This opening is visible in public discovery. Close it when you are no longer accepting collaborators.'
+                  ? 'This opening is visible in public discovery for 30 days. You can close it sooner when you stop accepting collaborators.'
+                  : openingStatus === 'expired'
+                    ? 'The 30-day application window ended, so this opening is no longer visible in public discovery and cannot accept new applications.'
                   : openingStatus === 'closed'
                     ? 'This opening is no longer visible in public discovery. Closed openings cannot be reopened.'
                     : isAuthenticated
@@ -542,8 +552,9 @@ export function CreateOpeningPanel({
               <div><dt>Commitment</dt><dd>{draft.commitment}</dd></div>
               <div><dt>Compensation</dt><dd>{draft.compensation}</dd></div>
               <div><dt>First milestone</dt><dd>{draft.firstMilestone}</dd></div>
+              {openingExpiresAt && <div><dt>Application deadline</dt><dd>{new Date(openingExpiresAt).toLocaleDateString('en-GB', { dateStyle: 'medium', timeZone: 'UTC' })}</dd></div>}
             </dl>
-            {isAuthenticated && (openingStatus === 'published' || openingStatus === 'closed') && (
+            {isAuthenticated && (openingStatus === 'published' || openingStatus === 'expired' || openingStatus === 'closed') && (
               <section aria-labelledby="submitted-applications-title" className="owner-application-review">
                 <div className="owner-application-review-heading">
                   <div>
@@ -726,7 +737,7 @@ export function CreateOpeningPanel({
             )}
             {transitionMessage && <p aria-live="polite" className="save-message">{transitionMessage}</p>}
             <div className="opening-complete-actions">
-              {isAuthenticated && openingStatus === 'closed' && (
+              {isAuthenticated && (openingStatus === 'expired' || openingStatus === 'closed') && (
                 <button className="secondary-button" onClick={startAnotherDraft} type="button">Start another draft</button>
               )}
               <button className="primary-button" onClick={onClose} type="button">Return to openings</button>

@@ -108,6 +108,29 @@ func TestPostgresOwnerDraftLifecycle(t *testing.T) {
 	if !foundPublished {
 		t.Fatal("published owner opening was not discoverable")
 	}
+	var expiresAt time.Time
+	if err := pool.QueryRow(ctx, `SELECT expires_at FROM project_openings WHERE id = $1`, created.ID).Scan(&expiresAt); err != nil {
+		t.Fatalf("load opening expiry: %v", err)
+	}
+	if remaining := time.Until(expiresAt); remaining < 29*24*time.Hour || remaining > 31*24*time.Hour {
+		t.Fatalf("opening expiry remaining = %v, want approximately 30 days", remaining)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE project_openings SET published_at = now() - INTERVAL '31 days', expires_at = now() - INTERVAL '1 day' WHERE id = $1`, created.ID); err != nil {
+		t.Fatalf("expire opening: %v", err)
+	}
+	public, err = repository.List(ctx, Filters{})
+	if err != nil {
+		t.Fatalf("List() after expiry error = %v", err)
+	}
+	for _, opening := range public {
+		if opening.ID == created.ID {
+			t.Fatal("expired owner opening remained publicly discoverable")
+		}
+	}
+	owned, err = manager.ListOwned(ctx, firstUser.ID)
+	if err != nil || len(owned) != 1 || owned[0].PublicationStatus != "expired" {
+		t.Fatalf("owned opening after expiry = %#v, %v", owned, err)
+	}
 	if _, err := manager.UpdateDraft(ctx, firstUser.ID, created.ID, input); !errors.Is(err, ErrDraftNotFound) {
 		t.Fatalf("published UpdateDraft() error = %v, want ErrDraftNotFound", err)
 	}

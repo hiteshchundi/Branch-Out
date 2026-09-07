@@ -7,6 +7,8 @@ package database
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const closeOwnedOpening = `-- name: CloseOwnedOpening :one
@@ -23,7 +25,7 @@ RETURNING
     id, title, summary, skills, role, compensation, commitment,
     commitment_band, duration, timezone, freshness, stage,
     desired_outcome, first_milestone, owner_contribution, owner_name,
-    owner_signal, confidentiality, publication_status
+    owner_signal, confidentiality, publication_status, expires_at
 `
 
 type CloseOwnedOpeningParams struct {
@@ -32,25 +34,26 @@ type CloseOwnedOpeningParams struct {
 }
 
 type CloseOwnedOpeningRow struct {
-	ID                string   `db:"id" json:"id"`
-	Title             string   `db:"title" json:"title"`
-	Summary           string   `db:"summary" json:"summary"`
-	Skills            []string `db:"skills" json:"skills"`
-	Role              string   `db:"role" json:"role"`
-	Compensation      string   `db:"compensation" json:"compensation"`
-	Commitment        string   `db:"commitment" json:"commitment"`
-	CommitmentBand    string   `db:"commitment_band" json:"commitment_band"`
-	Duration          string   `db:"duration" json:"duration"`
-	Timezone          string   `db:"timezone" json:"timezone"`
-	Freshness         string   `db:"freshness" json:"freshness"`
-	Stage             string   `db:"stage" json:"stage"`
-	DesiredOutcome    string   `db:"desired_outcome" json:"desired_outcome"`
-	FirstMilestone    string   `db:"first_milestone" json:"first_milestone"`
-	OwnerContribution string   `db:"owner_contribution" json:"owner_contribution"`
-	OwnerName         string   `db:"owner_name" json:"owner_name"`
-	OwnerSignal       string   `db:"owner_signal" json:"owner_signal"`
-	Confidentiality   string   `db:"confidentiality" json:"confidentiality"`
-	PublicationStatus string   `db:"publication_status" json:"publication_status"`
+	ID                string             `db:"id" json:"id"`
+	Title             string             `db:"title" json:"title"`
+	Summary           string             `db:"summary" json:"summary"`
+	Skills            []string           `db:"skills" json:"skills"`
+	Role              string             `db:"role" json:"role"`
+	Compensation      string             `db:"compensation" json:"compensation"`
+	Commitment        string             `db:"commitment" json:"commitment"`
+	CommitmentBand    string             `db:"commitment_band" json:"commitment_band"`
+	Duration          string             `db:"duration" json:"duration"`
+	Timezone          string             `db:"timezone" json:"timezone"`
+	Freshness         string             `db:"freshness" json:"freshness"`
+	Stage             string             `db:"stage" json:"stage"`
+	DesiredOutcome    string             `db:"desired_outcome" json:"desired_outcome"`
+	FirstMilestone    string             `db:"first_milestone" json:"first_milestone"`
+	OwnerContribution string             `db:"owner_contribution" json:"owner_contribution"`
+	OwnerName         string             `db:"owner_name" json:"owner_name"`
+	OwnerSignal       string             `db:"owner_signal" json:"owner_signal"`
+	Confidentiality   string             `db:"confidentiality" json:"confidentiality"`
+	PublicationStatus string             `db:"publication_status" json:"publication_status"`
+	ExpiresAt         pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
 }
 
 func (q *Queries) CloseOwnedOpening(ctx context.Context, arg CloseOwnedOpeningParams) (CloseOwnedOpeningRow, error) {
@@ -76,6 +79,7 @@ func (q *Queries) CloseOwnedOpening(ctx context.Context, arg CloseOwnedOpeningPa
 		&i.OwnerSignal,
 		&i.Confidentiality,
 		&i.PublicationStatus,
+		&i.ExpiresAt,
 	)
 	return i, err
 }
@@ -100,7 +104,7 @@ RETURNING
     id, title, summary, skills, role, compensation, commitment,
     commitment_band, duration, timezone, freshness, stage,
     desired_outcome, first_milestone, owner_contribution, owner_name,
-    owner_signal, confidentiality, publication_status
+    owner_signal, confidentiality, publication_status, expires_at
 `
 
 type CreateOwnedOpeningParams struct {
@@ -126,25 +130,26 @@ type CreateOwnedOpeningParams struct {
 }
 
 type CreateOwnedOpeningRow struct {
-	ID                string   `db:"id" json:"id"`
-	Title             string   `db:"title" json:"title"`
-	Summary           string   `db:"summary" json:"summary"`
-	Skills            []string `db:"skills" json:"skills"`
-	Role              string   `db:"role" json:"role"`
-	Compensation      string   `db:"compensation" json:"compensation"`
-	Commitment        string   `db:"commitment" json:"commitment"`
-	CommitmentBand    string   `db:"commitment_band" json:"commitment_band"`
-	Duration          string   `db:"duration" json:"duration"`
-	Timezone          string   `db:"timezone" json:"timezone"`
-	Freshness         string   `db:"freshness" json:"freshness"`
-	Stage             string   `db:"stage" json:"stage"`
-	DesiredOutcome    string   `db:"desired_outcome" json:"desired_outcome"`
-	FirstMilestone    string   `db:"first_milestone" json:"first_milestone"`
-	OwnerContribution string   `db:"owner_contribution" json:"owner_contribution"`
-	OwnerName         string   `db:"owner_name" json:"owner_name"`
-	OwnerSignal       string   `db:"owner_signal" json:"owner_signal"`
-	Confidentiality   string   `db:"confidentiality" json:"confidentiality"`
-	PublicationStatus string   `db:"publication_status" json:"publication_status"`
+	ID                string             `db:"id" json:"id"`
+	Title             string             `db:"title" json:"title"`
+	Summary           string             `db:"summary" json:"summary"`
+	Skills            []string           `db:"skills" json:"skills"`
+	Role              string             `db:"role" json:"role"`
+	Compensation      string             `db:"compensation" json:"compensation"`
+	Commitment        string             `db:"commitment" json:"commitment"`
+	CommitmentBand    string             `db:"commitment_band" json:"commitment_band"`
+	Duration          string             `db:"duration" json:"duration"`
+	Timezone          string             `db:"timezone" json:"timezone"`
+	Freshness         string             `db:"freshness" json:"freshness"`
+	Stage             string             `db:"stage" json:"stage"`
+	DesiredOutcome    string             `db:"desired_outcome" json:"desired_outcome"`
+	FirstMilestone    string             `db:"first_milestone" json:"first_milestone"`
+	OwnerContribution string             `db:"owner_contribution" json:"owner_contribution"`
+	OwnerName         string             `db:"owner_name" json:"owner_name"`
+	OwnerSignal       string             `db:"owner_signal" json:"owner_signal"`
+	Confidentiality   string             `db:"confidentiality" json:"confidentiality"`
+	PublicationStatus string             `db:"publication_status" json:"publication_status"`
+	ExpiresAt         pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
 }
 
 func (q *Queries) CreateOwnedOpening(ctx context.Context, arg CreateOwnedOpeningParams) (CreateOwnedOpeningRow, error) {
@@ -190,6 +195,7 @@ func (q *Queries) CreateOwnedOpening(ctx context.Context, arg CreateOwnedOpening
 		&i.OwnerSignal,
 		&i.Confidentiality,
 		&i.PublicationStatus,
+		&i.ExpiresAt,
 	)
 	return i, err
 }
@@ -213,10 +219,12 @@ SELECT
     owner_contribution,
     owner_name,
     owner_signal,
-    confidentiality
+    confidentiality,
+    expires_at
 FROM project_openings
 WHERE
     publication_status = 'published'
+    AND expires_at > now()
     AND ($1::text = '' OR role = $1::text)
     AND ($2::text = '' OR compensation = $2::text)
     AND ($3::text = '' OR commitment_band = $3::text)
@@ -249,24 +257,25 @@ type ListOpeningsParams struct {
 }
 
 type ListOpeningsRow struct {
-	ID                string   `db:"id" json:"id"`
-	Title             string   `db:"title" json:"title"`
-	Summary           string   `db:"summary" json:"summary"`
-	Skills            []string `db:"skills" json:"skills"`
-	Role              string   `db:"role" json:"role"`
-	Compensation      string   `db:"compensation" json:"compensation"`
-	Commitment        string   `db:"commitment" json:"commitment"`
-	CommitmentBand    string   `db:"commitment_band" json:"commitment_band"`
-	Duration          string   `db:"duration" json:"duration"`
-	Timezone          string   `db:"timezone" json:"timezone"`
-	Freshness         string   `db:"freshness" json:"freshness"`
-	Stage             string   `db:"stage" json:"stage"`
-	DesiredOutcome    string   `db:"desired_outcome" json:"desired_outcome"`
-	FirstMilestone    string   `db:"first_milestone" json:"first_milestone"`
-	OwnerContribution string   `db:"owner_contribution" json:"owner_contribution"`
-	OwnerName         string   `db:"owner_name" json:"owner_name"`
-	OwnerSignal       string   `db:"owner_signal" json:"owner_signal"`
-	Confidentiality   string   `db:"confidentiality" json:"confidentiality"`
+	ID                string             `db:"id" json:"id"`
+	Title             string             `db:"title" json:"title"`
+	Summary           string             `db:"summary" json:"summary"`
+	Skills            []string           `db:"skills" json:"skills"`
+	Role              string             `db:"role" json:"role"`
+	Compensation      string             `db:"compensation" json:"compensation"`
+	Commitment        string             `db:"commitment" json:"commitment"`
+	CommitmentBand    string             `db:"commitment_band" json:"commitment_band"`
+	Duration          string             `db:"duration" json:"duration"`
+	Timezone          string             `db:"timezone" json:"timezone"`
+	Freshness         string             `db:"freshness" json:"freshness"`
+	Stage             string             `db:"stage" json:"stage"`
+	DesiredOutcome    string             `db:"desired_outcome" json:"desired_outcome"`
+	FirstMilestone    string             `db:"first_milestone" json:"first_milestone"`
+	OwnerContribution string             `db:"owner_contribution" json:"owner_contribution"`
+	OwnerName         string             `db:"owner_name" json:"owner_name"`
+	OwnerSignal       string             `db:"owner_signal" json:"owner_signal"`
+	Confidentiality   string             `db:"confidentiality" json:"confidentiality"`
+	ExpiresAt         pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
 }
 
 func (q *Queries) ListOpenings(ctx context.Context, arg ListOpeningsParams) ([]ListOpeningsRow, error) {
@@ -302,6 +311,7 @@ func (q *Queries) ListOpenings(ctx context.Context, arg ListOpeningsParams) ([]L
 			&i.OwnerName,
 			&i.OwnerSignal,
 			&i.Confidentiality,
+			&i.ExpiresAt,
 		); err != nil {
 			return nil, err
 		}
@@ -318,32 +328,38 @@ SELECT
     id, title, summary, skills, role, compensation, commitment,
     commitment_band, duration, timezone, freshness, stage,
     desired_outcome, first_milestone, owner_contribution, owner_name,
-    owner_signal, confidentiality, publication_status
+    owner_signal, confidentiality,
+    (CASE
+        WHEN publication_status = 'published' AND expires_at <= now() THEN 'expired'
+        ELSE publication_status
+    END)::text AS publication_status,
+    expires_at
 FROM project_openings
 WHERE owner_user_id = $1
 ORDER BY updated_at DESC, id
 `
 
 type ListOwnedOpeningsRow struct {
-	ID                string   `db:"id" json:"id"`
-	Title             string   `db:"title" json:"title"`
-	Summary           string   `db:"summary" json:"summary"`
-	Skills            []string `db:"skills" json:"skills"`
-	Role              string   `db:"role" json:"role"`
-	Compensation      string   `db:"compensation" json:"compensation"`
-	Commitment        string   `db:"commitment" json:"commitment"`
-	CommitmentBand    string   `db:"commitment_band" json:"commitment_band"`
-	Duration          string   `db:"duration" json:"duration"`
-	Timezone          string   `db:"timezone" json:"timezone"`
-	Freshness         string   `db:"freshness" json:"freshness"`
-	Stage             string   `db:"stage" json:"stage"`
-	DesiredOutcome    string   `db:"desired_outcome" json:"desired_outcome"`
-	FirstMilestone    string   `db:"first_milestone" json:"first_milestone"`
-	OwnerContribution string   `db:"owner_contribution" json:"owner_contribution"`
-	OwnerName         string   `db:"owner_name" json:"owner_name"`
-	OwnerSignal       string   `db:"owner_signal" json:"owner_signal"`
-	Confidentiality   string   `db:"confidentiality" json:"confidentiality"`
-	PublicationStatus string   `db:"publication_status" json:"publication_status"`
+	ID                string             `db:"id" json:"id"`
+	Title             string             `db:"title" json:"title"`
+	Summary           string             `db:"summary" json:"summary"`
+	Skills            []string           `db:"skills" json:"skills"`
+	Role              string             `db:"role" json:"role"`
+	Compensation      string             `db:"compensation" json:"compensation"`
+	Commitment        string             `db:"commitment" json:"commitment"`
+	CommitmentBand    string             `db:"commitment_band" json:"commitment_band"`
+	Duration          string             `db:"duration" json:"duration"`
+	Timezone          string             `db:"timezone" json:"timezone"`
+	Freshness         string             `db:"freshness" json:"freshness"`
+	Stage             string             `db:"stage" json:"stage"`
+	DesiredOutcome    string             `db:"desired_outcome" json:"desired_outcome"`
+	FirstMilestone    string             `db:"first_milestone" json:"first_milestone"`
+	OwnerContribution string             `db:"owner_contribution" json:"owner_contribution"`
+	OwnerName         string             `db:"owner_name" json:"owner_name"`
+	OwnerSignal       string             `db:"owner_signal" json:"owner_signal"`
+	Confidentiality   string             `db:"confidentiality" json:"confidentiality"`
+	PublicationStatus string             `db:"publication_status" json:"publication_status"`
+	ExpiresAt         pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
 }
 
 func (q *Queries) ListOwnedOpenings(ctx context.Context, ownerUserID *int64) ([]ListOwnedOpeningsRow, error) {
@@ -375,6 +391,7 @@ func (q *Queries) ListOwnedOpenings(ctx context.Context, ownerUserID *int64) ([]
 			&i.OwnerSignal,
 			&i.Confidentiality,
 			&i.PublicationStatus,
+			&i.ExpiresAt,
 		); err != nil {
 			return nil, err
 		}
@@ -392,6 +409,7 @@ UPDATE project_openings SET
     freshness = 'Published just now',
     stage = 'Open for collaborators',
     published_at = now(),
+    expires_at = now() + INTERVAL '30 days',
     closed_at = NULL,
     updated_at = now()
 WHERE id = $1
@@ -401,7 +419,7 @@ RETURNING
     id, title, summary, skills, role, compensation, commitment,
     commitment_band, duration, timezone, freshness, stage,
     desired_outcome, first_milestone, owner_contribution, owner_name,
-    owner_signal, confidentiality, publication_status
+    owner_signal, confidentiality, publication_status, expires_at
 `
 
 type PublishOwnedDraftParams struct {
@@ -410,25 +428,26 @@ type PublishOwnedDraftParams struct {
 }
 
 type PublishOwnedDraftRow struct {
-	ID                string   `db:"id" json:"id"`
-	Title             string   `db:"title" json:"title"`
-	Summary           string   `db:"summary" json:"summary"`
-	Skills            []string `db:"skills" json:"skills"`
-	Role              string   `db:"role" json:"role"`
-	Compensation      string   `db:"compensation" json:"compensation"`
-	Commitment        string   `db:"commitment" json:"commitment"`
-	CommitmentBand    string   `db:"commitment_band" json:"commitment_band"`
-	Duration          string   `db:"duration" json:"duration"`
-	Timezone          string   `db:"timezone" json:"timezone"`
-	Freshness         string   `db:"freshness" json:"freshness"`
-	Stage             string   `db:"stage" json:"stage"`
-	DesiredOutcome    string   `db:"desired_outcome" json:"desired_outcome"`
-	FirstMilestone    string   `db:"first_milestone" json:"first_milestone"`
-	OwnerContribution string   `db:"owner_contribution" json:"owner_contribution"`
-	OwnerName         string   `db:"owner_name" json:"owner_name"`
-	OwnerSignal       string   `db:"owner_signal" json:"owner_signal"`
-	Confidentiality   string   `db:"confidentiality" json:"confidentiality"`
-	PublicationStatus string   `db:"publication_status" json:"publication_status"`
+	ID                string             `db:"id" json:"id"`
+	Title             string             `db:"title" json:"title"`
+	Summary           string             `db:"summary" json:"summary"`
+	Skills            []string           `db:"skills" json:"skills"`
+	Role              string             `db:"role" json:"role"`
+	Compensation      string             `db:"compensation" json:"compensation"`
+	Commitment        string             `db:"commitment" json:"commitment"`
+	CommitmentBand    string             `db:"commitment_band" json:"commitment_band"`
+	Duration          string             `db:"duration" json:"duration"`
+	Timezone          string             `db:"timezone" json:"timezone"`
+	Freshness         string             `db:"freshness" json:"freshness"`
+	Stage             string             `db:"stage" json:"stage"`
+	DesiredOutcome    string             `db:"desired_outcome" json:"desired_outcome"`
+	FirstMilestone    string             `db:"first_milestone" json:"first_milestone"`
+	OwnerContribution string             `db:"owner_contribution" json:"owner_contribution"`
+	OwnerName         string             `db:"owner_name" json:"owner_name"`
+	OwnerSignal       string             `db:"owner_signal" json:"owner_signal"`
+	Confidentiality   string             `db:"confidentiality" json:"confidentiality"`
+	PublicationStatus string             `db:"publication_status" json:"publication_status"`
+	ExpiresAt         pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
 }
 
 func (q *Queries) PublishOwnedDraft(ctx context.Context, arg PublishOwnedDraftParams) (PublishOwnedDraftRow, error) {
@@ -454,6 +473,7 @@ func (q *Queries) PublishOwnedDraft(ctx context.Context, arg PublishOwnedDraftPa
 		&i.OwnerSignal,
 		&i.Confidentiality,
 		&i.PublicationStatus,
+		&i.ExpiresAt,
 	)
 	return i, err
 }
@@ -482,7 +502,7 @@ RETURNING
     id, title, summary, skills, role, compensation, commitment,
     commitment_band, duration, timezone, freshness, stage,
     desired_outcome, first_milestone, owner_contribution, owner_name,
-    owner_signal, confidentiality, publication_status
+    owner_signal, confidentiality, publication_status, expires_at
 `
 
 type UpdateOwnedDraftParams struct {
@@ -505,25 +525,26 @@ type UpdateOwnedDraftParams struct {
 }
 
 type UpdateOwnedDraftRow struct {
-	ID                string   `db:"id" json:"id"`
-	Title             string   `db:"title" json:"title"`
-	Summary           string   `db:"summary" json:"summary"`
-	Skills            []string `db:"skills" json:"skills"`
-	Role              string   `db:"role" json:"role"`
-	Compensation      string   `db:"compensation" json:"compensation"`
-	Commitment        string   `db:"commitment" json:"commitment"`
-	CommitmentBand    string   `db:"commitment_band" json:"commitment_band"`
-	Duration          string   `db:"duration" json:"duration"`
-	Timezone          string   `db:"timezone" json:"timezone"`
-	Freshness         string   `db:"freshness" json:"freshness"`
-	Stage             string   `db:"stage" json:"stage"`
-	DesiredOutcome    string   `db:"desired_outcome" json:"desired_outcome"`
-	FirstMilestone    string   `db:"first_milestone" json:"first_milestone"`
-	OwnerContribution string   `db:"owner_contribution" json:"owner_contribution"`
-	OwnerName         string   `db:"owner_name" json:"owner_name"`
-	OwnerSignal       string   `db:"owner_signal" json:"owner_signal"`
-	Confidentiality   string   `db:"confidentiality" json:"confidentiality"`
-	PublicationStatus string   `db:"publication_status" json:"publication_status"`
+	ID                string             `db:"id" json:"id"`
+	Title             string             `db:"title" json:"title"`
+	Summary           string             `db:"summary" json:"summary"`
+	Skills            []string           `db:"skills" json:"skills"`
+	Role              string             `db:"role" json:"role"`
+	Compensation      string             `db:"compensation" json:"compensation"`
+	Commitment        string             `db:"commitment" json:"commitment"`
+	CommitmentBand    string             `db:"commitment_band" json:"commitment_band"`
+	Duration          string             `db:"duration" json:"duration"`
+	Timezone          string             `db:"timezone" json:"timezone"`
+	Freshness         string             `db:"freshness" json:"freshness"`
+	Stage             string             `db:"stage" json:"stage"`
+	DesiredOutcome    string             `db:"desired_outcome" json:"desired_outcome"`
+	FirstMilestone    string             `db:"first_milestone" json:"first_milestone"`
+	OwnerContribution string             `db:"owner_contribution" json:"owner_contribution"`
+	OwnerName         string             `db:"owner_name" json:"owner_name"`
+	OwnerSignal       string             `db:"owner_signal" json:"owner_signal"`
+	Confidentiality   string             `db:"confidentiality" json:"confidentiality"`
+	PublicationStatus string             `db:"publication_status" json:"publication_status"`
+	ExpiresAt         pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
 }
 
 func (q *Queries) UpdateOwnedDraft(ctx context.Context, arg UpdateOwnedDraftParams) (UpdateOwnedDraftRow, error) {
@@ -566,6 +587,7 @@ func (q *Queries) UpdateOwnedDraft(ctx context.Context, arg UpdateOwnedDraftPara
 		&i.OwnerSignal,
 		&i.Confidentiality,
 		&i.PublicationStatus,
+		&i.ExpiresAt,
 	)
 	return i, err
 }

@@ -25,6 +25,7 @@ export type ProjectOpening = {
   ownerName: string;
   ownerSignal: string;
   confidentiality: string;
+  expiresAt: string;
 };
 
 export type ProjectFilters = {
@@ -62,6 +63,7 @@ export const projects: ProjectOpening[] = [
     ownerName: 'Maya Chen',
     ownerSignal: 'Collaboration Proven · 3 projects',
     confidentiality: 'Public project with limited repository access during the trial.',
+    expiresAt: '2099-01-30T00:00:00Z',
   },
   {
     id: 'accessible-finance',
@@ -82,6 +84,7 @@ export const projects: ProjectOpening[] = [
     ownerName: 'Noah Williams',
     ownerSignal: 'Work Demonstrated · 2 shipped products',
     confidentiality: 'Limited details until both people accept a short confidentiality agreement.',
+    expiresAt: '2099-01-30T00:00:00Z',
   },
   {
     id: 'research-assistant',
@@ -102,6 +105,7 @@ export const projects: ProjectOpening[] = [
     ownerName: 'Elena García',
     ownerSignal: 'Skill Screened · AI evaluation',
     confidentiality: 'Confidential dataset; the trial uses a sandbox and synthetic documents.',
+    expiresAt: '2099-01-30T00:00:00Z',
   },
   {
     id: 'open-source-onboarding',
@@ -122,6 +126,7 @@ export const projects: ProjectOpening[] = [
     ownerName: 'Arjun Mehta',
     ownerSignal: 'Collaboration Proven · 5 projects',
     confidentiality: 'Public research; participants remain anonymous in published notes.',
+    expiresAt: '2099-01-30T00:00:00Z',
   },
   {
     id: 'developer-portfolio',
@@ -142,6 +147,7 @@ export const projects: ProjectOpening[] = [
     ownerName: 'Sofia Kim',
     ownerSignal: 'Work Demonstrated · design engineering',
     confidentiality: 'Public project; all reusable assets will have an explicit open-source license.',
+    expiresAt: '2099-01-30T00:00:00Z',
   },
 ];
 
@@ -226,6 +232,8 @@ function parseProjectOpening(value: unknown): ProjectOpening {
     || !projectRoles.includes(opening.role as ProjectRole)
     || !compensationTypes.includes(opening.compensation as CompensationType)
     || !commitmentBands.includes(opening.commitmentBand as CommitmentBand)
+    || typeof opening.expiresAt !== 'string'
+    || Number.isNaN(Date.parse(opening.expiresAt))
     || !Array.isArray(skills)
     || skills.length < 1
     || skills.length > 12
@@ -254,6 +262,7 @@ function parseProjectOpening(value: unknown): ProjectOpening {
     ownerName: (opening.ownerName as string).trim(),
     ownerSignal: (opening.ownerSignal as string).trim(),
     confidentiality: (opening.confidentiality as string).trim(),
+    expiresAt: opening.expiresAt as string,
   };
 }
 

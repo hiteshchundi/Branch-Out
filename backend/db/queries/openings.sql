@@ -17,10 +17,12 @@ SELECT
     owner_contribution,
     owner_name,
     owner_signal,
-    confidentiality
+    confidentiality,
+    expires_at
 FROM project_openings
 WHERE
     publication_status = 'published'
+    AND expires_at > now()
     AND (sqlc.arg(role)::text = '' OR role = sqlc.arg(role)::text)
     AND (sqlc.arg(compensation)::text = '' OR compensation = sqlc.arg(compensation)::text)
     AND (sqlc.arg(commitment)::text = '' OR commitment_band = sqlc.arg(commitment)::text)
@@ -49,7 +51,12 @@ SELECT
     id, title, summary, skills, role, compensation, commitment,
     commitment_band, duration, timezone, freshness, stage,
     desired_outcome, first_milestone, owner_contribution, owner_name,
-    owner_signal, confidentiality, publication_status
+    owner_signal, confidentiality,
+    (CASE
+        WHEN publication_status = 'published' AND expires_at <= now() THEN 'expired'
+        ELSE publication_status
+    END)::text AS publication_status,
+    expires_at
 FROM project_openings
 WHERE owner_user_id = sqlc.arg(owner_user_id)
 ORDER BY updated_at DESC, id;
@@ -74,7 +81,7 @@ RETURNING
     id, title, summary, skills, role, compensation, commitment,
     commitment_band, duration, timezone, freshness, stage,
     desired_outcome, first_milestone, owner_contribution, owner_name,
-    owner_signal, confidentiality, publication_status;
+    owner_signal, confidentiality, publication_status, expires_at;
 
 -- name: PublishOwnedDraft :one
 UPDATE project_openings SET
@@ -82,6 +89,7 @@ UPDATE project_openings SET
     freshness = 'Published just now',
     stage = 'Open for collaborators',
     published_at = now(),
+    expires_at = now() + INTERVAL '30 days',
     closed_at = NULL,
     updated_at = now()
 WHERE id = sqlc.arg(id)
@@ -91,7 +99,7 @@ RETURNING
     id, title, summary, skills, role, compensation, commitment,
     commitment_band, duration, timezone, freshness, stage,
     desired_outcome, first_milestone, owner_contribution, owner_name,
-    owner_signal, confidentiality, publication_status;
+    owner_signal, confidentiality, publication_status, expires_at;
 
 -- name: CloseOwnedOpening :one
 UPDATE project_openings SET
@@ -107,7 +115,7 @@ RETURNING
     id, title, summary, skills, role, compensation, commitment,
     commitment_band, duration, timezone, freshness, stage,
     desired_outcome, first_milestone, owner_contribution, owner_name,
-    owner_signal, confidentiality, publication_status;
+    owner_signal, confidentiality, publication_status, expires_at;
 
 -- name: UpdateOwnedDraft :one
 UPDATE project_openings SET
@@ -133,4 +141,4 @@ RETURNING
     id, title, summary, skills, role, compensation, commitment,
     commitment_band, duration, timezone, freshness, stage,
     desired_outcome, first_milestone, owner_contribution, owner_name,
-    owner_signal, confidentiality, publication_status;
+    owner_signal, confidentiality, publication_status, expires_at;

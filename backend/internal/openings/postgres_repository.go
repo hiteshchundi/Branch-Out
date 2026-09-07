@@ -3,9 +3,11 @@ package openings
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/hiteshchundi/branch-out/backend/internal/database"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type PostgresRepository struct {
@@ -23,7 +25,7 @@ func (repository *PostgresRepository) ListOwned(ctx context.Context, userID int6
 			row.ID, row.Title, row.Summary, row.Skills, row.Role, row.Compensation,
 			row.Commitment, row.CommitmentBand, row.Duration, row.Timezone, row.Freshness,
 			row.Stage, row.DesiredOutcome, row.FirstMilestone, row.OwnerContribution,
-			row.OwnerName, row.OwnerSignal, row.Confidentiality, row.PublicationStatus,
+			row.OwnerName, row.OwnerSignal, row.Confidentiality, row.PublicationStatus, row.ExpiresAt,
 		))
 	}
 	return results, nil
@@ -48,7 +50,7 @@ func (repository *PostgresRepository) CreateDraft(ctx context.Context, record dr
 		row.ID, row.Title, row.Summary, row.Skills, row.Role, row.Compensation,
 		row.Commitment, row.CommitmentBand, row.Duration, row.Timezone, row.Freshness,
 		row.Stage, row.DesiredOutcome, row.FirstMilestone, row.OwnerContribution,
-		row.OwnerName, row.OwnerSignal, row.Confidentiality, row.PublicationStatus,
+		row.OwnerName, row.OwnerSignal, row.Confidentiality, row.PublicationStatus, row.ExpiresAt,
 	), nil
 }
 
@@ -73,7 +75,7 @@ func (repository *PostgresRepository) UpdateDraft(ctx context.Context, id string
 		row.ID, row.Title, row.Summary, row.Skills, row.Role, row.Compensation,
 		row.Commitment, row.CommitmentBand, row.Duration, row.Timezone, row.Freshness,
 		row.Stage, row.DesiredOutcome, row.FirstMilestone, row.OwnerContribution,
-		row.OwnerName, row.OwnerSignal, row.Confidentiality, row.PublicationStatus,
+		row.OwnerName, row.OwnerSignal, row.Confidentiality, row.PublicationStatus, row.ExpiresAt,
 	), nil
 }
 
@@ -97,7 +99,7 @@ func (repository *PostgresRepository) CloseOpening(ctx context.Context, userID i
 		row.ID, row.Title, row.Summary, row.Skills, row.Role, row.Compensation,
 		row.Commitment, row.CommitmentBand, row.Duration, row.Timezone, row.Freshness,
 		row.Stage, row.DesiredOutcome, row.FirstMilestone, row.OwnerContribution,
-		row.OwnerName, row.OwnerSignal, row.Confidentiality, row.PublicationStatus,
+		row.OwnerName, row.OwnerSignal, row.Confidentiality, row.PublicationStatus, row.ExpiresAt,
 	), nil
 }
 
@@ -117,7 +119,7 @@ func (repository *PostgresRepository) transition(
 		row.ID, row.Title, row.Summary, row.Skills, row.Role, row.Compensation,
 		row.Commitment, row.CommitmentBand, row.Duration, row.Timezone, row.Freshness,
 		row.Stage, row.DesiredOutcome, row.FirstMilestone, row.OwnerContribution,
-		row.OwnerName, row.OwnerSignal, row.Confidentiality, row.PublicationStatus,
+		row.OwnerName, row.OwnerSignal, row.Confidentiality, row.PublicationStatus, row.ExpiresAt,
 	), nil
 }
 
@@ -125,7 +127,7 @@ func managedOpening(
 	id, title, summary string, skills []string, role, compensation, commitment,
 	commitmentBand, duration, timezone, freshness, stage, desiredOutcome,
 	firstMilestone, ownerContribution, ownerName, ownerSignal, confidentiality,
-	publicationStatus string,
+	publicationStatus string, expiresAt pgtype.Timestamptz,
 ) ManagedOpening {
 	return ManagedOpening{
 		Opening: Opening{
@@ -136,9 +138,18 @@ func managedOpening(
 			DesiredOutcome: desiredOutcome, FirstMilestone: firstMilestone,
 			OwnerContribution: ownerContribution, OwnerName: ownerName,
 			OwnerSignal: ownerSignal, Confidentiality: confidentiality,
+			ExpiresAt: expiryTime(expiresAt),
 		},
 		PublicationStatus: publicationStatus,
 	}
+}
+
+func expiryTime(value pgtype.Timestamptz) *time.Time {
+	if !value.Valid {
+		return nil
+	}
+	expiresAt := value.Time
+	return &expiresAt
 }
 
 func NewPostgresRepository(queries *database.Queries) *PostgresRepository {
@@ -166,7 +177,7 @@ func (repository *PostgresRepository) List(ctx context.Context, filters Filters)
 			Stage: row.Stage, DesiredOutcome: row.DesiredOutcome,
 			FirstMilestone: row.FirstMilestone, OwnerContribution: row.OwnerContribution,
 			OwnerName: row.OwnerName, OwnerSignal: row.OwnerSignal,
-			Confidentiality: row.Confidentiality,
+			Confidentiality: row.Confidentiality, ExpiresAt: expiryTime(row.ExpiresAt),
 		})
 	}
 

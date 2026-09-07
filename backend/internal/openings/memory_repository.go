@@ -1,6 +1,9 @@
 package openings
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 type MemoryRepository struct {
 	openings []Opening
@@ -18,7 +21,7 @@ func (repository *MemoryRepository) List(ctx context.Context, filters Filters) (
 
 	matches := make([]Opening, 0, len(repository.openings))
 	for _, opening := range repository.openings {
-		if Matches(opening, filters) {
+		if IsDiscoverable(opening, time.Now()) && Matches(opening, filters) {
 			matches = append(matches, opening)
 		}
 	}

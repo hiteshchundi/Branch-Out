@@ -129,6 +129,12 @@ func TestPostgresApplicationLifecycle(t *testing.T) {
 	if _, err := manager.SaveDraft(ctx, thirdApplicant.ID, opening.ID, validInput()); err != nil {
 		t.Fatalf("third applicant SaveDraft() error = %v", err)
 	}
+	if _, err := pool.Exec(ctx, `UPDATE project_openings SET published_at = now() - INTERVAL '31 days', expires_at = now() - INTERVAL '1 day' WHERE id = $1`, opening.ID); err != nil {
+		t.Fatalf("expire opening: %v", err)
+	}
+	if _, err := manager.Submit(ctx, thirdApplicant.ID, opening.ID); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("expired opening Submit() error = %v, want ErrUnavailable", err)
+	}
 	if _, err := openingManager.CloseOpening(ctx, owner.ID, opening.ID); err != nil {
 		t.Fatalf("CloseOpening() error = %v", err)
 	}

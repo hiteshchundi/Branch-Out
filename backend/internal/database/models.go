@@ -90,6 +90,7 @@ type ProjectOpening struct {
 	PublicationStatus string             `db:"publication_status" json:"publication_status"`
 	PublishedAt       pgtype.Timestamptz `db:"published_at" json:"published_at"`
 	ClosedAt          pgtype.Timestamptz `db:"closed_at" json:"closed_at"`
+	ExpiresAt         pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
 }
 
 type SafetyReport struct {

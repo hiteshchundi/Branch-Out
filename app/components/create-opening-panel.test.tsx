@@ -36,7 +36,7 @@ const authenticatedUser: AuthenticatedUser = {
 
 function managedDraft(
   projectName = completeDraft.projectName,
-  publicationStatus: 'draft' | 'published' | 'closed' = 'draft',
+  publicationStatus: 'draft' | 'published' | 'expired' | 'closed' = 'draft',
 ) {
   return {
     id: '61616161-6161-4161-a161-616161616161',
@@ -52,6 +52,7 @@ function managedDraft(
     ownerContribution: completeDraft.ownerContribution,
     confidentiality: 'Public project details; no private credentials or client-confidential material.',
     publicationStatus,
+    expiresAt: publicationStatus === 'draft' ? null : '2026-10-07T00:00:00Z',
   };
 }
 
@@ -188,6 +189,23 @@ describe('CreateOpeningPanel', () => {
     expect(await screen.findByText('Opening closed')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /start another draft/i })).toBeInTheDocument();
     expect(onOpeningChanged).toHaveBeenCalledOnce();
+  });
+
+  it('explains an expired opening and preserves its private application review', async () => {
+    const expired = managedDraft(completeDraft.projectName, 'expired');
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [expired] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 }));
+    vi.stubGlobal('fetch', fetcher);
+    render(<CreateOpeningPanel authenticatedUser={authenticatedUser} onClose={vi.fn()} />);
+
+    expect(await screen.findByText('Opening expired')).toBeInTheDocument();
+    expect(screen.getByText(/30-day application window ended/i)).toBeInTheDocument();
+    expect(screen.getByText('7 Oct 2026')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /close opening/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /submitted applications/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /start another draft/i })).toBeInTheDocument();
   });
 
   it('shows only submitted applications in the private owner review', async () => {

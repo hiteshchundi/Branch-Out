@@ -1695,6 +1695,7 @@ components:
         - ownerName
         - ownerSignal
         - confidentiality
+        - expiresAt
       properties:
         id:
           type: string
@@ -1734,6 +1735,10 @@ components:
           type: string
         confidentiality:
           type: string
+        expiresAt:
+          description: The fixed 30-day application deadline. Null while the opening is a private draft.
+          type: [string, 'null']
+          format: date-time
     ManagedOpening:
       allOf:
         - $ref: '#/components/schemas/Opening'
@@ -1742,7 +1747,7 @@ components:
           properties:
             publicationStatus:
               type: string
-              enum: [draft, published, closed]
+              enum: [draft, published, expired, closed]
     OpeningDraftInput:
       type: object
       additionalProperties: false

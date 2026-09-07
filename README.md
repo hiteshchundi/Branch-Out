@@ -30,6 +30,7 @@ kind of evidence that people can consider when choosing a collaborator.
 - Create a collaboration profile supported by public work evidence.
 - Apply to a specific project with a relevant sample and proposed first step.
 - Post a project with clear scope, expectations, and compensation.
+- Keep discovery current with a visible 30-day application deadline.
 - Plan a bounded two-week trial before making a larger commitment.
 - Record trial outcomes and build explainable trust from completed work.
 - Report safety concerns and use the available review and appeal processes.

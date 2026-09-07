@@ -40,6 +40,10 @@ import { useAccessibleDialog } from './use-accessible-dialog';
 
 const SAVED_PROJECTS_CHANGED_EVENT = 'branch-out-saved-projects-changed';
 
+function formatApplicationDeadline(value: string) {
+  return new Date(value).toLocaleDateString('en-GB', { dateStyle: 'medium', timeZone: 'UTC' });
+}
+
 /** Subscribes React to saved-opening changes from this tab and other tabs. */
 function subscribeToSavedProjects(onStoreChange: () => void) {
   window.addEventListener('storage', onStoreChange);
@@ -194,6 +198,7 @@ function ProjectDetailPanel({
           <div><span>Commitment</span><strong>{project.commitment}</strong></div>
           <div><span>Duration</span><strong>{project.duration}</strong></div>
           <div><span>Overlap</span><strong>{project.timezone}</strong></div>
+          <div><span>Apply by</span><strong>{formatApplicationDeadline(project.expiresAt)}</strong></div>
         </div>
 
         <div className="detail-sections">
@@ -711,6 +716,7 @@ export function HomeExperience() {
                     <div><dt>Commitment</dt><dd>{project.commitment}</dd></div>
                     <div><dt>Duration</dt><dd>{project.duration}</dd></div>
                     <div><dt>Overlap</dt><dd>{project.timezone}</dd></div>
+                    <div><dt>Apply by</dt><dd>{formatApplicationDeadline(project.expiresAt)}</dd></div>
                   </dl>
                   <div className="card-actions">
                     <button

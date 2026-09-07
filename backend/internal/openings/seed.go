@@ -1,9 +1,11 @@
 package openings
 
+import "time"
+
 // Seed mirrors the representative frontend catalogue until PostgreSQL becomes
 // the single source of truth in the persistence milestone.
 func Seed() []Opening {
-	return []Opening{
+	openings := []Opening{
 		{
 			ID: "climate-data-explorer", Title: "Frontend engineer for a climate data explorer",
 			Summary: "Turn open emissions data into a fast, understandable planning tool for local teams.",
@@ -65,4 +67,9 @@ func Seed() []Opening {
 			Confidentiality: "Public project; all reusable assets will have an explicit open-source license.",
 		},
 	}
+	expiresAt := time.Date(2099, time.January, 30, 0, 0, 0, 0, time.UTC)
+	for index := range openings {
+		openings[index].ExpiresAt = &expiresAt
+	}
+	return openings
 }

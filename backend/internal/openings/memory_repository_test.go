@@ -3,6 +3,7 @@ package openings
 import (
 	"context"
 	"testing"
+	"time"
 )
 
 func TestMemoryRepositoryList(t *testing.T) {
@@ -44,5 +45,19 @@ func TestMemoryRepositoryHonorsCancelledContext(t *testing.T) {
 
 	if _, err := repository.List(ctx, Filters{}); err != context.Canceled {
 		t.Fatalf("List() error = %v, want context.Canceled", err)
+	}
+}
+
+func TestMemoryRepositoryExcludesExpiredOpenings(t *testing.T) {
+	now := time.Now()
+	expiredAt := now.Add(-time.Minute)
+	activeAt := now.Add(time.Hour)
+	seed := Seed()[:2]
+	seed[0].ExpiresAt = &expiredAt
+	seed[1].ExpiresAt = &activeAt
+
+	got, err := NewMemoryRepository(seed).List(context.Background(), Filters{})
+	if err != nil || len(got) != 1 || got[0].ID != seed[1].ID {
+		t.Fatalf("List() = %#v, %v; want only active opening", got, err)
 	}
 }
