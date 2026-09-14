@@ -2,13 +2,19 @@ SQLC_VERSION := v1.31.1
 GOOSE_VERSION := v3.27.3
 DATABASE_URL ?= postgres://branch_out:branch_out@localhost:5432/branch_out?sslmode=disable
 
-.PHONY: db-up db-down generate migrate-up migrate-down migrate-status test test-integration vet
+.PHONY: db-up db-down stack-up stack-down generate migrate-up migrate-down migrate-status test test-integration vet
 
 db-up:
 	docker compose up -d postgres
 
 db-down:
 	docker compose stop postgres
+
+stack-up:
+	docker compose up --build -d api
+
+stack-down:
+	docker compose stop api postgres
 
 generate:
 	go run github.com/sqlc-dev/sqlc/cmd/sqlc@$(SQLC_VERSION) generate

@@ -16,5 +16,39 @@ services:
       # PostgreSQL 18 stores its versioned PGDATA directory under this parent.
       - branch_out_postgres_data:/var/lib/postgresql
 
+  migrate:
+    build:
+      context: .
+    entrypoint: ["/app/goose"]
+    command:
+      - -dir
+      - /app/migrations
+      - postgres
+      - postgres://branch_out:branch_out@postgres:5432/branch_out?sslmode=disable
+      - up
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build:
+      context: .
+    environment:
+      BRANCH_OUT_ALLOWED_ORIGIN: ${BRANCH_OUT_ALLOWED_ORIGIN:-http://localhost:3000}
+      BRANCH_OUT_API_ADDRESS: :8080
+      BRANCH_OUT_COOKIE_SECURE: ${BRANCH_OUT_COOKIE_SECURE:-false}
+      BRANCH_OUT_DATABASE_URL: postgres://branch_out:branch_out@postgres:5432/branch_out?sslmode=disable
+      BRANCH_OUT_FRONTEND_URL: ${BRANCH_OUT_FRONTEND_URL:-http://localhost:3000/}
+      BRANCH_OUT_GITHUB_CALLBACK_URL: ${BRANCH_OUT_GITHUB_CALLBACK_URL:-http://localhost:8080/v1/auth/github/callback}
+      BRANCH_OUT_GITHUB_CLIENT_ID: ${BRANCH_OUT_GITHUB_CLIENT_ID:-}
+      BRANCH_OUT_GITHUB_CLIENT_SECRET: ${BRANCH_OUT_GITHUB_CLIENT_SECRET:-}
+    ports:
+      - "${BRANCH_OUT_API_PORT:-8080}:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
 volumes:
   branch_out_postgres_data:
